@@ -101,6 +101,16 @@ const [messages, setMessages] = useState<Message[]>([
   },
 ])
 
+// Counter to ensure unique IDs even when Date.now() is the same
+const [idCounter, setIdCounter] = useState(0);
+
+// Function to generate unique IDs
+const generateUniqueId = () => {
+  const uniqueId = `${Date.now()}-${idCounter}`;
+  setIdCounter(idCounter + 1);
+  return uniqueId;
+};
+
 // Fetch user profile data
 useEffect(() => {
   const fetchProfileData = async () => {
@@ -200,7 +210,7 @@ useEffect(() => {
     setMessages((prevMessages) => [
       ...prevMessages,
       {
-        id: Date.now().toString(),
+        id: generateUniqueId(),
         role: "assistant",
         content: contextMessage,
         timestamp: new Date(),
@@ -211,14 +221,14 @@ useEffect(() => {
     // Open the chat when context is provided
     setIsOpen(true)
   }
-}, [initialContext, messages])
+}, [initialContext, messages, idCounter])
 
 // Use useCallback for handleSendMessage to prevent unnecessary re-renders
 const handleSendMessage = useCallback(async () => {
   if (!input.trim()) return
 
   const userMessage: Message = {
-    id: Date.now().toString(),
+    id: generateUniqueId(),
     role: "user",
     content: input,
     timestamp: new Date(),
@@ -255,7 +265,7 @@ const handleSendMessage = useCallback(async () => {
     const text = data.text;
 
     const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
+      id: generateUniqueId(),
       role: "assistant",
       content: text,
       timestamp: new Date(),
@@ -272,7 +282,7 @@ const handleSendMessage = useCallback(async () => {
   } finally {
     setIsTyping(false)
   }
-}, [input, toast, profileData])
+}, [input, toast, profileData, idCounter, generateUniqueId])
 
 // Use useCallback for handleKeyDown to prevent unnecessary re-renders
 const handleKeyDown = useCallback(

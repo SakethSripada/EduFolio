@@ -60,6 +60,7 @@ export default function EssaysTab() {
   const [isLoading, setIsLoading] = useState(true)
   const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [idCounter, setIdCounter] = useState(0)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -68,6 +69,13 @@ export default function EssaysTab() {
 
   // Add a new state variable to store the essay content
   const [essayContent, setEssayContent] = useState<string>("")
+
+  // Function to generate unique IDs
+  const generateUniqueId = () => {
+    const uniqueId = `${Date.now()}-${idCounter}`;
+    setIdCounter(prev => prev + 1);
+    return uniqueId;
+  };
 
   const performDatabaseOperation = async (
     operation: () => Promise<any>,
@@ -212,7 +220,7 @@ export default function EssaysTab() {
               ...essayVersions,
               [data[0].id]: [
                 {
-                  id: Date.now().toString(), // Temporary ID until we fetch the real one
+                  id: generateUniqueId(), // Use the unique ID generator instead of Date.now()
                   essay_id: data[0].id,
                   content: newEssay.content,
                   word_count: wordCount,
