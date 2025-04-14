@@ -17,6 +17,7 @@ import { calculateWordCount, calculateCharacterCount, validateRequired } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 
 type Essay = {
   id: string
@@ -581,10 +582,16 @@ export default function EssaysTab() {
                   <strong>Prompt:</strong> {essay.prompt}
                 </div>
                 {editingEssay === index ? (
-                  <Textarea
-                    className="min-h-[200px] font-serif"
-                    value={essayContent}
-                    onChange={(e) => handleEssayContentChange(e.target.value)}
+                  <SimpleEssayEditor
+                    content={essayContent}
+                    onChange={handleEssayContentChange}
+                    onSave={() => {
+                      setEditingEssay(null)
+                      handleSaveEssayContent(essay, essayContent)
+                    }}
+                    wordCount={calculateWordCount(essayContent)}
+                    targetWordCount={essay.target_word_count}
+                    onShowHistory={() => setShowVersionHistory(essay.id)}
                   />
                 ) : (
                   <div className="p-4 bg-muted/50 rounded-md font-serif">
@@ -593,17 +600,7 @@ export default function EssaysTab() {
                 )}
               </CardContent>
               <CardFooter className="flex justify-end space-x-2 bg-muted/20">
-                {editingEssay === index ? (
-                  <Button
-                    variant="default"
-                    onClick={() => {
-                      setEditingEssay(null)
-                      handleSaveEssayContent(essay, essayContent)
-                    }}
-                  >
-                    <Save className="h-4 w-4 mr-1" /> Save
-                  </Button>
-                ) : (
+                {editingEssay === index ? null : (
                   <>
                     <Button
                       variant="outline"
