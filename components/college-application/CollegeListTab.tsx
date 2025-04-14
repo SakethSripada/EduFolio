@@ -59,6 +59,8 @@ export default function CollegeListTab() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const { user } = useAuth()
   const { toast } = useToast()
+  const [collegeSearchQuery, setCollegeSearchQuery] = useState("")
+  const [selectedColleges, setSelectedColleges] = useState<string[]>([])
 
   const [newUserCollege, setNewUserCollege] = useState({
     college_id: "",
@@ -138,81 +140,109 @@ export default function CollegeListTab() {
     return Object.keys(errors).length === 0
   }
 
-  const addCollege = async () => {
-    if (!user || !validateCollegeForm()) return
+  // Filter colleges based on search query for the add college dialog
+  const filteredCollegesForSelection = colleges.filter((college) => {
+    if (!collegeSearchQuery) return true;
+    return (
+      college.name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
+      college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase())
+    );
+  });
 
-    await performDatabaseOperation(
-      async () => {
+  // Toggle selection of a college
+  const toggleCollegeSelection = (collegeId: string) => {
+    setSelectedColleges((prev) => {
+      if (prev.includes(collegeId)) {
+        return prev.filter((id) => id !== collegeId);
+      } else {
+        return [...prev, collegeId];
+      }
+    });
+  };
+
+  // Add multiple selected colleges
+  const addSelectedColleges = async () => {
+    if (selectedColleges.length === 0) {
+      toast({
+        title: "No colleges selected",
+        description: "Please select at least one college to add.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Add each selected college
+      for (const collegeId of selectedColleges) {
+        const selectedCollege = colleges.find((c) => c.id === collegeId);
+        if (!selectedCollege) continue;
+
         // Check if college is already in user's list
         const { data: existingCollege, error: checkError } = await supabase
           .from("user_colleges")
           .select("id")
-          .eq("user_id", user.id)
-          .eq("college_id", newUserCollege.college_id)
-          .maybeSingle()
+          .eq("user_id", user?.id)
+          .eq("college_id", collegeId)
+          .maybeSingle();
 
-        if (checkError) throw checkError
+        if (checkError) throw checkError;
 
         if (existingCollege) {
-          throw new Error("This college is already in your list")
+          toast({
+            title: "College already in list",
+            description: `${selectedCollege.name} is already in your list.`,
+            variant: "destructive",
+          });
+          continue;
         }
 
         // Add college to user's list
-        const { data, error } = await supabase
-          .from("user_colleges")
-          .insert([
-            {
-              user_id: user.id,
-              college_id: newUserCollege.college_id,
-              application_status: newUserCollege.application_status,
-              application_deadline_display: newUserCollege.application_deadline_display || null,
-              is_reach: newUserCollege.is_reach,
-              is_target: newUserCollege.is_target,
-              is_safety: newUserCollege.is_safety,
-              is_favorite: newUserCollege.is_favorite,
-              notes: newUserCollege.notes || null,
-            },
-          ])
-          .select(`
+        const { error } = await supabase.from("user_colleges").insert([
+          {
+            user_id: user?.id,
+            college_id: collegeId,
+            application_status: "Researching",
+            is_reach: selectedCollege.acceptance_rate < 0.15,
+            is_target: selectedCollege.acceptance_rate >= 0.15 && selectedCollege.acceptance_rate < 0.35,
+            is_safety: selectedCollege.acceptance_rate >= 0.35,
+            is_favorite: false,
+          },
+        ]);
+
+        if (error) throw error;
+      }
+
+      // Refresh user's colleges
+      const { data: userCollegesData, error: userCollegesError } = await supabase
+        .from("user_colleges")
+        .select(`
           *,
           college:colleges(*)
         `)
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
 
-        if (error) throw error
+      if (userCollegesError) throw userCollegesError;
 
-        return data
-      },
-      setIsLoading,
-      (data) => {
-        if (data && data[0]) {
-          setUserColleges([data[0], ...userColleges])
-          setNewUserCollege({
-            college_id: "",
-            application_status: "Researching",
-            application_deadline_display: "",
-            is_reach: false,
-            is_target: false,
-            is_safety: false,
-            is_favorite: false,
-            notes: "",
-          })
-          setIsAddingCollege(false)
+      setUserColleges(userCollegesData || []);
+      setSelectedColleges([]);
+      setIsAddingCollege(false);
 
-          toast({
-            title: "College added",
-            description: "The college has been added to your list successfully.",
-          })
-        }
-      },
-      (error) => {
-        toast({
-          title: "Error adding college",
-          description: handleSupabaseError(error, "There was a problem adding the college to your list."),
-          variant: "destructive",
-        })
-      },
-    )
-  }
+      toast({
+        title: "Colleges added",
+        description: `Added ${selectedColleges.length} college(s) to your list.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error adding colleges",
+        description: handleSupabaseError(error, "There was a problem adding the colleges to your list."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const startEditCollege = (userCollegeId: string) => {
     const userCollegeToEdit = userColleges.find((uc) => uc.id === userCollegeId)
@@ -284,6 +314,7 @@ export default function CollegeListTab() {
           is_reach: false,
           is_target: false,
           is_safety: false,
+          is_favorite: false,
           notes: "",
         })
         setIsEditingCollege(false)
@@ -596,158 +627,87 @@ export default function CollegeListTab() {
       <Dialog open={isAddingCollege} onOpenChange={setIsAddingCollege}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Add College to Your List</DialogTitle>
+            <DialogTitle>Add Colleges to Your List</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="college">College</Label>
-              <Select
-                value={newUserCollege.college_id}
-                onValueChange={(value) => {
-                  const selectedCollege = colleges.find((c) => c.id === value)
-                  setNewUserCollege({
-                    ...newUserCollege,
-                    college_id: value,
-                    // Auto-categorize based on acceptance rate
-                    is_reach: selectedCollege ? selectedCollege.acceptance_rate < 0.15 : false,
-                    is_target: selectedCollege
-                      ? selectedCollege.acceptance_rate >= 0.15 && selectedCollege.acceptance_rate < 0.35
-                      : false,
-                    is_safety: selectedCollege ? selectedCollege.acceptance_rate >= 0.35 : false,
-                  })
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a college" />
-                </SelectTrigger>
-                <SelectContent>
-                  {colleges.map((college) => (
-                    <SelectItem key={college.id} value={college.id}>
-                      {college.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formErrors.college_id && <p className="text-sm text-red-500">{formErrors.college_id}</p>}
-
-              {newUserCollege.college_id && (
-                <div className="mt-2 p-3 bg-muted rounded-md">
-                  {(() => {
-                    const selectedCollege = colleges.find((c) => c.id === newUserCollege.college_id)
-                    if (!selectedCollege) return null
-
-                    return (
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">Location:</span>
-                          <span>{selectedCollege.location}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">Type:</span>
-                          <span>{selectedCollege.type}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">Size:</span>
-                          <span>{selectedCollege.size}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">Acceptance Rate:</span>
-                          <span>{(selectedCollege.acceptance_rate * 100).toFixed(1)}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">Ranking:</span>
-                          <span>#{selectedCollege.ranking}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">Tuition:</span>
-                          <span>${selectedCollege.tuition.toLocaleString()}/year</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
+              <Label htmlFor="college-search">Search Colleges</Label>
+              <Input
+                id="college-search"
+                placeholder="Search by name or location..."
+                value={collegeSearchQuery}
+                onChange={(e) => setCollegeSearchQuery(e.target.value)}
+                className="mb-2"
+              />
+              
+              <div className="border rounded-md max-h-[300px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead>College</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Acceptance Rate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCollegesForSelection.map((college) => (
+                      <TableRow 
+                        key={college.id}
+                        className={selectedColleges.includes(college.id) ? "bg-muted" : ""}
+                        onClick={() => toggleCollegeSelection(college.id)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedColleges.includes(college.id)}
+                            onChange={() => {}}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
+                        <TableCell>{college.name}</TableCell>
+                        <TableCell>{college.location}</TableCell>
+                        <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              
+              {selectedColleges.length > 0 && (
+                <div className="mt-2 p-2 bg-muted rounded-md">
+                  <p className="text-sm font-medium">Selected Colleges:</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {selectedColleges.map((collegeId) => {
+                      const college = colleges.find((c) => c.id === collegeId);
+                      if (!college) return null;
+                      return (
+                        <Badge key={collegeId} variant="outline" className="m-1">
+                          {college.name}
+                        </Badge>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="status">Application Status</Label>
-              <Select
-                value={newUserCollege.application_status}
-                onValueChange={(value) => setNewUserCollege({ ...newUserCollege, application_status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Researching">Researching</SelectItem>
-                  <SelectItem value="Applying">Applying</SelectItem>
-                  <SelectItem value="Applied">Applied</SelectItem>
-                  <SelectItem value="Waitlisted">Waitlisted</SelectItem>
-                  <SelectItem value="Accepted">Accepted</SelectItem>
-                  <SelectItem value="Rejected">Rejected</SelectItem>
-                  <SelectItem value="Committed">Committed</SelectItem>
-                </SelectContent>
-              </Select>
-              {formErrors.application_status && <p className="text-sm text-red-500">{formErrors.application_status}</p>}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="deadline">Application Deadline (Optional)</Label>
-              <Input
-                id="deadline"
-                placeholder="e.g., January 1, 2025"
-                value={newUserCollege.application_deadline_display || ""}
-                onChange={(e) => setNewUserCollege({ ...newUserCollege, application_deadline_display: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>College Category</Label>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="reach"
-                    checked={newUserCollege.is_reach}
-                    onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_reach: checked })}
-                  />
-                  <Label htmlFor="reach">Reach</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="target"
-                    checked={newUserCollege.is_target}
-                    onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_target: checked })}
-                  />
-                  <Label htmlFor="target">Target</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="safety"
-                    checked={newUserCollege.is_safety}
-                    onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_safety: checked })}
-                  />
-                  <Label htmlFor="safety">Safety</Label>
-                </div>
-              </div>
-              {formErrors.category && <p className="text-sm text-red-500">{formErrors.category}</p>}
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="favorite"
-                checked={newUserCollege.is_favorite}
-                onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_favorite: checked })}
-              />
-              <Label htmlFor="favorite">Add to favorites</Label>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add any notes about this college..."
-                value={newUserCollege.notes || ""}
-                onChange={(e) => setNewUserCollege({ ...newUserCollege, notes: e.target.value })}
-              />
-            </div>
           </div>
           <DialogFooter>
-            <Button onClick={addCollege}>Add College</Button>
+            <Button 
+              onClick={addSelectedColleges} 
+              disabled={selectedColleges.length === 0 || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                `Add ${selectedColleges.length} College${selectedColleges.length !== 1 ? 's' : ''}`
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
