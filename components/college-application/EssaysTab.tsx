@@ -133,16 +133,25 @@ export default function EssaysTab() {
                 .from("essay_versions")
                 .select("*")
                 .eq("essay_id", essay.id)
-                .order("created_at", { ascending: false }),
+                .order("created_at", { ascending: false })
+                .limit(MAX_VERSIONS_PER_ESSAY) // Limit to max versions per essay
             )
 
             const versionsResults = await Promise.all(versionsPromises)
 
-            versionsResults.forEach((result, index) => {
+            // Process and clean up existing versions
+            for (let i = 0; i < versionsResults.length; i++) {
+              const result = versionsResults[i];
               if (!result.error && result.data) {
-                versionsMap[data[index].id] = result.data
+                const essayId = data[i].id;
+                versionsMap[essayId] = result.data;
+                
+                // Check if we need to clean up old versions in the database
+                if (result.data.length >= MAX_VERSIONS_PER_ESSAY) {
+                  await cleanupExistingVersions(essayId, result.data);
+                }
               }
-            })
+            }
           }
 
           return { essays: data || [], versions: versionsMap }
@@ -151,6 +160,23 @@ export default function EssaysTab() {
         (data) => {
           setEssays(data.essays)
           setEssayVersions(data.versions)
+          
+          // Initialize the lastSavedContent and lastVersionTimestamp from loaded data
+          const initialSavedContent: Record<string, string> = {};
+          const initialVersionTimestamp: Record<string, number> = {};
+          
+          data.essays.forEach((essay: Essay) => {
+            initialSavedContent[essay.id] = essay.content;
+            
+            // Find the latest version timestamp for each essay
+            if (data.versions[essay.id]?.length > 0) {
+              const latestVersion = data.versions[essay.id][0]; // First is the latest due to ordering
+              initialVersionTimestamp[essay.id] = new Date(latestVersion.created_at).getTime();
+            }
+          });
+          
+          setLastSavedContent(initialSavedContent);
+          setLastVersionTimestamp(initialVersionTimestamp);
         },
         (error) => {
           toast({
@@ -163,7 +189,57 @@ export default function EssaysTab() {
     }
 
     fetchData()
-  }, [user, toast])
+  }, [user, toast, MAX_VERSIONS_PER_ESSAY])
+
+  // New function to clean up versions in the database during initial load
+  const cleanupExistingVersions = async (essayId: string, existingVersions: EssayVersion[]) => {
+    if (!user || existingVersions.length <= MAX_VERSIONS_PER_ESSAY) return;
+    
+    try {
+      // Get all versions for this essay to ensure we have the complete list
+      const { data, error } = await supabase
+        .from("essay_versions")
+        .select("*")
+        .eq("essay_id", essayId)
+        .order("created_at", { ascending: false });
+      
+      if (error || !data || data.length <= MAX_VERSIONS_PER_ESSAY) return;
+      
+      // Keep the MAX_VERSIONS_PER_ESSAY most recent versions
+      const versionsToKeep = data.slice(0, MAX_VERSIONS_PER_ESSAY);
+      const keepIds = versionsToKeep.map(v => v.id);
+      
+      // Delete all other versions
+      if (keepIds.length > 0) {
+        // Get versions to delete (all except the ones we want to keep)
+        const { data: toDelete, error: fetchError } = await supabase
+          .from("essay_versions")
+          .select("id")
+          .eq("essay_id", essayId)
+          .not("id", "in", keepIds);
+        
+        if (fetchError || !toDelete || toDelete.length === 0) {
+          return;
+        }
+        
+        const idsToDelete = toDelete.map(v => v.id);
+        
+        const { error: deleteError } = await supabase
+          .from("essay_versions")
+          .delete()
+          .in("id", idsToDelete);
+        
+        if (deleteError) {
+          console.error("Error cleaning up existing versions:", deleteError);
+          return;
+        }
+        
+        console.log(`Cleaned up ${idsToDelete.length} old versions during initial load for essay ${essayId}`);
+      }
+    } catch (error) {
+      console.error("Error in cleanupExistingVersions:", error);
+    }
+  }
 
   // Validate essay form
   const validateEssayForm = (): boolean => {
@@ -556,7 +632,8 @@ export default function EssaysTab() {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       
-      // Get versions to delete (keep first MAX_VERSIONS_PER_ESSAY, delete the rest)
+      // Get versions to keep and to delete
+      const versionsToKeep = sortedVersions.slice(0, MAX_VERSIONS_PER_ESSAY);
       const versionsToDelete = sortedVersions.slice(MAX_VERSIONS_PER_ESSAY);
       
       if (versionsToDelete.length > 0) {
@@ -576,7 +653,7 @@ export default function EssaysTab() {
         
         // Update versions in state
         const updatedVersions = { ...essayVersions };
-        updatedVersions[essayId] = sortedVersions.slice(0, MAX_VERSIONS_PER_ESSAY);
+        updatedVersions[essayId] = versionsToKeep;
         setEssayVersions(updatedVersions);
         
         console.log(`Cleaned up ${versionIdsToDelete.length} old versions for essay ${essayId}`);
@@ -585,6 +662,49 @@ export default function EssaysTab() {
       console.error("Error cleaning up old versions:", error);
     }
   }
+
+  // Add a new function to manually clean up versions
+  const manualCleanupVersions = async (essayId: string) => {
+    if (!user || !essayId) return;
+    
+    setIsLoading(true);
+    try {
+      // Get all versions for this essay
+      const { data, error } = await supabase
+        .from("essay_versions")
+        .select("*")
+        .eq("essay_id", essayId)
+        .order("created_at", { ascending: false });
+      
+      if (error || !data || data.length <= MAX_VERSIONS_PER_ESSAY) {
+        setIsLoading(false);
+        if (data && data.length <= MAX_VERSIONS_PER_ESSAY) {
+          toast({
+            title: "No cleanup needed",
+            description: `You already have ${data.length} versions, which is within the maximum limit of ${MAX_VERSIONS_PER_ESSAY}.`,
+          });
+        }
+        return;
+      }
+      
+      // Use the cleanupOldVersions function
+      await cleanupOldVersions(essayId, data);
+      
+      toast({
+        title: "Version history cleaned up",
+        description: `Kept the ${MAX_VERSIONS_PER_ESSAY} most recent versions for this essay.`,
+      });
+    } catch (error) {
+      console.error("Error cleaning up versions:", error);
+      toast({
+        title: "Error cleaning up versions",
+        description: handleSupabaseError(error, "There was a problem cleaning up the versions."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -800,7 +920,39 @@ export default function EssaysTab() {
       <Dialog open={!!showVersionHistory} onOpenChange={(open) => !open && setShowVersionHistory(null)}>
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
-            <DialogTitle>Version History</DialogTitle>
+            <div className="flex justify-between items-center">
+              <DialogTitle>Version History</DialogTitle>
+              {showVersionHistory && essayVersions[showVersionHistory] && essayVersions[showVersionHistory].length > MAX_VERSIONS_PER_ESSAY && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex items-center gap-1"
+                  onClick={() => manualCleanupVersions(showVersionHistory)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <History className="h-4 w-4" />
+                      <span>Clean Up History</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex ml-1">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Keep only the {MAX_VERSIONS_PER_ESSAY} most recent versions and delete older ones.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {showVersionHistory && essayVersions[showVersionHistory] && essayVersions[showVersionHistory].length > 0 ? (
