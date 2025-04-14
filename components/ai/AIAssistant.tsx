@@ -13,6 +13,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { MessageCircle, X, Send, Sparkles, Pencil, Plus, Maximize2, Minimize2, Paperclip, Mic, Bot, User } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/AuthProvider"
+import { supabase } from "@/lib/supabase"
+import ReactMarkdown from "react-markdown"
 
 // For client-side usage of API key
 const API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
@@ -64,7 +67,9 @@ const MessageComponent = React.memo(({ message }: { message: Message }) => (
       message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
     )}
   >
-    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+    <div className="text-sm whitespace-pre-wrap">
+      <ReactMarkdown>{message.content}</ReactMarkdown>
+    </div>
     {message.context && (
       <Badge variant="outline" className="mt-2 text-xs">
         {message.context.type}: {message.context.title}
@@ -83,6 +88,8 @@ const [isTyping, setIsTyping] = useState(false)
 const messagesEndRef = useRef<HTMLDivElement>(null)
 const inputRef = useRef<HTMLInputElement>(null)
 const { toast } = useToast()
+const { user } = useAuth()
+const [profileData, setProfileData] = useState<any>(null)
 
 const [messages, setMessages] = useState<Message[]>([
   {
@@ -93,6 +100,77 @@ const [messages, setMessages] = useState<Message[]>([
     timestamp: new Date(),
   },
 ])
+
+// Fetch user profile data
+useEffect(() => {
+  const fetchProfileData = async () => {
+    if (!user) return
+
+    try {
+      // Fetch profile
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError)
+        toast({
+          title: "Error fetching profile",
+          description: "Failed to load your profile information.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Fetch related data
+      const [academics, extracurriculars, awards, essays] = await Promise.all([
+        supabase.from("academics").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase
+          .from("extracurricular_activities")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase.from("awards").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("essays").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      ])
+
+      if (academics.error || extracurriculars.error || awards.error || essays.error) {
+        console.error(
+          "Error fetching related data:",
+          academics.error,
+          extracurriculars.error,
+          awards.error,
+          essays.error,
+        )
+        toast({
+          title: "Error fetching related data",
+          description: "Failed to load some of your profile information.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setProfileData({
+        ...profile,
+        academics: academics.data,
+        extracurriculars: extracurriculars.data,
+        awards: awards.data,
+        essays: essays.data,
+      })
+    } catch (error) {
+      console.error("Error fetching profile data:", error)
+      toast({
+        title: "Error fetching profile data",
+        description: "Failed to load your profile information.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  fetchProfileData()
+}, [user, toast])
 
 // If initialContext is provided, add a contextual message
 useEffect(() => {
@@ -152,13 +230,21 @@ const handleSendMessage = useCallback(async () => {
   setIsTyping(true)
 
   try {
+    let prompt = input
+
+    // Append profile data to the prompt
+    if (profileData) {
+      prompt += `\n\nUser Profile Data:\n${JSON.stringify(profileData, null, 2)}`
+      prompt += "\nPlease provide a concise and direct answer."
+    }
+
     // Call our secure API route instead of directly using OpenAI
     const response = await fetch('/api/ai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt: input }),
+      body: JSON.stringify({ prompt: prompt }),
     });
 
     if (!response.ok) {
@@ -186,7 +272,7 @@ const handleSendMessage = useCallback(async () => {
   } finally {
     setIsTyping(false)
   }
-}, [input, toast])
+}, [input, toast, profileData])
 
 // Use useCallback for handleKeyDown to prevent unnecessary re-renders
 const handleKeyDown = useCallback(
@@ -397,7 +483,9 @@ return (
                     </div>
                     <div className="flex-1">
                       <h4 className="text-sm font-medium">Your Essays</h4>
-                      <p className="text-xs text-muted-foreground">2 essays in progress</p>
+                      <p className="text-xs text-muted-foreground">
+                        {profileData?.essays?.length || 0} essays in progress
+                      </p>
                     </div>
                     <Button variant="ghost" size="sm" className="h-7 gap-1">
                       <Plus className="h-3 w-3" /> Add
@@ -414,7 +502,9 @@ return (
                     </div>
                     <div className="flex-1">
                       <h4 className="text-sm font-medium">Your Extracurriculars</h4>
-                      <p className="text-xs text-muted-foreground">5 activities added</p>
+                      <p className="text-xs text-muted-foreground">
+                        {profileData?.extracurriculars?.length || 0} activities added
+                      </p>
                     </div>
                     <Button variant="ghost" size="sm" className="h-7 gap-1">
                       <Plus className="h-3 w-3" /> Add
@@ -431,7 +521,10 @@ return (
                     </div>
                     <div className="flex-1">
                       <h4 className="text-sm font-medium">Your Academics</h4>
-                      <p className="text-xs text-muted-foreground">GPA: 3.85 (Weighted: 4.2)</p>
+                      <p className="text-xs text-muted-foreground">
+                        GPA: {profileData?.academics?.unweighted || "N/A"} (Weighted:{" "}
+                        {profileData?.academics?.weighted || "N/A"})
+                      </p>
                     </div>
                     <Button variant="ghost" size="sm" className="h-7">
                       View
