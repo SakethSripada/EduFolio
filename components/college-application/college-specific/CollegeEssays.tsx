@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
+import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 
 type CollegeEssaysProps = {
   collegeId: string
@@ -67,6 +68,8 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const [essayContent, setEssayContent] = useState<string>("")
 
   const [editingEssay, setEditingEssay] = useState<number | null>(null)
+
+  const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user || !collegeId) return
@@ -126,7 +129,8 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     return Object.keys(errors).length === 0
   }
 
-  const countWords = (text: string): number => {
+  const countWords = (text: string | undefined): number => {
+    if (!text) return 0
     return text.trim().split(/\s+/).filter(Boolean).length
   }
 
@@ -150,11 +154,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           {
             user_id: user.id,
             college_id: collegeId,
-            title: newEssay.title,
-            prompt: newEssay.prompt,
-            content: newEssay.content,
-            word_count: countWords(newEssay.content),
-            character_count: newEssay.content.length,
+            title: newEssay.title || "",
+            prompt: newEssay.prompt || "",
+            content: newEssay.content || "",
+            word_count: countWords(newEssay.content || ""),
+            character_count: (newEssay.content || "").length,
             target_word_count: newEssay.target_word_count || null,
             last_edited: new Date().toISOString(),
             status: newEssay.status || "Draft",
@@ -216,11 +220,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       const { error } = await supabase
         .from("college_essays")
         .update({
-          title: newEssay.title,
-          prompt: newEssay.prompt,
-          content: newEssay.content,
-          word_count: countWords(newEssay.content),
-          character_count: newEssay.content.length,
+          title: newEssay.title || "",
+          prompt: newEssay.prompt || "",
+          content: newEssay.content as string,
+          word_count: countWords(newEssay.content || ""),
+          character_count: (newEssay.content || "").length,
           target_word_count: newEssay.target_word_count || null,
           last_edited: new Date().toISOString(),
           status: newEssay.status || "Draft",
@@ -239,8 +243,8 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               title: newEssay.title as string,
               prompt: newEssay.prompt as string,
               content: newEssay.content as string,
-              word_count: countWords(newEssay.content),
-              character_count: newEssay.content.length,
+              word_count: countWords(newEssay.content || ""),
+              character_count: (newEssay.content || "").length,
               target_word_count: newEssay.target_word_count || null,
               last_edited: new Date().toISOString(),
               status: newEssay.status as string,
@@ -499,30 +503,26 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="p-4 bg-muted/50 rounded-md font-serif">
-                      {editingEssay === index ? (
-                        <Textarea
-                          className="min-h-[200px] font-serif"
-                          value={essayContent}
-                          onChange={(e) => handleEssayContentChange(e.target.value)}
-                        />
-                      ) : (
-                        essay.content || "Start writing your essay..."
-                      )}
-                    </div>
-                  </CardContent>
-                  <div className="px-6 py-2 bg-muted/50 flex justify-end space-x-2">
                     {editingEssay === index ? (
-                      <Button
-                        variant="default"
-                        onClick={() => {
+                      <SimpleEssayEditor
+                        content={essayContent}
+                        onChange={handleEssayContentChange}
+                        onSave={() => {
                           setEditingEssay(null)
                           handleSaveEssayContent(essay, essayContent)
                         }}
-                      >
-                        <Save className="h-4 w-4 mr-1" /> Save
-                      </Button>
+                        wordCount={calculateWordCount(essayContent)}
+                        targetWordCount={essay.target_word_count}
+                        onShowHistory={() => setShowVersionHistory(essay.id)}
+                      />
                     ) : (
+                      <div className="p-4 bg-muted/50 rounded-md font-serif">
+                        {essay.content || "Start writing your essay..."}
+                      </div>
+                    )}
+                  </CardContent>
+                  <div className="px-6 py-2 bg-muted/50 flex justify-end space-x-2">
+                    {editingEssay === index ? null : (
                       <>
                         <Button
                           variant="outline"
@@ -774,10 +774,16 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         onOpenChange={(open) => !open && setConfirmDeleteEssay(null)}
         title="Delete Essay"
         description="Are you sure you want to delete this essay? This action cannot be undone."
-        confirmText={isLoading ? "Deleting..." : "Delete"}
-        onConfirm={() => confirmDeleteEssay && deleteEssay(confirmDeleteEssay)}
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDeleteEssay) {
+            const index = essays.findIndex((essay) => essay.id === confirmDeleteEssay)
+            if (index !== -1) {
+              deleteEssay(confirmDeleteEssay)
+            }
+          }
+        }}
         variant="destructive"
-        disabled={isLoading}
       />
     </div>
   )

@@ -42,6 +42,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
+import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 
 type CollegeProfileProps = {
   collegeId: string
@@ -529,10 +530,12 @@ export default function CollegeProfile({
                         </CardHeader>
                         <CardContent>
                           {editingEssay === index ? (
-                            <Textarea
-                              className="min-h-[200px] font-serif"
-                              value={essay.content}
-                              onChange={(e) => updateEssayContent(index, e.target.value)}
+                            <SimpleEssayEditor
+                              content={essay.content}
+                              onChange={(content) => updateEssayContent(index, content)}
+                              onSave={() => setEditingEssay(null)}
+                              wordCount={essay.wordCount}
+                              targetWordCount={essay.targetWordCount}
                             />
                           ) : (
                             <div className="p-4 bg-muted/50 rounded-md font-serif">
