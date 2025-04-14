@@ -105,6 +105,8 @@ export default function AcademicsTab() {
   const [confirmDeleteCourse, setConfirmDeleteCourse] = useState<string | null>(null)
   const [confirmDeleteTestScore, setConfirmDeleteTestScore] = useState<string | null>(null)
 
+  const [aiAction, setAiAction] = useState<"courses" | "testscores" | "gpa" | null>(null)
+
   useEffect(() => {
     if (!user) return
 
@@ -779,6 +781,87 @@ export default function AcademicsTab() {
     }
   }
 
+  // Format courses for AI
+  const formatCoursesForAI = () => {
+    if (courses.length === 0) {
+      return "You haven't added any courses yet.";
+    }
+
+    const coursesByGradeLevel: Record<string, Course[]> = {};
+    
+    courses.forEach(course => {
+      if (!coursesByGradeLevel[course.grade_level]) {
+        coursesByGradeLevel[course.grade_level] = [];
+      }
+      coursesByGradeLevel[course.grade_level].push(course);
+    });
+
+    let formattedText = "Here is your academic course information:\n\n";
+    
+    Object.keys(coursesByGradeLevel).sort().forEach(gradeLevel => {
+      formattedText += `Grade ${gradeLevel}:\n`;
+      coursesByGradeLevel[gradeLevel].forEach(course => {
+        formattedText += `- ${course.name} (${course.level}) - Grade: ${course.grade}, Credits: ${course.credits}, Term: ${course.term}\n`;
+      });
+      formattedText += '\n';
+    });
+
+    return formattedText;
+  };
+
+  // Format test scores for AI
+  const formatTestScoresForAI = () => {
+    if (testScores.length === 0) {
+      return "You haven't added any test scores yet.";
+    }
+
+    let formattedText = "Here are your test scores:\n\n";
+    
+    testScores.forEach(score => {
+      formattedText += `${score.test_name}: ${score.score}`;
+      if (score.max_score) formattedText += ` out of ${score.max_score}`;
+      if (score.test_date_display) formattedText += ` (${score.test_date_display})`;
+      if (score.notes) formattedText += ` - Notes: ${score.notes}`;
+      formattedText += '\n';
+    });
+
+    return formattedText;
+  };
+
+  // Format GPA information for AI
+  const formatGPAForAI = () => {
+    let formattedText = "GPA Information:\n";
+    
+    if (manualGPA.use_manual) {
+      formattedText += `- Using manually entered GPA values\n`;
+      formattedText += `- Unweighted GPA: ${manualGPA.unweighted}\n`;
+      formattedText += `- Weighted GPA: ${manualGPA.weighted}\n`;
+      formattedText += `- UC GPA: ${manualGPA.uc_gpa}\n`;
+    } else {
+      const unweighted = calculateGPA(courses, false);
+      const weighted = calculateGPA(courses, true);
+      const ucGPA = calculateUCGPA(courses);
+      
+      formattedText += `- Using calculated GPA values\n`;
+      formattedText += `- Unweighted GPA: ${unweighted}\n`;
+      formattedText += `- Weighted GPA: ${weighted}\n`;
+      formattedText += `- UC GPA: ${ucGPA}\n`;
+    }
+
+    return formattedText;
+  };
+
+  // Format all academic data for AI
+  const formatAllAcademicDataForAI = () => {
+    return `${formatCoursesForAI()}\n${formatTestScoresForAI()}\n${formatGPAForAI()}\n\nWhat would you like to know about your academic profile?`;
+  };
+
+  // Open AI assistant for course recommendations
+  const openAIAssistantForCourses = () => {
+    setAiAction("courses");
+    setShowAIAssistant(true);
+  };
+
   return (
     <div className="space-y-8">
       {/* GPA Summary Card */}
@@ -843,7 +926,7 @@ export default function AcademicsTab() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 rounded-full"
-                          onClick={() => setShowAIAssistant(true)}
+                          onClick={() => openAIAssistantForCourses()}
                         >
                           <Sparkles className="h-4 w-4 text-primary" />
                         </Button>
@@ -1520,6 +1603,16 @@ export default function AcademicsTab() {
           initialContext={{
             type: "academics",
             title: "Course Planning",
+          }}
+          initialPrompt={
+            aiAction === "courses" 
+              ? `${formatAllAcademicDataForAI()}\n\nBased on my academic record, can you recommend courses I should take to strengthen my profile? Are there any gaps or weaknesses in my academic record I should address?`
+              : undefined
+          }
+          showOnLoad={true}
+          onClose={() => {
+            setShowAIAssistant(false);
+            setAiAction(null);
           }}
         />
       )}

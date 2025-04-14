@@ -5,6 +5,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Save, History, Eye, EyeOff, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import DOMPurify from "dompurify"
 
 interface SimpleEssayEditorProps {
   content: string
@@ -29,12 +30,47 @@ export default function SimpleEssayEditor({
 }: SimpleEssayEditorProps) {
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+  const [isInitialized, setIsInitialized] = useState(false)
 
   const handleEditorChange = () => {
     if (editorRef.current) {
       onChange(editorRef.current.innerHTML)
     }
+  }
+
+  // Initialize editor content on first render
+  useEffect(() => {
+    if (editorRef.current && !isInitialized) {
+      editorRef.current.innerHTML = DOMPurify.sanitize(content)
+      setIsInitialized(true)
+    }
+  }, [content, isInitialized])
+
+  // Update editor content when it changes (and not focused)
+  useEffect(() => {
+    if (isInitialized && editorRef.current && document.activeElement !== editorRef.current) {
+      editorRef.current.innerHTML = DOMPurify.sanitize(content)
+    }
+  }, [content, isInitialized])
+
+  // Update preview content when content changes or preview mode is toggled
+  useEffect(() => {
+    if (previewRef.current) {
+      // Safely set the content using sanitized HTML
+      previewRef.current.innerHTML = DOMPurify.sanitize(content)
+    }
+  }, [content, isPreviewMode])
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text/plain')
+    document.execCommand('insertText', false, text)
+  }
+
+  const togglePreviewMode = () => {
+    setIsPreviewMode(!isPreviewMode)
   }
 
   const handleSave = () => {
@@ -45,8 +81,37 @@ export default function SimpleEssayEditor({
     })
   }
 
+  // Function to handle editor focusing
+  const focusEditor = () => {
+    if (editorRef.current) {
+      editorRef.current.focus()
+    }
+  }
+
+  // Function to position cursor at end of content when first focusing
+  const handleEditorClick = (e: React.MouseEvent) => {
+    // Only handle if this is the first click (editor not already focused)
+    if (editorRef.current && document.activeElement !== editorRef.current) {
+      focusEditor()
+      
+      // Try to position cursor at end of content
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(editorRef.current);
+        range.collapse(false); // collapse to end
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    }
+  }
+
+  // Ensure format commands work correctly
   const execCommand = (command: string, value?: string) => {
+    focusEditor()
     document.execCommand(command, false, value)
+    // Update content after executing a command
+    handleEditorChange()
   }
 
   return (
@@ -66,7 +131,7 @@ export default function SimpleEssayEditor({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsPreviewMode(!isPreviewMode)}
+                onClick={togglePreviewMode}
                 className="gap-2"
               >
                 {isPreviewMode ? (
@@ -166,15 +231,17 @@ export default function SimpleEssayEditor({
             <div
               ref={editorRef}
               contentEditable
-              className="p-4 min-h-[500px] focus:outline-none prose prose-sm max-w-none"
+              suppressContentEditableWarning
+              className="p-4 min-h-[500px] focus:outline-none prose prose-sm max-w-none dark:text-slate-100 text-slate-900 dark:prose-invert"
               onInput={handleEditorChange}
-              dangerouslySetInnerHTML={{ __html: content }}
+              onPaste={handlePaste}
+              onClick={handleEditorClick}
             />
           </TabsContent>
           <TabsContent value="preview" className="m-0">
             <div
-              className="p-6 prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: content }}
+              ref={previewRef}
+              className="p-6 prose prose-sm max-w-none dark:text-slate-100 text-slate-900 dark:prose-invert"
             />
           </TabsContent>
         </Tabs>

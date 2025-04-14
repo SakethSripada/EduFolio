@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
+import DOMPurify from "dompurify"
 
 type Essay = {
   id: string
@@ -61,6 +62,7 @@ export default function EssaysTab() {
   const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [idCounter, setIdCounter] = useState(0)
+  const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -363,8 +365,31 @@ export default function EssaysTab() {
     saveEssayContent(essay, content)
   }
 
+  // AI feedback function - opens AI assistant with feedback prompt
+  const getAiFeedback = (essay: any) => {
+    setSelectedEssay(essay)
+    setAiAction("feedback")
+    setShowAIAssistant(true)
+  }
+
+  // AI grammar check function - opens AI assistant with grammar checking prompt
+  const checkGrammarWithAi = (essay: any) => {
+    setSelectedEssay(essay)
+    setAiAction("grammar")
+    setShowAIAssistant(true)
+  }
+
+  // AI rephrase function - opens AI assistant with rephrasing prompt
+  const rephraseWithAi = (essay: any) => {
+    setSelectedEssay(essay)
+    setAiAction("rephrase")
+    setShowAIAssistant(true)
+  }
+
+  // General AI assistant without specific function
   const openAIAssistant = (essay: any) => {
     setSelectedEssay(essay)
+    setAiAction(null)
     setShowAIAssistant(true)
   }
 
@@ -452,6 +477,21 @@ export default function EssaysTab() {
       default:
         return <Badge variant="outline">{status}</Badge>
     }
+  }
+
+  // Safe HTML rendering function
+  const renderSafeHTML = (content: string) => {
+    return DOMPurify.sanitize(content || "")
+  }
+
+  // Extract plain text from HTML for AI prompts
+  const stripHTML = (htmlContent: string) => {
+    // Create a temp div to hold the HTML
+    const tempDiv = document.createElement('div');
+    // Set the sanitized HTML to the div
+    tempDiv.innerHTML = DOMPurify.sanitize(htmlContent || "");
+    // Return just the text content (strips HTML tags)
+    return tempDiv.textContent || tempDiv.innerText || "";
   }
 
   if (isLoading) {
@@ -602,9 +642,10 @@ export default function EssaysTab() {
                     onShowHistory={() => setShowVersionHistory(essay.id)}
                   />
                 ) : (
-                  <div className="p-4 bg-muted/50 rounded-md font-serif">
-                    {essay.content || "Start writing your essay..."}
-                  </div>
+                  <div 
+                    className="p-4 bg-muted/50 rounded-md font-serif"
+                    dangerouslySetInnerHTML={{ __html: renderSafeHTML(essay.content || "Start writing your essay...") }}
+                  />
                 )}
               </CardContent>
               <CardFooter className="flex justify-end space-x-2 bg-muted/20">
@@ -617,8 +658,14 @@ export default function EssaysTab() {
                     >
                       <History className="h-4 w-4 mr-1" /> History
                     </Button>
-                    <Button variant="outline" onClick={() => openAIAssistant(essay)}>
+                    <Button variant="outline" onClick={() => getAiFeedback(essay)}>
                       <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
+                    </Button>
+                    <Button variant="outline" onClick={() => checkGrammarWithAi(essay)}>
+                      <Sparkles className="h-4 w-4 mr-1" /> Check Grammar
+                    </Button>
+                    <Button variant="outline" onClick={() => rephraseWithAi(essay)}>
+                      <Sparkles className="h-4 w-4 mr-1" /> Rephrase
                     </Button>
                     <Button
                       variant="outline"
@@ -661,9 +708,10 @@ export default function EssaysTab() {
                       </div>
                     </CardHeader>
                     <CardContent className="py-2">
-                      <div className="p-3 bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto">
-                        {version.content}
-                      </div>
+                      <div 
+                        className="p-3 bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto"
+                        dangerouslySetInnerHTML={{ __html: renderSafeHTML(version.content) }}
+                      />
                     </CardContent>
                     <CardFooter className="py-2">
                       <Button size="sm" onClick={() => restoreVersion(showVersionHistory, version.id, version.content)}>
@@ -687,6 +735,20 @@ export default function EssaysTab() {
             type: "essay",
             id: selectedEssay?.id,
             title: selectedEssay?.prompt || "Essay Writing",
+          }}
+          initialPrompt={
+            selectedEssay && aiAction 
+              ? aiAction === "feedback"
+                ? `Please provide feedback on this essay:\n\n${stripHTML(selectedEssay.content)}`
+                : aiAction === "grammar"
+                  ? `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
+                  : `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
+              : undefined
+          }
+          showOnLoad={true}
+          onClose={() => {
+            setShowAIAssistant(false)
+            setAiAction(null)
           }}
         />
       )}

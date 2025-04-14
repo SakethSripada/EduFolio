@@ -78,6 +78,8 @@ export default function ExtracurricularsTab() {
   // Add state for confirmation dialog
   const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null)
 
+  const [aiAction, setAiAction] = useState<"improve" | "all" | null>(null)
+
   useEffect(() => {
     if (!user) return
 
@@ -209,10 +211,53 @@ export default function ExtracurricularsTab() {
     setExpandedActivity(expandedActivity === index ? null : index)
   }
 
+  // Format a single activity for AI
+  const formatActivityForAI = (activity: Activity) => {
+    return `
+Activity: ${activity.organization}
+Position: ${activity.position}
+Type: ${activity.activity_type}
+Description: ${activity.description || "N/A"}
+Impact: ${activity.impact_statement || "N/A"}
+Time Commitment: ${activity.hours_per_week} hours per week, ${activity.weeks_per_year} weeks per year
+Grade Levels: ${activity.grade_levels}
+Timing: ${activity.participation_timing}
+Currently Active: ${activity.is_current ? "Yes" : "No"}
+Plan to Continue in College: ${activity.continue_in_college ? "Yes" : "No"}
+    `.trim();
+  };
+
+  // Format all activities for AI
+  const formatAllActivitiesForAI = () => {
+    if (activities.length === 0) {
+      return "You haven't added any extracurricular activities yet.";
+    }
+
+    return `Here are all your extracurricular activities:
+    
+${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(activity)}`).join('\n\n')}`;
+  };
+
+  // Open AI assistant for a specific activity
+  const openAIAssistantForActivity = (activity: any) => {
+    setSelectedActivity(activity);
+    setAiAction("improve");
+    setShowAIAssistant(true);
+  };
+
+  // Open AI assistant for all activities
+  const openAIAssistantForAll = () => {
+    setSelectedActivity(null);
+    setAiAction("all");
+    setShowAIAssistant(true);
+  };
+
+  // Original openAIAssistant can remain as a general function without specific formatting
   const openAIAssistant = (activity: any) => {
-    setSelectedActivity(activity)
-    setShowAIAssistant(true)
-  }
+    setSelectedActivity(activity);
+    setAiAction(null);
+    setShowAIAssistant(true);
+  };
 
   const startEditActivity = (activityId: string) => {
     const activityToEdit = activities.find((a) => a.id === activityId)
@@ -366,10 +411,7 @@ export default function ExtracurricularsTab() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 rounded-full"
-                          onClick={() => {
-                            setSelectedActivity(null)
-                            setShowAIAssistant(true)
-                          }}
+                          onClick={() => openAIAssistantForAll()}
                         >
                           <Sparkles className="h-4 w-4 text-primary" />
                         </Button>
@@ -780,7 +822,7 @@ export default function ExtracurricularsTab() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
-                            openAIAssistant(activity)
+                            openAIAssistantForActivity(activity)
                           }}
                         >
                           <Sparkles className="h-4 w-4 mr-1" /> Improve with AI
@@ -822,6 +864,18 @@ export default function ExtracurricularsTab() {
             type: "extracurricular",
             id: selectedActivity?.id,
             title: selectedActivity?.organization || "Extracurricular Activities",
+          }}
+          initialPrompt={
+            aiAction === "improve" && selectedActivity
+              ? `Please help me improve this extracurricular activity for my college applications:\n\n${formatActivityForAI(selectedActivity)}\n\nCan you suggest ways to strengthen the description, highlight the impact better, and make this activity more compelling to college admissions officers?`
+              : aiAction === "all"
+                ? `${formatAllActivitiesForAI()}\n\nPlease review my extracurricular activities and provide specific advice on how to improve them. Which ones should I emphasize for college applications? Are there any gaps in my profile I should address?`
+                : undefined
+          }
+          showOnLoad={true}
+          onClose={() => {
+            setShowAIAssistant(false);
+            setAiAction(null);
           }}
         />
       )}
