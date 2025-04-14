@@ -7,18 +7,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info } from "lucide-react"
 import AIAssistant from "@/components/ai/AIAssistant"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { calculateWordCount, calculateCharacterCount, validateRequired } from "@/lib/validation"
+import { debounce, hasSignificantChanges } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import DOMPurify from "dompurify"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type Essay = {
   id: string
@@ -71,6 +73,18 @@ export default function EssaysTab() {
 
   // Add a new state variable to store the essay content
   const [essayContent, setEssayContent] = useState<string>("")
+
+  // Add a state to track the last saved content for each essay
+  const [lastSavedContent, setLastSavedContent] = useState<Record<string, string>>({})
+  // Add a state to track the last version timestamp for each essay
+  const [lastVersionTimestamp, setLastVersionTimestamp] = useState<Record<string, number>>({})
+  // Add a minimum time between versions in milliseconds (default: 15 minutes)
+  const MIN_TIME_BETWEEN_VERSIONS = 15 * 60 * 1000; 
+  // Add a debounce delay for saving content (default: 2 seconds)
+  const SAVE_DEBOUNCE_DELAY = 2000;
+
+  // Add a maximum number of versions to keep per essay
+  const MAX_VERSIONS_PER_ESSAY = 10;
 
   // Function to generate unique IDs
   const generateUniqueId = () => {
@@ -271,12 +285,21 @@ export default function EssaysTab() {
     setEssays(newEssays)
   }
 
+  // Create a debounced version of saveEssayContent
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSaveEssayContent = useRef(
+    debounce(async (essay: any, content: string) => {
+      saveEssayContent(essay, content);
+    }, SAVE_DEBOUNCE_DELAY)
+  ).current;
+
   // Add a new function to save the essay content to the database
   const saveEssayContent = async (essay: any, content: string) => {
     if (!user) return
 
     const wordCount = calculateWordCount(content)
     const charCount = calculateCharacterCount(content)
+    const now = new Date()
 
     try {
       const { error } = await supabase
@@ -285,12 +308,12 @@ export default function EssaysTab() {
           content: content,
           word_count: wordCount,
           character_count: charCount,
-          last_edited: new Date().toLocaleDateString("en-US", {
+          last_edited: now.toLocaleDateString("en-US", {
             month: "long",
             day: "numeric",
             year: "numeric",
           }),
-          updated_at: new Date().toISOString(),
+          updated_at: now.toISOString(),
         })
         .eq("id", essay.id)
 
@@ -298,29 +321,58 @@ export default function EssaysTab() {
         throw error
       }
 
-      // Create a new version
-      const { data: versionData, error: versionError } = await supabase
-        .from("essay_versions")
-        .insert({
-          essay_id: essay.id,
-          content: content,
-          word_count: wordCount,
-          character_count: charCount,
-          version_name: `Edit on ${new Date().toLocaleDateString()}`,
-        })
-        .select()
+      // Get the previously saved content or empty string if none exists
+      const previousContent = lastSavedContent[essay.id] || "";
+      const lastVersionTime = lastVersionTimestamp[essay.id] || 0;
+      const currentTime = now.getTime();
+      
+      // Determine if we should create a new version based on:
+      // 1. Significant content changes
+      // 2. Enough time has passed since the last version
+      const shouldCreateVersion = 
+        hasSignificantChanges(previousContent, content) && 
+        (currentTime - lastVersionTime >= MIN_TIME_BETWEEN_VERSIONS);
 
-      if (versionError) {
-        console.error("Error creating essay version:", versionError)
-      } else if (versionData) {
-        // Update versions in state
-        const updatedVersions = { ...essayVersions }
-        if (!updatedVersions[essay.id]) {
-          updatedVersions[essay.id] = []
+      // Create a new version only if needed
+      if (shouldCreateVersion) {
+        const { data: versionData, error: versionError } = await supabase
+          .from("essay_versions")
+          .insert({
+            essay_id: essay.id,
+            content: content,
+            word_count: wordCount,
+            character_count: charCount,
+            version_name: `Edit on ${now.toLocaleDateString()}`,
+          })
+          .select()
+
+        if (versionError) {
+          console.error("Error creating essay version:", versionError)
+        } else if (versionData) {
+          // Update versions in state
+          const updatedVersions = { ...essayVersions }
+          if (!updatedVersions[essay.id]) {
+            updatedVersions[essay.id] = []
+          }
+          updatedVersions[essay.id] = [versionData[0], ...(updatedVersions[essay.id] || [])]
+          setEssayVersions(updatedVersions)
+          
+          // Update last version timestamp
+          setLastVersionTimestamp(prev => ({
+            ...prev,
+            [essay.id]: currentTime
+          }));
+          
+          // Clean up old versions if necessary
+          cleanupOldVersions(essay.id, [versionData[0], ...(updatedVersions[essay.id] || [])]);
         }
-        updatedVersions[essay.id] = [versionData[0], ...(updatedVersions[essay.id] || [])]
-        setEssayVersions(updatedVersions)
       }
+
+      // Update last saved content regardless of version creation
+      setLastSavedContent(prev => ({
+        ...prev,
+        [essay.id]: content
+      }));
 
       // Update local state immediately after successful database update
       setEssays((prevEssays) =>
@@ -331,7 +383,7 @@ export default function EssaysTab() {
                 content: content,
                 word_count: wordCount,
                 character_count: charCount,
-                last_edited: new Date().toLocaleDateString("en-US", {
+                last_edited: now.toLocaleDateString("en-US", {
                   month: "long",
                   day: "numeric",
                   year: "numeric",
@@ -362,7 +414,7 @@ export default function EssaysTab() {
 
   // Add a new function to handle the save essay content
   const handleSaveEssayContent = (essay: any, content: string) => {
-    saveEssayContent(essay, content)
+    debouncedSaveEssayContent(essay, content)
   }
 
   // AI feedback function - opens AI assistant with feedback prompt
@@ -492,6 +544,46 @@ export default function EssaysTab() {
     tempDiv.innerHTML = DOMPurify.sanitize(htmlContent || "");
     // Return just the text content (strips HTML tags)
     return tempDiv.textContent || tempDiv.innerText || "";
+  }
+
+  // Add a function to clean up old versions when they exceed the maximum limit
+  const cleanupOldVersions = async (essayId: string, currentVersions: EssayVersion[]) => {
+    if (!user || currentVersions.length <= MAX_VERSIONS_PER_ESSAY) return;
+    
+    try {
+      // Sort versions by creation date, newest first
+      const sortedVersions = [...currentVersions].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      // Get versions to delete (keep first MAX_VERSIONS_PER_ESSAY, delete the rest)
+      const versionsToDelete = sortedVersions.slice(MAX_VERSIONS_PER_ESSAY);
+      
+      if (versionsToDelete.length > 0) {
+        // Get the IDs of versions to delete
+        const versionIdsToDelete = versionsToDelete.map(v => v.id);
+        
+        // Delete versions from the database
+        const { error } = await supabase
+          .from("essay_versions")
+          .delete()
+          .in("id", versionIdsToDelete);
+          
+        if (error) {
+          console.error("Error deleting old versions:", error);
+          return;
+        }
+        
+        // Update versions in state
+        const updatedVersions = { ...essayVersions };
+        updatedVersions[essayId] = sortedVersions.slice(0, MAX_VERSIONS_PER_ESSAY);
+        setEssayVersions(updatedVersions);
+        
+        console.log(`Cleaned up ${versionIdsToDelete.length} old versions for essay ${essayId}`);
+      }
+    } catch (error) {
+      console.error("Error cleaning up old versions:", error);
+    }
   }
 
   if (isLoading) {
@@ -652,11 +744,28 @@ export default function EssaysTab() {
                 {editingEssay === index ? null : (
                   <>
                     <Button
+                      size="sm"
                       variant="outline"
+                      className="ml-2"
                       onClick={() => setShowVersionHistory(essay.id)}
                       disabled={!essayVersions[essay.id] || essayVersions[essay.id].length === 0}
                     >
-                      <History className="h-4 w-4 mr-1" /> History
+                      <div className="flex items-center gap-1">
+                        <History className="h-4 w-4" />
+                        <span>Version History</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex ml-1">
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Smart versioning enabled. New versions are created only when significant changes are made, reducing clutter in version history.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </Button>
                     <Button variant="outline" onClick={() => getAiFeedback(essay)}>
                       <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
