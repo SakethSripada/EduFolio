@@ -102,7 +102,7 @@ export default function EssaysTab() {
           if (error) throw error
 
           // Fetch versions for each essay if essays exist
-          const versionsMap = {}
+          const versionsMap: Record<string, EssayVersion[]> = {}
           if (data && data.length > 0) {
             const versionsPromises = data.map((essay) =>
               supabase
