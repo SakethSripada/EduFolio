@@ -4,7 +4,7 @@ import { openai } from '@ai-sdk/openai';
 
 export async function POST(request: Request) {
   try {
-    const { prompt } = await request.json();
+    const { prompt, max_tokens = 800, temperature = 0.7 } = await request.json();
     
     if (!prompt) {
       return NextResponse.json(
@@ -13,9 +13,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Add system message to ensure concise responses
+    const systemMessage = 
+      "You are a helpful AI assistant for a college application platform. " +
+      "Keep your responses concise, direct, and to the point. " +
+      "Avoid lengthy explanations and unnecessary details. " +
+      "Provide specific, actionable advice when asked. " +
+      "Do not repeat information that's already been provided.";
+
     const { text } = await generateText({
       model: openai("gpt-4o"),
       prompt,
+      system: systemMessage,
+      maxTokens: max_tokens,
+      temperature: temperature,
     });
 
     return NextResponse.json({ text });

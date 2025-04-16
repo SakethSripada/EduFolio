@@ -306,7 +306,7 @@ export default function CollegeApplication() {
         </Dialog>
 
         {/* AI Assistant */}
-        <AIAssistant />
+        <AIAssistant showOnLoad={false} />
       </div>
     </ProtectedRoute>
   )

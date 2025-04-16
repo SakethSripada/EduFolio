@@ -67,7 +67,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
     isLoading: isLoadingTodos,
     refetch: refetchTodos,
   } = useSupabaseQuery<Todo[]>({
-    queryKey: ["college-todos", collegeId, user?.id],
+    queryKey: ["college-todos", collegeId, user?.id ?? ""],
     queryFn: async () => {
       if (!user || !collegeId) return []
 
@@ -88,7 +88,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
 
   // Update the general todos query
   const { data: generalTodos, isLoading: isLoadingGeneralTodos } = useSupabaseQuery<Todo[]>({
-    queryKey: ["general-todos", user?.id],
+    queryKey: ["general-todos", user?.id ?? ""],
     queryFn: async () => {
       if (!user) return []
 
@@ -786,7 +786,6 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
         confirmText={deleteTodoMutation.isLoading ? "Deleting..." : "Delete"}
         onConfirm={() => confirmDeleteTodo && deleteTodo(confirmDeleteTodo)}
         variant="destructive"
-        disabled={deleteTodoMutation.isLoading}
       />
     </div>
   )

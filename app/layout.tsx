@@ -14,7 +14,16 @@ export const metadata: Metadata = {
   title: "EduFolio - Your Educational Journey, Beautifully Organized",
   description: "Manage your college applications, resume, professional experience, and portfolio with ease.",
   viewport: "width=device-width, initial-scale=1",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  icons: {
+    icon: [
+      { url: '/EduFolioLogo.ico', sizes: '32x32' },
+      { url: '/EduFolioLogo.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/EduFolioLogo.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 }
 
 export default function RootLayout({
@@ -24,6 +33,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/EduFolioLogo.ico" />
+      </head>
       <body className={inter.className}>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

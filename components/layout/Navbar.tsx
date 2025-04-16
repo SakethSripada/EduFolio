@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
@@ -42,8 +43,15 @@ export default function Navbar() {
   return (
     <header className="bg-background border-b">
       <div className="container flex items-center justify-between py-4">
-        <Link href="/" className="text-2xl font-bold">
-          EduFolio
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/EduFolioLogo.png"
+            alt="EduFolio Logo"
+            width={52}
+            height={52}
+            className="rounded-sm mr-0"
+          />
+          <span className="text-2xl font-bold">EduFolio</span>
         </Link>
 
         <div className="hidden md:flex items-center space-x-6">

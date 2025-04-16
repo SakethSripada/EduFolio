@@ -44,7 +44,9 @@ initialContext?: {
   id?: string
   title?: string
 }
+initialPrompt?: string
 onClose?: () => void
+showOnLoad?: boolean
 }
 
 const MessageComponent = React.memo(({ message }: { message: Message }) => (
@@ -79,11 +81,11 @@ const MessageComponent = React.memo(({ message }: { message: Message }) => (
 </div>
 ))
 
-export default function AIAssistant({ initialContext, onClose }: AIAssistantProps) {
-const [isOpen, setIsOpen] = useState(false)
+export default function AIAssistant({ initialContext, initialPrompt, onClose, showOnLoad = false }: AIAssistantProps) {
+const [isOpen, setIsOpen] = useState(showOnLoad)
 const [isExpanded, setIsExpanded] = useState(false)
 const [activeTab, setActiveTab] = useState<string>("chat")
-const [input, setInput] = useState("")
+const [input, setInput] = useState(initialPrompt || "")
 const [isTyping, setIsTyping] = useState(false)
 const messagesEndRef = useRef<HTMLDivElement>(null)
 const inputRef = useRef<HTMLInputElement>(null)
@@ -91,15 +93,18 @@ const { toast } = useToast()
 const { user } = useAuth()
 const [profileData, setProfileData] = useState<any>(null)
 
-const [messages, setMessages] = useState<Message[]>([
-  {
-    id: "welcome",
-    role: "assistant",
-    content:
-      "Hi there! I'm your EduFolio AI assistant. I can help you craft compelling essays, optimize your extracurriculars, build your college list, and more. What would you like help with today?",
-    timestamp: new Date(),
-  },
-])
+// Start with empty messages, no default welcome message
+const [messages, setMessages] = useState<Message[]>([])
+
+// Counter to ensure unique IDs even when Date.now() is the same
+const [idCounter, setIdCounter] = useState(0);
+
+// Function to generate unique IDs
+const generateUniqueId = () => {
+  const uniqueId = `${Date.now()}-${idCounter}`;
+  setIdCounter(idCounter + 1);
+  return uniqueId;
+};
 
 // Fetch user profile data
 useEffect(() => {
@@ -172,53 +177,57 @@ useEffect(() => {
   fetchProfileData()
 }, [user, toast])
 
-// If initialContext is provided, add a contextual message
+// If initialContext is provided, add a contextual message ONLY if there's no initialPrompt
 useEffect(() => {
+  // Skip adding context message if we have an initialPrompt - avoid duplicates
+  if (initialPrompt) return;
+  
+  // Only add contextual message once and only if it doesn't already exist
   if (initialContext && !messages.some((m) => m.context?.id === initialContext.id)) {
     let contextMessage = ""
 
     switch (initialContext.type) {
       case "essay":
-        contextMessage = `I see you're working on your essay "${initialContext.title}". Would you like help brainstorming ideas, improving your structure, or polishing your writing?`
+        contextMessage = `How can I help with your essay "${initialContext.title}"?`
         break
       case "extracurricular":
-        contextMessage = `I see you're focusing on your "${initialContext.title}" activity. I can help you highlight your impact and leadership in this extracurricular.`
+        contextMessage = `How can I help with your "${initialContext.title}" activity?`
         break
       case "award":
-        contextMessage = `I notice you're working with your "${initialContext.title}" award. I can help you describe its significance and relevance to your application.`
+        contextMessage = `How can I help with your "${initialContext.title}" award?`
         break
       case "academics":
-        contextMessage = `I see you're in the academics section. I can help calculate your GPA, suggest course strategies, or optimize your academic profile.`
+        contextMessage = `How can I help with your academics?`
         break
       case "college":
-        contextMessage = `I see you're looking at ${initialContext.title}. Would you like insights about this college or help tailoring your application for it?`
+        contextMessage = `How can I help with your application to ${initialContext.title}?`
         break
       default:
-        contextMessage = "How can I help you with your college application today?"
+        contextMessage = "How can I help with your college application today?"
     }
 
     setMessages((prevMessages) => [
       ...prevMessages,
       {
-        id: Date.now().toString(),
+        id: generateUniqueId(),
         role: "assistant",
         content: contextMessage,
         timestamp: new Date(),
         context: initialContext,
       },
     ])
-
-    // Open the chat when context is provided
-    setIsOpen(true)
+    
+    // Do not automatically open the chat when context is provided
+    // Let the user click to open it when they want assistance
   }
-}, [initialContext, messages])
+}, [initialContext, messages, idCounter, initialPrompt])
 
 // Use useCallback for handleSendMessage to prevent unnecessary re-renders
 const handleSendMessage = useCallback(async () => {
   if (!input.trim()) return
 
   const userMessage: Message = {
-    id: Date.now().toString(),
+    id: generateUniqueId(),
     role: "user",
     content: input,
     timestamp: new Date(),
@@ -230,12 +239,22 @@ const handleSendMessage = useCallback(async () => {
   setIsTyping(true)
 
   try {
-    let prompt = input
+    // Determine if this is a specific task based on the input
+    const isSpecificTask = 
+      input.includes("feedback on this essay") || 
+      input.includes("grammar") || 
+      input.includes("rephrase") ||
+      input.includes("check this essay");
+    
+    // Construct a prompt with instructions to keep the AI concise
+    let prompt = `${input}\n\n` +
+      `IMPORTANT: Provide a concise, direct response that addresses the query efficiently. ` +
+      `Avoid unnecessary explanations, lengthy introductions, or redundant content. ` +
+      `Focus on providing precise, valuable information in as few words as possible while still being helpful and complete.`;
 
-    // Append profile data to the prompt
+    // Append profile data to the prompt if applicable
     if (profileData) {
       prompt += `\n\nUser Profile Data:\n${JSON.stringify(profileData, null, 2)}`
-      prompt += "\nPlease provide a concise and direct answer."
     }
 
     // Call our secure API route instead of directly using OpenAI
@@ -244,7 +263,11 @@ const handleSendMessage = useCallback(async () => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt: prompt }),
+      body: JSON.stringify({ 
+        prompt: prompt,
+        max_tokens: isSpecificTask ? 700 : 500, // Allow more tokens for specific tasks
+        temperature: isSpecificTask ? 0.5 : 0.7 // Lower temperature for more focused responses on specific tasks
+      }),
     });
 
     if (!response.ok) {
@@ -255,7 +278,7 @@ const handleSendMessage = useCallback(async () => {
     const text = data.text;
 
     const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
+      id: generateUniqueId(),
       role: "assistant",
       content: text,
       timestamp: new Date(),
@@ -272,7 +295,29 @@ const handleSendMessage = useCallback(async () => {
   } finally {
     setIsTyping(false)
   }
-}, [input, toast, profileData])
+}, [input, toast, profileData, idCounter, generateUniqueId])
+
+// Update isOpen when showOnLoad or initialPrompt changes
+useEffect(() => {
+  // If showOnLoad is true, or we have an initialPrompt that explicitly requires showing (from EssaysTab for example)
+  const shouldOpen = showOnLoad || (initialPrompt !== undefined && initialPrompt.includes("feedback on this essay"));
+  if (shouldOpen) {
+    setIsOpen(true);
+  }
+}, [showOnLoad, initialPrompt]);
+
+// If initialPrompt is provided, send message automatically only if assistant is open
+useEffect(() => {
+  // Only auto-send if the assistant is already open (or just got opened) and we have a prompt
+  if (initialPrompt && input === initialPrompt && isOpen) {
+    // Add small delay to ensure component is fully mounted
+    const timer = setTimeout(() => {
+      handleSendMessage();
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }
+}, [initialPrompt, input, handleSendMessage, isOpen]);
 
 // Use useCallback for handleKeyDown to prevent unnecessary re-renders
 const handleKeyDown = useCallback(

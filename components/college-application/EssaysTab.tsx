@@ -1,23 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info } from "lucide-react"
 import AIAssistant from "@/components/ai/AIAssistant"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { calculateWordCount, calculateCharacterCount, validateRequired } from "@/lib/validation"
+import { debounce, hasSignificantChanges } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
+import DOMPurify from "dompurify"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type Essay = {
   id: string
@@ -60,6 +63,8 @@ export default function EssaysTab() {
   const [isLoading, setIsLoading] = useState(true)
   const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [idCounter, setIdCounter] = useState(0)
+  const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -68,6 +73,25 @@ export default function EssaysTab() {
 
   // Add a new state variable to store the essay content
   const [essayContent, setEssayContent] = useState<string>("")
+
+  // Add a state to track the last saved content for each essay
+  const [lastSavedContent, setLastSavedContent] = useState<Record<string, string>>({})
+  // Add a state to track the last version timestamp for each essay
+  const [lastVersionTimestamp, setLastVersionTimestamp] = useState<Record<string, number>>({})
+  // Add a minimum time between versions in milliseconds (default: 15 minutes)
+  const MIN_TIME_BETWEEN_VERSIONS = 15 * 60 * 1000; 
+  // Add a debounce delay for saving content (default: 2 seconds)
+  const SAVE_DEBOUNCE_DELAY = 2000;
+
+  // Add a maximum number of versions to keep per essay
+  const MAX_VERSIONS_PER_ESSAY = 10;
+
+  // Function to generate unique IDs
+  const generateUniqueId = () => {
+    const uniqueId = `${Date.now()}-${idCounter}`;
+    setIdCounter(prev => prev + 1);
+    return uniqueId;
+  };
 
   const performDatabaseOperation = async (
     operation: () => Promise<any>,
@@ -102,23 +126,32 @@ export default function EssaysTab() {
           if (error) throw error
 
           // Fetch versions for each essay if essays exist
-          const versionsMap = {}
+          const versionsMap: Record<string, EssayVersion[]> = {}
           if (data && data.length > 0) {
             const versionsPromises = data.map((essay) =>
               supabase
                 .from("essay_versions")
                 .select("*")
                 .eq("essay_id", essay.id)
-                .order("created_at", { ascending: false }),
+                .order("created_at", { ascending: false })
+                .limit(MAX_VERSIONS_PER_ESSAY) // Limit to max versions per essay
             )
 
             const versionsResults = await Promise.all(versionsPromises)
 
-            versionsResults.forEach((result, index) => {
+            // Process and clean up existing versions
+            for (let i = 0; i < versionsResults.length; i++) {
+              const result = versionsResults[i];
               if (!result.error && result.data) {
-                versionsMap[data[index].id] = result.data
+                const essayId = data[i].id;
+                versionsMap[essayId] = result.data;
+                
+                // Check if we need to clean up old versions in the database
+                if (result.data.length >= MAX_VERSIONS_PER_ESSAY) {
+                  await cleanupExistingVersions(essayId, result.data);
+                }
               }
-            })
+            }
           }
 
           return { essays: data || [], versions: versionsMap }
@@ -127,6 +160,23 @@ export default function EssaysTab() {
         (data) => {
           setEssays(data.essays)
           setEssayVersions(data.versions)
+          
+          // Initialize the lastSavedContent and lastVersionTimestamp from loaded data
+          const initialSavedContent: Record<string, string> = {};
+          const initialVersionTimestamp: Record<string, number> = {};
+          
+          data.essays.forEach((essay: Essay) => {
+            initialSavedContent[essay.id] = essay.content;
+            
+            // Find the latest version timestamp for each essay
+            if (data.versions[essay.id]?.length > 0) {
+              const latestVersion = data.versions[essay.id][0]; // First is the latest due to ordering
+              initialVersionTimestamp[essay.id] = new Date(latestVersion.created_at).getTime();
+            }
+          });
+          
+          setLastSavedContent(initialSavedContent);
+          setLastVersionTimestamp(initialVersionTimestamp);
         },
         (error) => {
           toast({
@@ -139,7 +189,57 @@ export default function EssaysTab() {
     }
 
     fetchData()
-  }, [user, toast])
+  }, [user, toast, MAX_VERSIONS_PER_ESSAY])
+
+  // New function to clean up versions in the database during initial load
+  const cleanupExistingVersions = async (essayId: string, existingVersions: EssayVersion[]) => {
+    if (!user || existingVersions.length <= MAX_VERSIONS_PER_ESSAY) return;
+    
+    try {
+      // Get all versions for this essay to ensure we have the complete list
+      const { data, error } = await supabase
+        .from("essay_versions")
+        .select("*")
+        .eq("essay_id", essayId)
+        .order("created_at", { ascending: false });
+      
+      if (error || !data || data.length <= MAX_VERSIONS_PER_ESSAY) return;
+      
+      // Keep the MAX_VERSIONS_PER_ESSAY most recent versions
+      const versionsToKeep = data.slice(0, MAX_VERSIONS_PER_ESSAY);
+      const keepIds = versionsToKeep.map(v => v.id);
+      
+      // Delete all other versions
+      if (keepIds.length > 0) {
+        // Get versions to delete (all except the ones we want to keep)
+        const { data: toDelete, error: fetchError } = await supabase
+          .from("essay_versions")
+          .select("id")
+          .eq("essay_id", essayId)
+          .not("id", "in", keepIds);
+        
+        if (fetchError || !toDelete || toDelete.length === 0) {
+          return;
+        }
+        
+        const idsToDelete = toDelete.map(v => v.id);
+        
+        const { error: deleteError } = await supabase
+          .from("essay_versions")
+          .delete()
+          .in("id", idsToDelete);
+        
+        if (deleteError) {
+          console.error("Error cleaning up existing versions:", deleteError);
+          return;
+        }
+        
+        console.log(`Cleaned up ${idsToDelete.length} old versions during initial load for essay ${essayId}`);
+      }
+    } catch (error) {
+      console.error("Error in cleanupExistingVersions:", error);
+    }
+  }
 
   // Validate essay form
   const validateEssayForm = (): boolean => {
@@ -212,7 +312,7 @@ export default function EssaysTab() {
               ...essayVersions,
               [data[0].id]: [
                 {
-                  id: Date.now().toString(), // Temporary ID until we fetch the real one
+                  id: generateUniqueId(), // Use the unique ID generator instead of Date.now()
                   essay_id: data[0].id,
                   content: newEssay.content,
                   word_count: wordCount,
@@ -261,12 +361,21 @@ export default function EssaysTab() {
     setEssays(newEssays)
   }
 
+  // Create a debounced version of saveEssayContent
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSaveEssayContent = useRef(
+    debounce(async (essay: any, content: string) => {
+      saveEssayContent(essay, content);
+    }, SAVE_DEBOUNCE_DELAY)
+  ).current;
+
   // Add a new function to save the essay content to the database
   const saveEssayContent = async (essay: any, content: string) => {
     if (!user) return
 
     const wordCount = calculateWordCount(content)
     const charCount = calculateCharacterCount(content)
+    const now = new Date()
 
     try {
       const { error } = await supabase
@@ -275,12 +384,12 @@ export default function EssaysTab() {
           content: content,
           word_count: wordCount,
           character_count: charCount,
-          last_edited: new Date().toLocaleDateString("en-US", {
+          last_edited: now.toLocaleDateString("en-US", {
             month: "long",
             day: "numeric",
             year: "numeric",
           }),
-          updated_at: new Date().toISOString(),
+          updated_at: now.toISOString(),
         })
         .eq("id", essay.id)
 
@@ -288,29 +397,58 @@ export default function EssaysTab() {
         throw error
       }
 
-      // Create a new version
-      const { data: versionData, error: versionError } = await supabase
-        .from("essay_versions")
-        .insert({
-          essay_id: essay.id,
-          content: content,
-          word_count: wordCount,
-          character_count: charCount,
-          version_name: `Edit on ${new Date().toLocaleDateString()}`,
-        })
-        .select()
+      // Get the previously saved content or empty string if none exists
+      const previousContent = lastSavedContent[essay.id] || "";
+      const lastVersionTime = lastVersionTimestamp[essay.id] || 0;
+      const currentTime = now.getTime();
+      
+      // Determine if we should create a new version based on:
+      // 1. Significant content changes
+      // 2. Enough time has passed since the last version
+      const shouldCreateVersion = 
+        hasSignificantChanges(previousContent, content) && 
+        (currentTime - lastVersionTime >= MIN_TIME_BETWEEN_VERSIONS);
 
-      if (versionError) {
-        console.error("Error creating essay version:", versionError)
-      } else if (versionData) {
-        // Update versions in state
-        const updatedVersions = { ...essayVersions }
-        if (!updatedVersions[essay.id]) {
-          updatedVersions[essay.id] = []
+      // Create a new version only if needed
+      if (shouldCreateVersion) {
+        const { data: versionData, error: versionError } = await supabase
+          .from("essay_versions")
+          .insert({
+            essay_id: essay.id,
+            content: content,
+            word_count: wordCount,
+            character_count: charCount,
+            version_name: `Edit on ${now.toLocaleDateString()}`,
+          })
+          .select()
+
+        if (versionError) {
+          console.error("Error creating essay version:", versionError)
+        } else if (versionData) {
+          // Update versions in state
+          const updatedVersions = { ...essayVersions }
+          if (!updatedVersions[essay.id]) {
+            updatedVersions[essay.id] = []
+          }
+          updatedVersions[essay.id] = [versionData[0], ...(updatedVersions[essay.id] || [])]
+          setEssayVersions(updatedVersions)
+          
+          // Update last version timestamp
+          setLastVersionTimestamp(prev => ({
+            ...prev,
+            [essay.id]: currentTime
+          }));
+          
+          // Clean up old versions if necessary
+          cleanupOldVersions(essay.id, [versionData[0], ...(updatedVersions[essay.id] || [])]);
         }
-        updatedVersions[essay.id] = [versionData[0], ...(updatedVersions[essay.id] || [])]
-        setEssayVersions(updatedVersions)
       }
+
+      // Update last saved content regardless of version creation
+      setLastSavedContent(prev => ({
+        ...prev,
+        [essay.id]: content
+      }));
 
       // Update local state immediately after successful database update
       setEssays((prevEssays) =>
@@ -321,7 +459,7 @@ export default function EssaysTab() {
                 content: content,
                 word_count: wordCount,
                 character_count: charCount,
-                last_edited: new Date().toLocaleDateString("en-US", {
+                last_edited: now.toLocaleDateString("en-US", {
                   month: "long",
                   day: "numeric",
                   year: "numeric",
@@ -352,11 +490,34 @@ export default function EssaysTab() {
 
   // Add a new function to handle the save essay content
   const handleSaveEssayContent = (essay: any, content: string) => {
-    saveEssayContent(essay, content)
+    debouncedSaveEssayContent(essay, content)
   }
 
+  // AI feedback function - opens AI assistant with feedback prompt
+  const getAiFeedback = (essay: any) => {
+    setSelectedEssay(essay)
+    setAiAction("feedback")
+    setShowAIAssistant(true)
+  }
+
+  // AI grammar check function - opens AI assistant with grammar checking prompt
+  const checkGrammarWithAi = (essay: any) => {
+    setSelectedEssay(essay)
+    setAiAction("grammar")
+    setShowAIAssistant(true)
+  }
+
+  // AI rephrase function - opens AI assistant with rephrasing prompt
+  const rephraseWithAi = (essay: any) => {
+    setSelectedEssay(essay)
+    setAiAction("rephrase")
+    setShowAIAssistant(true)
+  }
+
+  // General AI assistant without specific function
   const openAIAssistant = (essay: any) => {
     setSelectedEssay(essay)
+    setAiAction(null)
     setShowAIAssistant(true)
   }
 
@@ -445,6 +606,105 @@ export default function EssaysTab() {
         return <Badge variant="outline">{status}</Badge>
     }
   }
+
+  // Safe HTML rendering function
+  const renderSafeHTML = (content: string) => {
+    return DOMPurify.sanitize(content || "")
+  }
+
+  // Extract plain text from HTML for AI prompts
+  const stripHTML = (htmlContent: string) => {
+    // Create a temp div to hold the HTML
+    const tempDiv = document.createElement('div');
+    // Set the sanitized HTML to the div
+    tempDiv.innerHTML = DOMPurify.sanitize(htmlContent || "");
+    // Return just the text content (strips HTML tags)
+    return tempDiv.textContent || tempDiv.innerText || "";
+  }
+
+  // Add a function to clean up old versions when they exceed the maximum limit
+  const cleanupOldVersions = async (essayId: string, currentVersions: EssayVersion[]) => {
+    if (!user || currentVersions.length <= MAX_VERSIONS_PER_ESSAY) return;
+    
+    try {
+      // Sort versions by creation date, newest first
+      const sortedVersions = [...currentVersions].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      // Get versions to keep and to delete
+      const versionsToKeep = sortedVersions.slice(0, MAX_VERSIONS_PER_ESSAY);
+      const versionsToDelete = sortedVersions.slice(MAX_VERSIONS_PER_ESSAY);
+      
+      if (versionsToDelete.length > 0) {
+        // Get the IDs of versions to delete
+        const versionIdsToDelete = versionsToDelete.map(v => v.id);
+        
+        // Delete versions from the database
+        const { error } = await supabase
+          .from("essay_versions")
+          .delete()
+          .in("id", versionIdsToDelete);
+          
+        if (error) {
+          console.error("Error deleting old versions:", error);
+          return;
+        }
+        
+        // Update versions in state
+        const updatedVersions = { ...essayVersions };
+        updatedVersions[essayId] = versionsToKeep;
+        setEssayVersions(updatedVersions);
+        
+        console.log(`Cleaned up ${versionIdsToDelete.length} old versions for essay ${essayId}`);
+      }
+    } catch (error) {
+      console.error("Error cleaning up old versions:", error);
+    }
+  }
+
+  // Add a new function to manually clean up versions
+  const manualCleanupVersions = async (essayId: string) => {
+    if (!user || !essayId) return;
+    
+    setIsLoading(true);
+    try {
+      // Get all versions for this essay
+      const { data, error } = await supabase
+        .from("essay_versions")
+        .select("*")
+        .eq("essay_id", essayId)
+        .order("created_at", { ascending: false });
+      
+      if (error || !data || data.length <= MAX_VERSIONS_PER_ESSAY) {
+        setIsLoading(false);
+        if (data && data.length <= MAX_VERSIONS_PER_ESSAY) {
+          toast({
+            title: "No cleanup needed",
+            description: `You already have ${data.length} versions, which is within the maximum limit of ${MAX_VERSIONS_PER_ESSAY}.`,
+          });
+        }
+        return;
+      }
+      
+      // Use the cleanupOldVersions function
+      await cleanupOldVersions(essayId, data);
+      
+      toast({
+        title: "Version history cleaned up",
+        description: `Kept the ${MAX_VERSIONS_PER_ESSAY} most recent versions for this essay.`,
+      });
+    } catch (error) {
+      console.error("Error cleaning up versions:", error);
+      toast({
+        title: "Error cleaning up versions",
+        description: handleSupabaseError(error, "There was a problem cleaning up the versions."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -594,23 +854,47 @@ export default function EssaysTab() {
                     onShowHistory={() => setShowVersionHistory(essay.id)}
                   />
                 ) : (
-                  <div className="p-4 bg-muted/50 rounded-md font-serif">
-                    {essay.content || "Start writing your essay..."}
-                  </div>
+                  <div 
+                    className="p-4 bg-muted/50 rounded-md font-serif"
+                    dangerouslySetInnerHTML={{ __html: renderSafeHTML(essay.content || "Start writing your essay...") }}
+                  />
                 )}
               </CardContent>
               <CardFooter className="flex justify-end space-x-2 bg-muted/20">
                 {editingEssay === index ? null : (
                   <>
                     <Button
+                      size="sm"
                       variant="outline"
+                      className="ml-2"
                       onClick={() => setShowVersionHistory(essay.id)}
                       disabled={!essayVersions[essay.id] || essayVersions[essay.id].length === 0}
                     >
-                      <History className="h-4 w-4 mr-1" /> History
+                      <div className="flex items-center gap-1">
+                        <History className="h-4 w-4" />
+                        <span>Version History</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex ml-1">
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Smart versioning enabled. New versions are created only when significant changes are made, reducing clutter in version history.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </Button>
-                    <Button variant="outline" onClick={() => openAIAssistant(essay)}>
+                    <Button variant="outline" onClick={() => getAiFeedback(essay)}>
                       <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
+                    </Button>
+                    <Button variant="outline" onClick={() => checkGrammarWithAi(essay)}>
+                      <Sparkles className="h-4 w-4 mr-1" /> Check Grammar
+                    </Button>
+                    <Button variant="outline" onClick={() => rephraseWithAi(essay)}>
+                      <Sparkles className="h-4 w-4 mr-1" /> Rephrase
                     </Button>
                     <Button
                       variant="outline"
@@ -636,7 +920,39 @@ export default function EssaysTab() {
       <Dialog open={!!showVersionHistory} onOpenChange={(open) => !open && setShowVersionHistory(null)}>
         <DialogContent className="sm:max-w-[700px]">
           <DialogHeader>
-            <DialogTitle>Version History</DialogTitle>
+            <div className="flex justify-between items-center">
+              <DialogTitle>Version History</DialogTitle>
+              {showVersionHistory && essayVersions[showVersionHistory] && essayVersions[showVersionHistory].length > MAX_VERSIONS_PER_ESSAY && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex items-center gap-1"
+                  onClick={() => manualCleanupVersions(showVersionHistory)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <History className="h-4 w-4" />
+                      <span>Clean Up History</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex ml-1">
+                              <Info className="h-4 w-4 text-muted-foreground" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>Keep only the {MAX_VERSIONS_PER_ESSAY} most recent versions and delete older ones.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             {showVersionHistory && essayVersions[showVersionHistory] && essayVersions[showVersionHistory].length > 0 ? (
@@ -653,9 +969,10 @@ export default function EssaysTab() {
                       </div>
                     </CardHeader>
                     <CardContent className="py-2">
-                      <div className="p-3 bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto">
-                        {version.content}
-                      </div>
+                      <div 
+                        className="p-3 bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto"
+                        dangerouslySetInnerHTML={{ __html: renderSafeHTML(version.content) }}
+                      />
                     </CardContent>
                     <CardFooter className="py-2">
                       <Button size="sm" onClick={() => restoreVersion(showVersionHistory, version.id, version.content)}>
@@ -679,6 +996,20 @@ export default function EssaysTab() {
             type: "essay",
             id: selectedEssay?.id,
             title: selectedEssay?.prompt || "Essay Writing",
+          }}
+          initialPrompt={
+            selectedEssay && aiAction 
+              ? aiAction === "feedback"
+                ? `Please provide feedback on this essay:\n\n${stripHTML(selectedEssay.content)}`
+                : aiAction === "grammar"
+                  ? `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
+                  : `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
+              : undefined
+          }
+          showOnLoad={true}
+          onClose={() => {
+            setShowAIAssistant(false)
+            setAiAction(null)
           }}
         />
       )}

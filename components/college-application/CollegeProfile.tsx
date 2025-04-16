@@ -90,6 +90,16 @@ export default function CollegeProfile({
   const { user } = useUser()
   const supabase = createClientComponentClient()
 
+  // Add a counter for generating unique IDs
+  const [idCounter, setIdCounter] = useState(0)
+  
+  // Function to generate unique IDs
+  const generateUniqueId = () => {
+    const uniqueId = `${Date.now()}-${idCounter}`;
+    setIdCounter(prev => prev + 1);
+    return uniqueId;
+  };
+
   // Add this to the component
   useEffect(() => {
     // Check for existing share link and generate share URL
@@ -187,7 +197,7 @@ export default function CollegeProfile({
       setEssays([
         ...essays,
         {
-          id: Date.now().toString(),
+          id: generateUniqueId(),
           prompt: newEssay.prompt,
           content: newEssay.content,
           wordCount: newEssay.content.split(/\s+/).filter(Boolean).length,
