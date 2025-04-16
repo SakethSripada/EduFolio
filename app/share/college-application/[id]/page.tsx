@@ -6,10 +6,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle, Star } from "lucide-react"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { format } from "date-fns"
+
+// Helper function to get status badge
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case "Researching":
+      return <Badge variant="outline">Researching</Badge>
+    case "Applying":
+      return <Badge className="bg-blue-500">Applying</Badge>
+    case "Applied":
+      return <Badge className="bg-purple-500">Applied</Badge>
+    case "Waitlisted":
+      return <Badge className="bg-yellow-500">Waitlisted</Badge>
+    case "Accepted":
+      return <Badge className="bg-green-500">Accepted</Badge>
+    case "Rejected":
+      return <Badge className="bg-red-500">Rejected</Badge>
+    case "Committed":
+      return <Badge className="bg-primary">Committed</Badge>
+    default:
+      return <Badge variant="outline">{status}</Badge>
+  }
+}
 
 export default function SharedCollegeApplicationPage() {
   // Use useParams to get the dynamic id from the route.
@@ -94,14 +116,17 @@ export default function SharedCollegeApplicationPage() {
           extracurricularsResponse,
           awardsResponse,
           essaysResponse,
-          collegesResponse,
+          userCollegesResponse,
         ] = await Promise.all([
           supabase.from("academics").select("*").eq("user_id", shareData.user_id),
           supabase.from("test_scores").select("*").eq("user_id", shareData.user_id),
           supabase.from("extracurricular_activities").select("*").eq("user_id", shareData.user_id),
           supabase.from("awards").select("*").eq("user_id", shareData.user_id),
           supabase.from("essays").select("*").eq("user_id", shareData.user_id),
-          supabase.from("colleges").select("*").eq("user_id", shareData.user_id),
+          supabase.from("user_colleges").select(`
+            *,
+            college:colleges(*)
+          `).eq("user_id", shareData.user_id).order("created_at", { ascending: false }),
         ])
 
         // Calculate GPA.
@@ -136,7 +161,7 @@ export default function SharedCollegeApplicationPage() {
           extracurriculars: extracurricularsResponse.data || [],
           awards: awardsResponse.data || [],
           essays: essaysResponse.data || [],
-          colleges: collegesResponse.data || [],
+          colleges: userCollegesResponse.data || [],
         })
       } catch (error) {
         console.error("Error fetching shared college application:", error)
@@ -257,47 +282,80 @@ export default function SharedCollegeApplicationPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {studentData.colleges.map((college: any) => (
-                        <Card key={college.id}>
+                      {studentData.colleges.map((userCollege: any) => (
+                        <Card key={userCollege.id}>
                           <CardHeader className="pb-2">
                             <div className="flex items-start justify-between">
                               <div>
-                                <CardTitle>{college.name}</CardTitle>
-                                <CardDescription>{college.location}</CardDescription>
+                                <div className="flex items-center gap-2">
+                                  {userCollege.is_favorite && 
+                                    <Star className="h-4 w-4 text-yellow-500" />
+                                  }
+                                  <CardTitle>{userCollege.college.name}</CardTitle>
+                                </div>
+                                <CardDescription>{userCollege.college.location}</CardDescription>
                               </div>
-                              {college.logo && (
+                              {userCollege.college.logo_url && (
                                 <img
-                                  src={college.logo || "/placeholder.svg"}
-                                  alt={college.name}
+                                  src={userCollege.college.logo_url || "/placeholder.svg"}
+                                  alt={userCollege.college.name}
                                   className="h-10 w-10 object-contain"
                                 />
                               )}
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Type</p>
-                                <p>{college.type}</p>
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap gap-2">
+                                {getStatusBadge(userCollege.application_status)}
+                                {userCollege.application_deadline_display && (
+                                  <Badge variant="outline">Deadline: {userCollege.application_deadline_display}</Badge>
+                                )}
                               </div>
-                              <div>
-                                <p className="text-muted-foreground">Size</p>
-                                <p>{college.size}</p>
+                              
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground">Type</p>
+                                  <p>{userCollege.college.type}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Size</p>
+                                  <p>{userCollege.college.size}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Acceptance</p>
+                                  <p>{userCollege.college.acceptance_rate}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Ranking</p>
+                                  <p>#{userCollege.college.ranking}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-muted-foreground">Acceptance</p>
-                                <p>{college.acceptance_rate}%</p>
+                              
+                              <div className="flex flex-wrap gap-2">
+                                {userCollege.is_reach && (
+                                  <Badge variant="outline" className="bg-red-100 text-red-800">
+                                    Reach
+                                  </Badge>
+                                )}
+                                {userCollege.is_target && (
+                                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                                    Target
+                                  </Badge>
+                                )}
+                                {userCollege.is_safety && (
+                                  <Badge variant="outline" className="bg-green-100 text-green-800">
+                                    Safety
+                                  </Badge>
+                                )}
                               </div>
-                              <div>
-                                <p className="text-muted-foreground">Ranking</p>
-                                <p>#{college.ranking}</p>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {college.is_reach && <Badge variant="secondary">Reach</Badge>}
-                              {college.is_target && <Badge variant="secondary">Target</Badge>}
-                              {college.is_safety && <Badge variant="secondary">Safety</Badge>}
-                              {college.is_favorite && <Badge variant="secondary">Favorite</Badge>}
+                              
+                              {userCollege.notes && (
+                                <div>
+                                  <p className="text-muted-foreground text-sm">Notes</p>
+                                  <p className="text-sm">{userCollege.notes}</p>
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
