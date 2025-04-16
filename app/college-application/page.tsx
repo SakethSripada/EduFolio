@@ -277,14 +277,14 @@ export default function CollegeApplication() {
         {/* Share Application Dialog */}
         <Dialog open={isSharingApplication} onOpenChange={setIsSharingApplication}>
           <DialogContent className="w-full max-w-[90vw] sm:max-w-[500px]">
-            <DialogHeader>
+            <DialogHeader className="pt-6">
               <DialogTitle>Share Your College Application</DialogTitle>
               <DialogDescription>
                 Control who can see your application and select which sections are shared.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
+            <div className="space-y-6 py-4 overflow-y-auto max-h-[60vh] pr-2">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <h3 className="font-medium">Application Visibility</h3>
@@ -410,7 +410,7 @@ export default function CollegeApplication() {
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t">
               <p className="text-xs text-amber-500 mr-4 hidden sm:block">
                 Remember to click "Update Share Link" to save visibility settings
               </p>

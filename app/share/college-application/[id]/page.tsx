@@ -407,9 +407,9 @@ export default function SharedCollegeApplicationPage() {
                             ) : (
                               studentData.academics.testScores.map((score: any) => (
                                 <TableRow key={score.id}>
-                                  <TableCell>{score.test}</TableCell>
+                                  <TableCell>{score.test_name}</TableCell>
                                   <TableCell>{score.score}</TableCell>
-                                  <TableCell>{score.test_date}</TableCell>
+                                  <TableCell>{score.test_date_display || (score.test_date ? format(new Date(score.test_date), "MMM d, yyyy") : "")}</TableCell>
                                 </TableRow>
                               ))
                             )}
@@ -439,7 +439,7 @@ export default function SharedCollegeApplicationPage() {
                                 <CardTitle>{activity.organization}</CardTitle>
                                 <CardDescription>{activity.position}</CardDescription>
                               </div>
-                              <Badge>{activity.type}</Badge>
+                              <Badge>{activity.activity_type || activity.type}</Badge>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -450,11 +450,11 @@ export default function SharedCollegeApplicationPage() {
                               </div>
                               <div>
                                 <dt className="text-sm font-medium text-muted-foreground">Grade Levels</dt>
-                                <dd>{activity.grades}</dd>
+                                <dd>{activity.grade_levels || activity.grades}</dd>
                               </div>
                               <div>
                                 <dt className="text-sm font-medium text-muted-foreground">Timing</dt>
-                                <dd>{activity.timing}</dd>
+                                <dd>{activity.participation_timing || activity.timing}</dd>
                               </div>
                               <div>
                                 <dt className="text-sm font-medium text-muted-foreground">Hours/Week</dt>
@@ -468,6 +468,12 @@ export default function SharedCollegeApplicationPage() {
                                 <dt className="text-sm font-medium text-muted-foreground">Continue in College</dt>
                                 <dd>{activity.continue_in_college ? "Yes" : "No"}</dd>
                               </div>
+                              {activity.impact_statement && (
+                                <div className="col-span-2">
+                                  <dt className="text-sm font-medium text-muted-foreground">Impact Statement</dt>
+                                  <dd>{activity.impact_statement}</dd>
+                                </div>
+                              )}
                             </dl>
                           </CardContent>
                         </Card>
@@ -481,34 +487,39 @@ export default function SharedCollegeApplicationPage() {
               <TabsContent value="awards">
                 <div>
                   <h2 className="text-2xl font-semibold mb-4">Awards and Honors</h2>
-                  <div className="rounded-md border overflow-hidden overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Honor Title</TableHead>
-                          <TableHead>Grade Level</TableHead>
-                          <TableHead>Level of Recognition</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {studentData.awards.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
-                              No awards added yet
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          studentData.awards.map((award: any) => (
-                            <TableRow key={award.id}>
-                              <TableCell>{award.title}</TableCell>
-                              <TableCell>{award.grade_level}</TableCell>
-                              <TableCell>{award.recognition_level}</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  {studentData.awards.length === 0 ? (
+                    <div className="text-center p-8 border rounded-md">
+                      <p className="text-muted-foreground">No awards added yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {studentData.awards.map((award: any, index: number) => (
+                        <Card key={award.id || index}>
+                          <CardHeader>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle>{award.title}</CardTitle>
+                                <CardDescription>
+                                  {award.grade_level} • {award.recognition_level}
+                                </CardDescription>
+                              </div>
+                              {award.issuing_organization && (
+                                <Badge variant="outline">{award.issuing_organization}</Badge>
+                              )}
+                            </div>
+                          </CardHeader>
+                          {award.description && (
+                            <CardContent>
+                              <div>
+                                <div className="text-sm font-medium text-muted-foreground mb-1">Description</div>
+                                <div>{award.description}</div>
+                              </div>
+                            </CardContent>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             )}
