@@ -98,7 +98,7 @@ export default function SharedCollegeApplicationPage() {
         ] = await Promise.all([
           supabase.from("academics").select("*").eq("user_id", shareData.user_id),
           supabase.from("test_scores").select("*").eq("user_id", shareData.user_id),
-          supabase.from("extracurriculars").select("*").eq("user_id", shareData.user_id),
+          supabase.from("extracurricular_activities").select("*").eq("user_id", shareData.user_id),
           supabase.from("awards").select("*").eq("user_id", shareData.user_id),
           supabase.from("essays").select("*").eq("user_id", shareData.user_id),
           supabase.from("colleges").select("*").eq("user_id", shareData.user_id),

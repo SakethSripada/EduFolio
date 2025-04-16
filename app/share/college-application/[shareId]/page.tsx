@@ -108,58 +108,96 @@ export default function SharedCollegeApplicationPage() {
         const [
           academicsResponse,
           testScoresResponse,
-          extracurricularsResponse,
+          extracurricularActivitiesResponse,
           awardsResponse,
           essaysResponse,
-          collegesResponse,
+          userCollegesResponse,
         ] = await Promise.all([
           supabase.from("academics").select("*").eq("user_id", shareData.user_id),
           supabase.from("test_scores").select("*").eq("user_id", shareData.user_id),
           supabase.from("extracurricular_activities").select("*").eq("user_id", shareData.user_id),
           supabase.from("awards").select("*").eq("user_id", shareData.user_id),
           supabase.from("essays").select("*").eq("user_id", shareData.user_id),
-          supabase
-            .from("user_colleges")
-            .select(`
-              *,
-              college:colleges(*)
-            `)
-            .eq("user_id", shareData.user_id),
+          supabase.from("user_colleges").select("*").eq("user_id", shareData.user_id),
         ])
 
+        // Log responses to debug what's coming back
+        console.log("User colleges data:", userCollegesResponse);
+        console.log("Extracurricular activities:", extracurricularActivitiesResponse);
+
+        // Only use the extracurricular_activities table
+        const extracurriculars = extracurricularActivitiesResponse.data || [];
+        console.log("Filtered extracurriculars:", extracurriculars);
+
+        // After getting user_colleges, fetch the college details for each
+        const collegesData = [];
+        if (userCollegesResponse.data && userCollegesResponse.data.length > 0) {
+          console.log("User colleges found:", userCollegesResponse.data.length);
+          
+          // Extract all college IDs
+          const collegeIds = userCollegesResponse.data.map(uc => uc.college_id).filter(id => id);
+          console.log("College IDs to fetch:", collegeIds);
+          
+          if (collegeIds.length > 0) {
+            // Fetch all colleges in one query
+            const { data: collegesDetails, error: collegesError } = await supabase
+              .from("colleges")
+              .select("*")
+              .in("id", collegeIds);
+              
+            console.log("Colleges details result:", collegesDetails?.length || 0, "colleges found");
+            
+            if (collegesError) {
+              console.error("Error fetching colleges details:", collegesError);
+            } else if (collegesDetails && collegesDetails.length > 0) {
+              // Map user_colleges to their respective college details
+              for (const userCollege of userCollegesResponse.data) {
+                const collegeDetail = collegesDetails.find(c => c.id === userCollege.college_id);
+                
+                if (collegeDetail) {
+                  collegesData.push({
+                    id: userCollege.id,
+                    name: collegeDetail.name || "Unknown College",
+                    location: collegeDetail.location || "",
+                    type: collegeDetail.type || "",
+                    size: collegeDetail.size || "",
+                    acceptance_rate: collegeDetail.acceptance_rate || 0,
+                    ranking: collegeDetail.ranking || 0,
+                    logo: collegeDetail.logo_url || "",
+                    is_reach: userCollege.is_reach || false,
+                    is_target: userCollege.is_target || false,
+                    is_safety: userCollege.is_safety || false,
+                    is_favorite: userCollege.is_favorite || false,
+                    application_status: userCollege.application_status || "",
+                    notes: userCollege.notes || "",
+                  });
+                } else {
+                  console.log("Could not find college details for ID:", userCollege.college_id);
+                }
+              }
+            }
+          }
+        }
+
+        console.log("Final colleges data prepared:", collegesData.length, "colleges");
+
         // Calculate GPA.
-        let unweightedGPA = 0
-        let weightedGPA = 0
-        let totalCredits = 0
+        let unweightedGPA = 0;
+        let weightedGPA = 0;
+        let totalCredits = 0;
 
         if (academicsResponse.data && academicsResponse.data.length > 0) {
           academicsResponse.data.forEach((course) => {
-            unweightedGPA += course.grade_points * course.credits
-            weightedGPA += course.weighted_grade_points * course.credits
-            totalCredits += course.credits
-          })
+            unweightedGPA += course.grade_points * course.credits;
+            weightedGPA += course.weighted_grade_points * course.credits;
+            totalCredits += course.credits;
+          });
 
-          unweightedGPA = totalCredits > 0 ? unweightedGPA / totalCredits : 0
-          weightedGPA = totalCredits > 0 ? weightedGPA / totalCredits : 0
+          unweightedGPA = totalCredits > 0 ? unweightedGPA / totalCredits : 0;
+          weightedGPA = totalCredits > 0 ? weightedGPA / totalCredits : 0;
         }
 
-        // Process the college data to make it easier to use
-        const colleges = collegesResponse.data?.map(userCollege => {
-          return {
-            id: userCollege.id,
-            name: userCollege.college?.name || "Unknown College",
-            location: userCollege.college?.location || "",
-            type: userCollege.college?.type || "",
-            size: userCollege.college?.size || "",
-            acceptance_rate: userCollege.college?.acceptance_rate || 0,
-            ranking: userCollege.college?.ranking || 0,
-            logo: userCollege.college?.logo_url || "",
-            is_reach: userCollege.is_reach || false,
-            is_target: userCollege.is_target || false,
-            is_safety: userCollege.is_safety || false,
-            is_favorite: userCollege.is_favorite || false,
-          };
-        }) || [];
+        console.log("Processed colleges data:", collegesData);
 
         setStudentData({
           name: profileData.full_name,
@@ -174,10 +212,10 @@ export default function SharedCollegeApplicationPage() {
             },
             testScores: testScoresResponse.data || [],
           },
-          extracurriculars: extracurricularsResponse.data || [],
+          extracurriculars: extracurriculars,
           awards: awardsResponse.data || [],
           essays: essaysResponse.data || [],
-          colleges: colleges,
+          colleges: collegesData,
         })
       } catch (error) {
         console.error("Error fetching shared college application:", error)
@@ -350,7 +388,256 @@ export default function SharedCollegeApplicationPage() {
             )}
             
             {/* Add the rest of your tabs here */}
-            
+            {visibleSettings.showAcademics && (
+              <TabsContent value="academics">
+                <div className="space-y-8">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>GPA</CardTitle>
+                      <CardDescription>Overall grade point average</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div className="flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg">
+                          <span className="text-sm text-muted-foreground mb-1">Unweighted GPA</span>
+                          <span className="text-4xl font-bold">{studentData.academics.gpa.unweighted}</span>
+                          <span className="text-xs text-muted-foreground mt-1">4.0 Scale</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg">
+                          <span className="text-sm text-muted-foreground mb-1">Weighted GPA</span>
+                          <span className="text-4xl font-bold">{studentData.academics.gpa.weighted}</span>
+                          <span className="text-xs text-muted-foreground mt-1">5.0 Scale</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Courses</CardTitle>
+                      <CardDescription>Academic courses and grades</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border overflow-hidden overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Course</TableHead>
+                              <TableHead>Grade</TableHead>
+                              <TableHead>Level</TableHead>
+                              <TableHead>Grade Level</TableHead>
+                              <TableHead>Term</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {studentData.academics.courses.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                                  No courses added yet
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              studentData.academics.courses.map((course: any) => (
+                                <TableRow key={course.id}>
+                                  <TableCell>{course.name}</TableCell>
+                                  <TableCell>{course.grade}</TableCell>
+                                  <TableCell>
+                                    {course.level === "AP/IB" ? (
+                                      <Badge className="bg-blue-500">AP/IB</Badge>
+                                    ) : course.level === "Honors" ? (
+                                      <Badge className="bg-purple-500">Honors</Badge>
+                                    ) : course.level === "College" ? (
+                                      <Badge className="bg-green-500">College</Badge>
+                                    ) : (
+                                      <Badge variant="outline">Regular</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{course.grade_level}</TableCell>
+                                  <TableCell>{course.term}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Test Scores</CardTitle>
+                      <CardDescription>Standardized test results</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border overflow-hidden overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Test</TableHead>
+                              <TableHead>Score</TableHead>
+                              <TableHead>Date</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {studentData.academics.testScores.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                                  No test scores added yet
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              studentData.academics.testScores.map((score: any) => (
+                                <TableRow key={score.id}>
+                                  <TableCell>{score.test_name}</TableCell>
+                                  <TableCell>{score.score}</TableCell>
+                                  <TableCell>{score.test_date_display}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            )}
+
+            {visibleSettings.showExtracurriculars && (
+              <TabsContent value="extracurriculars">
+                <div>
+                  <h2 className="text-2xl font-semibold mb-4">Extracurricular Activities</h2>
+                  <div className="space-y-4">
+                    {studentData.extracurriculars.length === 0 ? (
+                      <div className="text-center p-8 border rounded-md">
+                        <p className="text-muted-foreground">No extracurricular activities added yet</p>
+                      </div>
+                    ) : (
+                      studentData.extracurriculars.map((activity: any, index: number) => (
+                        <Card key={activity.id || index}>
+                          <CardHeader>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle>{activity.organization || activity.position}</CardTitle>
+                                <CardDescription>{activity.position || activity.organization}</CardDescription>
+                              </div>
+                              <Badge>{activity.activity_type || activity.type}</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">Description</dt>
+                                <dd>{activity.description}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">Grade Levels</dt>
+                                <dd>{activity.grade_levels || activity.grades}</dd>
+                              </div>
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">Time Commitment</dt>
+                                <dd>
+                                  {activity.hours_per_week} hrs/week, {activity.weeks_per_year} weeks/year
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">Timing</dt>
+                                <dd>{activity.participation_timing || activity.timing}</dd>
+                              </div>
+                            </dl>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+
+            {visibleSettings.showAwards && (
+              <TabsContent value="awards">
+                <div>
+                  <h2 className="text-2xl font-semibold mb-4">Awards & Honors</h2>
+                  <div className="space-y-4">
+                    {studentData.awards.length === 0 ? (
+                      <div className="text-center p-8 border rounded-md">
+                        <p className="text-muted-foreground">No awards added yet</p>
+                      </div>
+                    ) : (
+                      studentData.awards.map((award: any) => (
+                        <Card key={award.id}>
+                          <CardHeader>
+                            <CardTitle>{award.title}</CardTitle>
+                            <CardDescription>{award.issuing_organization}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">Recognition Level</dt>
+                                <dd>
+                                  <Badge>{award.recognition_level}</Badge>
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">Date Received</dt>
+                                <dd>{award.date_display}</dd>
+                              </div>
+                              <div className="sm:col-span-2">
+                                <dt className="text-sm font-medium text-muted-foreground">Description</dt>
+                                <dd>{award.description}</dd>
+                              </div>
+                            </dl>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+
+            {visibleSettings.showEssays && (
+              <TabsContent value="essays">
+                <div>
+                  <h2 className="text-2xl font-semibold mb-4">Essays</h2>
+                  <div className="space-y-4">
+                    {studentData.essays.length === 0 ? (
+                      <div className="text-center p-8 border rounded-md">
+                        <p className="text-muted-foreground">No essays added yet</p>
+                      </div>
+                    ) : (
+                      studentData.essays.map((essay: any) => (
+                        <Card key={essay.id}>
+                          <CardHeader>
+                            <CardTitle>{essay.title}</CardTitle>
+                            <CardDescription>
+                              {essay.word_count} words
+                              {essay.status && (
+                                <Badge className="ml-2" variant="outline">
+                                  {essay.status}
+                                </Badge>
+                              )}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="mb-4">
+                              <h4 className="text-sm font-medium text-muted-foreground mb-1">Prompt</h4>
+                              <p>{essay.prompt}</p>
+                            </div>
+                            <div className="border-t pt-4">
+                              <h4 className="text-sm font-medium text-muted-foreground mb-1">Essay Content</h4>
+                              <div className="prose prose-sm max-w-none">
+                                <p>{essay.content?.substring(0, 300)}...</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </div>

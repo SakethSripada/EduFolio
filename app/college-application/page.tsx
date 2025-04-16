@@ -33,6 +33,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createOrUpdateShareLink, generateShareUrl } from "@/lib/supabase/utils"
+import { Separator } from "@/components/ui/separator"
 
 export default function CollegeApplication() {
   const [isSharingApplication, setIsSharingApplication] = useState(false)
@@ -162,6 +163,10 @@ export default function CollegeApplication() {
       }
       // Do not change the share_id if a record exists. Use it directly.
       const currentShareId = existingShareLink?.share_id || shareId
+      
+      // Log the settings being saved
+      console.log("Saving share settings:", shareSettings);
+      
       const { success, error } = await createOrUpdateShareLink({
         userId: user.id,
         contentType: "college_application",
@@ -171,6 +176,7 @@ export default function CollegeApplication() {
         existingShareId: currentShareId,
         settings: shareSettings,
       })
+      
       if (error) throw error
 
       toast({
@@ -289,6 +295,64 @@ export default function CollegeApplication() {
                 <Switch checked={isPublic} onCheckedChange={toggleApplicationVisibility} />
               </div>
 
+              <Separator className="my-4" />
+              
+              <div className="space-y-4">
+                <h3 className="font-medium">Section Visibility</h3>
+                <p className="text-sm text-muted-foreground">
+                  Control which sections of your application are visible to others
+                </p>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showAcademics" className="cursor-pointer">Academics</Label>
+                    <Switch 
+                      id="showAcademics" 
+                      checked={shareSettings.showAcademics} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showAcademics: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showExtracurriculars" className="cursor-pointer">Extracurriculars</Label>
+                    <Switch 
+                      id="showExtracurriculars" 
+                      checked={shareSettings.showExtracurriculars} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showExtracurriculars: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showAwards" className="cursor-pointer">Awards</Label>
+                    <Switch 
+                      id="showAwards" 
+                      checked={shareSettings.showAwards} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showAwards: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showEssays" className="cursor-pointer">Essays</Label>
+                    <Switch 
+                      id="showEssays" 
+                      checked={shareSettings.showEssays} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showEssays: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showColleges" className="cursor-pointer">College List</Label>
+                    <Switch 
+                      id="showColleges" 
+                      checked={shareSettings.showColleges} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showColleges: checked})} 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <Separator className="my-4" />
+
               <div className="space-y-3">
                 <Label>Link Expiration</Label>
                 <RadioGroup value={expiryOption} onValueChange={setExpiryOption}>
@@ -347,6 +411,9 @@ export default function CollegeApplication() {
             </div>
 
             <DialogFooter>
+              <p className="text-xs text-amber-500 mr-4 hidden sm:block">
+                Remember to click "Update Share Link" to save visibility settings
+              </p>
               <Button onClick={handleCreateShareLink} disabled={isLoading}>
                 {isLoading ? "Processing..." : "Update Share Link"}
               </Button>
