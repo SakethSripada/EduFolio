@@ -63,7 +63,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
     isLoading: isLoadingAwards,
     refetch: refetchAwards,
   } = useSupabaseQuery<Award[]>({
-    queryKey: ["college-awards", collegeId, user?.id],
+    queryKey: ["college-awards", collegeId, user?.id ?? ""],
     queryFn: async () => {
       if (!user || !collegeId) return []
 
@@ -84,7 +84,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
 
   // Use our custom hook for fetching general awards
   const { data: generalAwards, isLoading: isLoadingGeneralAwards } = useSupabaseQuery<Award[]>({
-    queryKey: ["general-awards", user?.id],
+    queryKey: ["general-awards", user?.id ?? ""],
     queryFn: async () => {
       if (!user) return []
 
@@ -698,8 +698,8 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
                       <h4 className="font-medium">{award.title}</h4>
                       <p className="text-sm text-muted-foreground line-clamp-2">{award.description}</p>
                       <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>{award.gradeLevel}</span>
-                        <span>{award.recognitionLevel}</span>
+                        <span>{award.grade_level}</span>
+                        <span>{award.recognition_level}</span>
                       </div>
                     </div>
                   </div>
@@ -741,7 +741,6 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
         confirmText={deleteAwardMutation.isLoading ? "Deleting..." : "Delete"}
         onConfirm={() => confirmDeleteAward && deleteAward(confirmDeleteAward)}
         variant="destructive"
-        disabled={deleteAwardMutation.isLoading}
       />
     </div>
   )
