@@ -37,12 +37,12 @@ export async function createOrUpdateShareLink({
   existingShareId?: string
   settings?: Record<string, any>
 }): Promise<{ success: boolean; shareId: string; error?: any }> {
-  // Create Supabase client
-  const supabase = createClientComponentClient()
-
   try {
+    const supabase = createClientComponentClient()
+    
+    // Use the provided shareId or generate a new one.
     const shareId = existingShareId || Math.random().toString(36).substring(2, 10)
-    // Build payload for debugging
+
     const payload = {
       user_id: userId,
       share_id: shareId,
@@ -52,34 +52,24 @@ export async function createOrUpdateShareLink({
       expires_at: expiresAt ? expiresAt.toISOString() : null,
       settings: settings || {},
     }
-    console.log("Insert/Update Payload for shared_links:", payload)
 
-    // First, verify that the current user is authenticated and matches the userId
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session || session.user.id !== userId) {
-      console.error("Authentication mismatch or missing session:", { 
-        hasSession: !!session, 
-        sessionUserId: session?.user.id, 
-        requestedUserId: userId 
-      })
-      return { success: false, shareId: "", error: "Authentication required. Please sign in again." }
-    }
-
-    // Check if a share link already exists.
-    const { data: existingLink, error: fetchError } = await supabase
+    // Check if a share link already exists for this user and content type
+    const { data: existingRecord, error: findError } = await supabase
       .from("shared_links")
-      .select("id")
+      .select("id, share_id")
       .eq("user_id", userId)
       .eq("content_type", contentType)
-      .eq(contentId ? "content_id" : "share_id", contentId || shareId)
-      .maybeSingle()
-
-    if (fetchError) {
-      throw fetchError
+      .maybeSingle();
+      
+    if (findError) {
+      console.error("Error checking for existing record:", findError);
+      throw findError;
     }
-
-    if (existingLink) {
-      // Update existing link.
+    
+    // If we have an existing record, update it
+    if (existingRecord) {
+      console.log("Updating existing share link");
+      
       const { error: updateError } = await supabase
         .from("shared_links")
         .update({
@@ -88,29 +78,34 @@ export async function createOrUpdateShareLink({
           settings: payload.settings,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", existingLink.id)
-
+        .eq("id", existingRecord.id);
+        
       if (updateError) {
-        throw updateError
+        console.error("Error updating share link:", updateError);
+        throw updateError;
       }
-
-      return { success: true, shareId }
-    } else {
-      // Create new share link record.
-      const { error: insertError } = await supabase.from("shared_links").insert(payload)
-
+      
+      return { success: true, shareId: existingRecord.share_id };
+    } 
+    // Otherwise create a new record
+    else {
+      console.log("Creating new share link");
+      
+      const { data: insertedData, error: insertError } = await supabase
+        .from("shared_links")
+        .insert(payload)
+        .select("share_id")
+        .single();
+      
       if (insertError) {
-        throw insertError
+        console.error("Error inserting share link:", insertError);
+        throw insertError;
       }
-      return { success: true, shareId }
+      
+      return { success: true, shareId: insertedData.share_id };
     }
   } catch (error: any) {
     console.error("Error creating/updating share link:", error)
-    if (error && error.message) {
-      console.error("Error message:", error.message)
-    } else {
-      console.error("Error object:", error)
-    }
     return { success: false, shareId: "", error }
   }
 }

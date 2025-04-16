@@ -1,4 +1,3 @@
-// /app/college-application/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -46,7 +45,7 @@ export default function CollegeApplication() {
   const [existingShareLink, setExistingShareLink] = useState<any>(null)
   const [expiryOption, setExpiryOption] = useState("never")
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
-  // New state for section visibility settings (to be shared)
+  // State for the section visibility settings
   const [shareSettings, setShareSettings] = useState({
     showAcademics: true,
     showExtracurriculars: true,
@@ -56,13 +55,17 @@ export default function CollegeApplication() {
   })
 
   const supabase = createClientComponentClient()
-  const { user } = useAuth() // Get the current user
+  const { user } = useAuth() // Get the current authenticated user
 
-  // Check for an existing share link on mount.
+  // On mount, check if a share link already exists and if not, immediately create one.
   useEffect(() => {
-    const checkExistingShareLink = async () => {
+    const checkOrCreateShareLink = async () => {
       if (!user) return
 
+      const baseUrl =
+        typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
+
+      // Simply check for existing share link without refreshing session
       const { data, error } = await supabase
         .from("shared_links")
         .select("*")
@@ -71,14 +74,12 @@ export default function CollegeApplication() {
         .maybeSingle()
 
       if (error) {
-        console.error("Error checking for existing share link:", error)
+        console.error("Error checking share link:", error)
         return
       }
 
-      const baseUrl =
-        typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
-
       if (data) {
+        // Share link record exists – load its data.
         setExistingShareLink(data)
         setShareId(data.share_id)
         setShareLink(`${baseUrl}/share/college-application/${data.share_id}`)
@@ -90,25 +91,57 @@ export default function CollegeApplication() {
           setExpiryOption("never")
           setExpiryDate(undefined)
         }
-        // Load saved share settings if they exist.
         if (data.settings) {
           setShareSettings({
-            showAcademics: data.settings.showAcademics !== undefined ? data.settings.showAcademics : true,
-            showExtracurriculars: data.settings.showExtracurriculars !== undefined ? data.settings.showExtracurriculars : true,
-            showAwards: data.settings.showAwards !== undefined ? data.settings.showAwards : true,
-            showEssays: data.settings.showEssays !== undefined ? data.settings.showEssays : true,
-            showColleges: data.settings.showColleges !== undefined ? data.settings.showColleges : true,
+            showAcademics: data.settings.showAcademics ?? true,
+            showExtracurriculars: data.settings.showExtracurriculars ?? true,
+            showAwards: data.settings.showAwards ?? true,
+            showEssays: data.settings.showEssays ?? true,
+            showColleges: data.settings.showColleges ?? true,
           })
         }
       } else {
-        // Generate a new share ID if none exists.
+        // No share link exists: create one with default settings.
         const newShareId = Math.random().toString(36).substring(2, 10)
-        setShareId(newShareId)
-        setShareLink(`${baseUrl}/share/college-application/${newShareId}`)
+        const defaultSettings = {
+          showAcademics: true,
+          showExtracurriculars: true,
+          showAwards: true,
+          showEssays: true,
+          showColleges: true,
+        }
+        
+        // Simple insert operation
+        const { data: insertedData, error: insertError } = await supabase
+          .from("shared_links")
+          .insert({
+            user_id: user.id,
+            share_id: newShareId,
+            content_type: "college_application",
+            content_id: null,
+            is_public: false, // default to private until updated
+            expires_at: null,
+            settings: defaultSettings,
+          })
+          .select("*")
+          .single()
+
+        if (insertError) {
+          console.error("Error creating share link:", insertError)
+          return
+        }
+
+        if (insertedData) {
+          setExistingShareLink(insertedData)
+          setShareId(insertedData.share_id)
+          setShareLink(`${baseUrl}/share/college-application/${insertedData.share_id}`)
+          setIsPublic(insertedData.is_public)
+          setShareSettings(defaultSettings)
+        }
       }
     }
 
-    checkExistingShareLink()
+    checkOrCreateShareLink()
   }, [supabase, user])
 
   const handleCreateShareLink = async () => {
@@ -120,28 +153,24 @@ export default function CollegeApplication() {
       })
       return
     }
+    
     setIsLoading(true)
     try {
-      // Calculate expiry date, if any.
       let expiresAt: Date | null = null
       if (expiryOption === "date" && expiryDate) {
         expiresAt = expiryDate
       }
-
-      // Extract the share ID from the link.
-      const currentShareId = shareLink.split("/").pop() || shareId
-
-      // Call the updated helper passing in the shareSettings.
+      // Do not change the share_id if a record exists. Use it directly.
+      const currentShareId = existingShareLink?.share_id || shareId
       const { success, error } = await createOrUpdateShareLink({
         userId: user.id,
         contentType: "college_application",
         contentId: null,
         isPublic,
         expiresAt,
-        existingShareId: existingShareLink?.share_id,
+        existingShareId: currentShareId,
         settings: shareSettings,
       })
-
       if (error) throw error
 
       toast({
@@ -301,7 +330,7 @@ export default function CollegeApplication() {
                 )}
               </div>
 
-              {/* The share link input is auto‑populated; no extra “Generate” button is shown */}
+              {/* The share link input is auto‑populated; no extra "Generate" button is shown */}
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input value={shareLink} readOnly className="flex-grow" />
@@ -315,16 +344,11 @@ export default function CollegeApplication() {
                     : "Enable public visibility to share your application"}
                 </p>
               </div>
-
-              {/* (Optional) You can add UI controls here for the owner to choose which sections to share.
-                  For example, checkboxes to toggle Academics, Extracurriculars, Awards, and Essays.
-                  In this demo we assume all sections are shared by default.
-              */}
             </div>
 
             <DialogFooter>
               <Button onClick={handleCreateShareLink} disabled={isLoading}>
-                {isLoading ? "Processing..." : existingShareLink ? "Update Share Link" : "Save Share Settings"}
+                {isLoading ? "Processing..." : "Update Share Link"}
               </Button>
               <Button variant="outline" onClick={() => setIsSharingApplication(false)}>
                 Done

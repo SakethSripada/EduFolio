@@ -4,6 +4,7 @@ import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Session, User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 
@@ -24,19 +25,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  
+  // Use the nextjs client for consistent auth
+  const client = createClientComponentClient()
 
   useEffect(() => {
     const setData = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoading(false)
+      try {
+        const {
+          data: { session },
+        } = await client.auth.getSession()
+        
+        console.log("Auth Provider: Initial session check", { 
+          hasSession: !!session,
+          sessionUser: session?.user?.id
+        })
+        
+        setSession(session)
+        setUser(session?.user ?? null)
+        setIsLoading(false)
+      } catch (error) {
+        console.error("Error getting session:", error)
+        setIsLoading(false)
+      }
     }
 
     // Update the auth state change listener to use setTimeout
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = client.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state change:", event, { hasSession: !!session })
+      
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
@@ -47,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTimeout(async () => {
             try {
               // First check if profile exists
-              const { data: existingProfile, error: fetchError } = await supabase
+              const { data: existingProfile, error: fetchError } = await client
                 .from("profiles")
                 .select("*")
                 .eq("user_id", session.user.id)
@@ -60,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               if (!existingProfile) {
                 // Insert new profile
-                const { error: insertError } = await supabase.from("profiles").insert({
+                const { error: insertError } = await client.from("profiles").insert({
                   user_id: session.user.id,
                   full_name: session.user.user_metadata.full_name || "",
                   email: session.user.email || "",
@@ -74,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
               } else {
                 // Update existing profile
-                const { error: updateError } = await supabase
+                const { error: updateError } = await client
                   .from("profiles")
                   .update({
                     full_name: session.user.user_metadata.full_name || existingProfile.full_name,
@@ -100,10 +117,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       authListener.subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, client])
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { error } = await client.auth.signUp({
       email,
       password,
       options: {
@@ -116,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await client.auth.signInWithPassword({
       email,
       password,
     })
@@ -124,12 +141,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await client.auth.signOut()
     router.push("/login")
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await client.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
     return { error }
