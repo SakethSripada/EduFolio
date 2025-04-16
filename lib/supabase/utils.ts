@@ -1,3 +1,4 @@
+// /lib/supabase/utils.ts
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export type ShareLinkType = "college_application" | "college_profile" | "portfolio"
@@ -9,13 +10,15 @@ export interface ShareLinkData {
   content_type: ShareLinkType
   content_id?: string | null
   is_public: boolean
+  settings?: Record<string, any> | null
   expires_at?: string | null
   created_at?: string
   updated_at?: string
 }
 
 /**
- * Creates or updates a share link
+ * Creates or updates a share link.
+ * Accepts an optional `settings` object to store JSON configuration.
  */
 export async function createOrUpdateShareLink({
   userId,
@@ -24,6 +27,7 @@ export async function createOrUpdateShareLink({
   isPublic,
   expiresAt,
   existingShareId,
+  settings, // settings for the share section visibility
 }: {
   userId: string
   contentType: ShareLinkType
@@ -31,14 +35,25 @@ export async function createOrUpdateShareLink({
   isPublic: boolean
   expiresAt?: Date | null
   existingShareId?: string
+  settings?: Record<string, any>
 }): Promise<{ success: boolean; shareId: string; error?: any }> {
   const supabase = createClientComponentClient()
 
   try {
-    // Generate a new share ID if none exists
     const shareId = existingShareId || Math.random().toString(36).substring(2, 10)
+    // Build payload for debugging
+    const payload = {
+      user_id: userId,
+      share_id: shareId,
+      content_type: contentType,
+      content_id: contentId || null,
+      is_public: isPublic,
+      expires_at: expiresAt ? expiresAt.toISOString() : null,
+      settings: settings || {},
+    }
+    console.log("Insert/Update Payload for shared_links:", payload)
 
-    // Check if a share link already exists
+    // Check if a share link already exists.
     const { data: existingLink, error: fetchError } = await supabase
       .from("shared_links")
       .select("id")
@@ -47,45 +62,49 @@ export async function createOrUpdateShareLink({
       .eq(contentId ? "content_id" : "share_id", contentId || shareId)
       .maybeSingle()
 
-    if (fetchError) throw fetchError
+    if (fetchError) {
+      throw fetchError
+    }
 
     if (existingLink) {
-      // Update existing share link
+      // Update existing link.
       const { error: updateError } = await supabase
         .from("shared_links")
         .update({
           is_public: isPublic,
-          expires_at: expiresAt ? expiresAt.toISOString() : null,
+          expires_at: payload.expires_at,
+          settings: payload.settings,
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingLink.id)
 
-      if (updateError) throw updateError
+      if (updateError) {
+        throw updateError
+      }
 
       return { success: true, shareId }
     } else {
-      // Create new share link
-      const { error: insertError } = await supabase.from("shared_links").insert({
-        user_id: userId,
-        share_id: shareId,
-        content_type: contentType,
-        content_id: contentId || null,
-        is_public: isPublic,
-        expires_at: expiresAt ? expiresAt.toISOString() : null,
-      })
+      // Create new share link record.
+      const { error: insertError } = await supabase.from("shared_links").insert(payload)
 
-      if (insertError) throw insertError
-
+      if (insertError) {
+        throw insertError
+      }
       return { success: true, shareId }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating/updating share link:", error)
+    if (error && error.message) {
+      console.error("Error message:", error.message)
+    } else {
+      console.error("Error object:", error)
+    }
     return { success: false, shareId: "", error }
   }
 }
 
 /**
- * Gets a share link by ID
+ * Gets a share link by ID.
  */
 export async function getShareLink(shareId: string): Promise<{ data: ShareLinkData | null; error: any }> {
   const supabase = createClientComponentClient()
@@ -95,11 +114,10 @@ export async function getShareLink(shareId: string): Promise<{ data: ShareLinkDa
 
     if (error) throw error
 
-    // Check if the link has expired
+    // Check for expiry.
     if (data.expires_at && new Date(data.expires_at) < new Date()) {
       return { data: null, error: "This share link has expired." }
     }
-
     return { data, error: null }
   } catch (error) {
     console.error("Error fetching share link:", error)
@@ -108,11 +126,10 @@ export async function getShareLink(shareId: string): Promise<{ data: ShareLinkDa
 }
 
 /**
- * Generates a share URL
+ * Generates a share URL.
  */
 export function generateShareUrl(contentType: ShareLinkType, shareId: string, contentId?: string): string {
   const baseUrl = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
-
   if (contentType === "college_profile" && contentId) {
     return `${baseUrl}/share/college/${contentId}/${shareId}`
   } else if (contentType === "college_application") {
@@ -120,6 +137,5 @@ export function generateShareUrl(contentType: ShareLinkType, shareId: string, co
   } else if (contentType === "portfolio") {
     return `${baseUrl}/share/portfolio/${shareId}`
   }
-
   return `${baseUrl}/share/${contentType}/${shareId}`
 }
