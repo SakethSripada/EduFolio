@@ -37,6 +37,7 @@ export async function createOrUpdateShareLink({
   existingShareId?: string
   settings?: Record<string, any>
 }): Promise<{ success: boolean; shareId: string; error?: any }> {
+  // Create Supabase client
   const supabase = createClientComponentClient()
 
   try {
@@ -52,6 +53,17 @@ export async function createOrUpdateShareLink({
       settings: settings || {},
     }
     console.log("Insert/Update Payload for shared_links:", payload)
+
+    // First, verify that the current user is authenticated and matches the userId
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session || session.user.id !== userId) {
+      console.error("Authentication mismatch or missing session:", { 
+        hasSession: !!session, 
+        sessionUserId: session?.user.id, 
+        requestedUserId: userId 
+      })
+      return { success: false, shareId: "", error: "Authentication required. Please sign in again." }
+    }
 
     // Check if a share link already exists.
     const { data: existingLink, error: fetchError } = await supabase
@@ -110,14 +122,24 @@ export async function getShareLink(shareId: string): Promise<{ data: ShareLinkDa
   const supabase = createClientComponentClient()
 
   try {
+    // First check if we can find the link
     const { data, error } = await supabase.from("shared_links").select("*").eq("share_id", shareId).single()
 
     if (error) throw error
 
-    // Check for expiry.
+    // Check for expiry
     if (data.expires_at && new Date(data.expires_at) < new Date()) {
       return { data: null, error: "This share link has expired." }
     }
+
+    // If the link is not public, verify that the current user is the owner
+    if (!data.is_public) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session || session.user.id !== data.user_id) {
+        return { data: null, error: "This is a private link. You need to be the owner to view it." }
+      }
+    }
+
     return { data, error: null }
   } catch (error) {
     console.error("Error fetching share link:", error)
