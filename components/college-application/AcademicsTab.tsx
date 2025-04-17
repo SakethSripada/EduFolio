@@ -399,6 +399,7 @@ export default function AcademicsTab() {
       },
       setIsLoading,
       () => {
+        const { regular, weighted } = getGradePoints(newCourse.grade as string, newCourse.level as string)
         setCourses(
           courses.map((course) => {
             if (course.id === editingCourseId) {
@@ -463,6 +464,7 @@ export default function AcademicsTab() {
           title: "Course deleted",
           description: "Your course has been deleted successfully.",
         })
+        setConfirmDeleteCourse(null)
       },
       (error) => {
         toast({
@@ -470,10 +472,7 @@ export default function AcademicsTab() {
           description: handleSupabaseError(error, "There was a problem deleting the course."),
           variant: "destructive",
         })
-      },
-      () => {
-        setConfirmDeleteCourse(null)
-      },
+      }
     )
   }
 
@@ -544,6 +543,7 @@ export default function AcademicsTab() {
           title: "Test score deleted",
           description: "Your test score has been deleted successfully.",
         })
+        setConfirmDeleteTestScore(null)
       },
       (error) => {
         toast({
@@ -551,10 +551,7 @@ export default function AcademicsTab() {
           description: handleSupabaseError(error, "There was a problem deleting the test score."),
           variant: "destructive",
         })
-      },
-      () => {
-        setConfirmDeleteTestScore(null)
-      },
+      }
     )
   }
 
@@ -828,6 +825,11 @@ export default function AcademicsTab() {
     return formattedText;
   };
 
+  // Calculate UC GPA (needed for format GPA for AI)
+  const calculateUCGPA = (coursesToCalculate: Course[]) => {
+    return calculateGPA(true, false);
+  }
+
   // Format GPA information for AI
   const formatGPAForAI = () => {
     let formattedText = "GPA Information:\n";
@@ -838,9 +840,9 @@ export default function AcademicsTab() {
       formattedText += `- Weighted GPA: ${manualGPA.weighted}\n`;
       formattedText += `- UC GPA: ${manualGPA.uc_gpa}\n`;
     } else {
-      const unweighted = calculateGPA(courses, false);
-      const weighted = calculateGPA(courses, true);
-      const ucGPA = calculateUCGPA(courses);
+      const unweighted = calculateGPA(false);
+      const weighted = calculateGPA(true);
+      const ucGPA = calculateGPA(true, false);
       
       formattedText += `- Using calculated GPA values\n`;
       formattedText += `- Unweighted GPA: ${unweighted}\n`;
