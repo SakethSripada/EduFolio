@@ -32,7 +32,8 @@ import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { createOrUpdateShareLink } from "@/lib/supabase/utils"
+import { createOrUpdateShareLink, generateShareUrl } from "@/lib/supabase/utils"
+import { Separator } from "@/components/ui/separator"
 
 export default function CollegeApplication() {
   const [isSharingApplication, setIsSharingApplication] = useState(false)
@@ -45,15 +46,27 @@ export default function CollegeApplication() {
   const [existingShareLink, setExistingShareLink] = useState<any>(null)
   const [expiryOption, setExpiryOption] = useState("never")
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
+  // State for the section visibility settings
+  const [shareSettings, setShareSettings] = useState({
+    showAcademics: true,
+    showExtracurriculars: true,
+    showAwards: true,
+    showEssays: true,
+    showColleges: true,
+  })
 
   const supabase = createClientComponentClient()
-  const { user } = useAuth() // Use the Auth context to get the current user
+  const { user } = useAuth() // Get the current authenticated user
 
-  // Check for existing share link
+  // On mount, check if a share link already exists and if not, immediately create one.
   useEffect(() => {
-    const checkExistingShareLink = async () => {
+    const checkOrCreateShareLink = async () => {
       if (!user) return
 
+      const baseUrl =
+        typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
+
+      // Simply check for existing share link without refreshing session
       const { data, error } = await supabase
         .from("shared_links")
         .select("*")
@@ -62,19 +75,16 @@ export default function CollegeApplication() {
         .maybeSingle()
 
       if (error) {
-        console.error("Error checking for existing share link:", error)
+        console.error("Error checking share link:", error)
         return
       }
 
       if (data) {
+        // Share link record exists – load its data.
         setExistingShareLink(data)
         setShareId(data.share_id)
-
-        const baseUrl = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
         setShareLink(`${baseUrl}/share/college-application/${data.share_id}`)
-
         setIsPublic(data.is_public)
-
         if (data.expires_at) {
           setExpiryOption("date")
           setExpiryDate(new Date(data.expires_at))
@@ -82,17 +92,57 @@ export default function CollegeApplication() {
           setExpiryOption("never")
           setExpiryDate(undefined)
         }
+        if (data.settings) {
+          setShareSettings({
+            showAcademics: data.settings.showAcademics ?? true,
+            showExtracurriculars: data.settings.showExtracurriculars ?? true,
+            showAwards: data.settings.showAwards ?? true,
+            showEssays: data.settings.showEssays ?? true,
+            showColleges: data.settings.showColleges ?? true,
+          })
+        }
       } else {
-        // Generate a new share ID if none exists
+        // No share link exists: create one with default settings.
         const newShareId = Math.random().toString(36).substring(2, 10)
-        setShareId(newShareId)
+        const defaultSettings = {
+          showAcademics: true,
+          showExtracurriculars: true,
+          showAwards: true,
+          showEssays: true,
+          showColleges: true,
+        }
+        
+        // Simple insert operation
+        const { data: insertedData, error: insertError } = await supabase
+          .from("shared_links")
+          .insert({
+            user_id: user.id,
+            share_id: newShareId,
+            content_type: "college_application",
+            content_id: null,
+            is_public: false, // default to private until updated
+            expires_at: null,
+            settings: defaultSettings,
+          })
+          .select("*")
+          .single()
 
-        const baseUrl = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
-        setShareLink(`${baseUrl}/share/college-application/${newShareId}`)
+        if (insertError) {
+          console.error("Error creating share link:", insertError)
+          return
+        }
+
+        if (insertedData) {
+          setExistingShareLink(insertedData)
+          setShareId(insertedData.share_id)
+          setShareLink(`${baseUrl}/share/college-application/${insertedData.share_id}`)
+          setIsPublic(insertedData.is_public)
+          setShareSettings(defaultSettings)
+        }
       }
     }
 
-    checkExistingShareLink()
+    checkOrCreateShareLink()
   }, [supabase, user])
 
   const handleCreateShareLink = async () => {
@@ -104,38 +154,40 @@ export default function CollegeApplication() {
       })
       return
     }
-
+    
     setIsLoading(true)
     try {
-      // Calculate expiry date if needed
-      let expiresAt = null
+      let expiresAt: Date | null = null
       if (expiryOption === "date" && expiryDate) {
-        expiresAt = expiryDate.toISOString()
+        expiresAt = expiryDate
       }
-
-      // Extract the share ID from the link
-      const shareId = shareLink.split("/").pop()
-
+      // Do not change the share_id if a record exists. Use it directly.
+      const currentShareId = existingShareLink?.share_id || shareId
+      
+      // Log the settings being saved
+      console.log("Saving share settings:", shareSettings);
+      
       const { success, error } = await createOrUpdateShareLink({
         userId: user.id,
         contentType: "college_application",
         contentId: null,
-        isPublic: isPublic,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-        existingShareId: existingShareLink?.share_id,
+        isPublic,
+        expiresAt,
+        existingShareId: currentShareId,
+        settings: shareSettings,
       })
-
+      
       if (error) throw error
 
       toast({
-        title: "Share link created",
-        description: "Your college application can now be shared with others.",
+        title: "Share link saved",
+        description: "Your college application share settings have been updated.",
       })
     } catch (error) {
       console.error("Error creating/updating share link:", error)
       toast({
         title: "Error with share link",
-        description: "There was a problem with your share link.",
+        description: "There was a problem updating your share settings.",
         variant: "destructive",
       })
     } finally {
@@ -165,7 +217,9 @@ export default function CollegeApplication() {
           <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-foreground">College Application</h1>
-              <p className="mt-2 text-muted-foreground">Manage all aspects of your college application in one place.</p>
+              <p className="mt-2 text-muted-foreground">
+                Manage all aspects of your college application in one place.
+              </p>
             </div>
             <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsSharingApplication(true)}>
               <Share2 className="h-4 w-4" /> Share Application
@@ -223,11 +277,14 @@ export default function CollegeApplication() {
         {/* Share Application Dialog */}
         <Dialog open={isSharingApplication} onOpenChange={setIsSharingApplication}>
           <DialogContent className="w-full max-w-[90vw] sm:max-w-[500px]">
-            <DialogHeader>
+            <DialogHeader className="pt-6">
               <DialogTitle>Share Your College Application</DialogTitle>
-              <DialogDescription>Control who can see your application and share it with others.</DialogDescription>
+              <DialogDescription>
+                Control who can see your application and select which sections are shared.
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-6 py-4">
+
+            <div className="space-y-6 py-4 overflow-y-auto max-h-[60vh] pr-2">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <h3 className="font-medium">Application Visibility</h3>
@@ -237,6 +294,64 @@ export default function CollegeApplication() {
                 </div>
                 <Switch checked={isPublic} onCheckedChange={toggleApplicationVisibility} />
               </div>
+
+              <Separator className="my-4" />
+              
+              <div className="space-y-4">
+                <h3 className="font-medium">Section Visibility</h3>
+                <p className="text-sm text-muted-foreground">
+                  Control which sections of your application are visible to others
+                </p>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showAcademics" className="cursor-pointer">Academics</Label>
+                    <Switch 
+                      id="showAcademics" 
+                      checked={shareSettings.showAcademics} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showAcademics: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showExtracurriculars" className="cursor-pointer">Extracurriculars</Label>
+                    <Switch 
+                      id="showExtracurriculars" 
+                      checked={shareSettings.showExtracurriculars} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showExtracurriculars: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showAwards" className="cursor-pointer">Awards</Label>
+                    <Switch 
+                      id="showAwards" 
+                      checked={shareSettings.showAwards} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showAwards: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showEssays" className="cursor-pointer">Essays</Label>
+                    <Switch 
+                      id="showEssays" 
+                      checked={shareSettings.showEssays} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showEssays: checked})} 
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="showColleges" className="cursor-pointer">College List</Label>
+                    <Switch 
+                      id="showColleges" 
+                      checked={shareSettings.showColleges} 
+                      onCheckedChange={(checked) => setShareSettings({...shareSettings, showColleges: checked})} 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <Separator className="my-4" />
 
               <div className="space-y-3">
                 <Label>Link Expiration</Label>
@@ -250,16 +365,15 @@ export default function CollegeApplication() {
                     <Label htmlFor="date">Expires on specific date</Label>
                   </div>
                 </RadioGroup>
-
                 {expiryOption === "date" && (
                   <div className="pt-2">
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
-                          variant={"outline"}
+                          variant="outline"
                           className={cn(
                             "w-full justify-start text-left font-normal",
-                            !expiryDate && "text-muted-foreground",
+                            !expiryDate && "text-muted-foreground"
                           )}
                         >
                           <Calendar className="mr-2 h-4 w-4" />
@@ -280,6 +394,7 @@ export default function CollegeApplication() {
                 )}
               </div>
 
+              {/* The share link input is auto‑populated; no extra "Generate" button is shown */}
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Input value={shareLink} readOnly className="flex-grow" />
@@ -294,9 +409,13 @@ export default function CollegeApplication() {
                 </p>
               </div>
             </div>
-            <DialogFooter>
+
+            <DialogFooter className="pt-4 border-t">
+              <p className="text-xs text-amber-500 mr-4 hidden sm:block">
+                Remember to click "Update Share Link" to save visibility settings
+              </p>
               <Button onClick={handleCreateShareLink} disabled={isLoading}>
-                {isLoading ? "Processing..." : existingShareLink ? "Update Share Link" : "Create Share Link"}
+                {isLoading ? "Processing..." : "Update Share Link"}
               </Button>
               <Button variant="outline" onClick={() => setIsSharingApplication(false)}>
                 Done
@@ -305,7 +424,6 @@ export default function CollegeApplication() {
           </DialogContent>
         </Dialog>
 
-        {/* AI Assistant */}
         <AIAssistant showOnLoad={false} />
       </div>
     </ProtectedRoute>
