@@ -26,7 +26,12 @@ const handleSupabaseError = (error: any, defaultMessage: string): string => {
 }
 
 // Utility function to perform database operations with loading and error handling
-const performDatabaseOperation = async (operation, setIsLoading, onSuccess, onError) => {
+const performDatabaseOperation = async <T,>(
+  operation: () => Promise<T>,
+  setIsLoading: (isLoading: boolean) => void,
+  onSuccess: (data: T) => void,
+  onError: (error: any) => void
+): Promise<void> => {
   setIsLoading(true)
   try {
     const data = await operation()
