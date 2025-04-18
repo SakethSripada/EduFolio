@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
@@ -40,6 +40,7 @@ import {
   MoreHorizontal,
   Plus,
   Loader2,
+  Calendar,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -51,9 +52,15 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/lib/supabase"
+import { supabase, handleSupabaseError, performDatabaseOperation } from "@/lib/supabase"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
-import { performDatabaseOperation, handleSupabaseError } from "@/lib/utils"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
+import { createOrUpdateShareLink, generateShareUrl } from "@/lib/supabase/utils"
+import { Separator } from "@/components/ui/separator"
 
 export default function PortfolioContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -65,10 +72,14 @@ export default function PortfolioContent() {
   const [isSharingPortfolio, setIsSharingPortfolio] = useState(false)
   const [isPublic, setIsPublic] = useState(false)
   const [shareLink, setShareLink] = useState("")
+  const [shareId, setShareId] = useState("")
   const [copied, setCopied] = useState(false)
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
   const [newCategory, setNewCategory] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [existingShareLink, setExistingShareLink] = useState<any>(null)
+  const [expiryOption, setExpiryOption] = useState("never")
+  const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
   const { user } = useAuth()
 
   const [newProject, setNewProject] = useState({
@@ -96,6 +107,79 @@ export default function PortfolioContent() {
   // Add state for confirmation dialogs
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<string | null>(null)
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string | null>(null)
+
+  // Check for existing share link on component mount
+  useEffect(() => {
+    if (!user) return;
+
+    const checkExistingShareLink = async () => {
+      try {
+        const baseUrl = 
+          typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : "";
+
+        // Check if a share link already exists
+        const { data, error } = await supabase
+          .from("shared_links")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("content_type", "portfolio")
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error checking share link:", error);
+          return;
+        }
+
+        if (data) {
+          // Share link exists - load its data
+          setExistingShareLink(data);
+          setShareId(data.share_id);
+          setShareLink(`${baseUrl}/share/portfolio/${data.share_id}`);
+          setIsPublic(data.is_public);
+          
+          if (data.expires_at) {
+            setExpiryOption("date");
+            setExpiryDate(new Date(data.expires_at));
+          } else {
+            setExpiryOption("never");
+            setExpiryDate(undefined);
+          }
+        } else {
+          // No share link exists - create a new one with default settings
+          const newShareId = Math.random().toString(36).substring(2, 10);
+          
+          const { data: insertedData, error: insertError } = await supabase
+            .from("shared_links")
+            .insert({
+              user_id: user.id,
+              share_id: newShareId,
+              content_type: "portfolio",
+              content_id: null,
+              is_public: false, // Default to private
+              expires_at: null,
+            })
+            .select("*")
+            .single();
+
+          if (insertError) {
+            console.error("Error creating share link:", insertError);
+            return;
+          }
+
+          if (insertedData) {
+            setExistingShareLink(insertedData);
+            setShareId(insertedData.share_id);
+            setShareLink(`${baseUrl}/share/portfolio/${insertedData.share_id}`);
+            setIsPublic(insertedData.is_public);
+          }
+        }
+      } catch (error) {
+        console.error("Error in checkExistingShareLink:", error);
+      }
+    };
+
+    checkExistingShareLink();
+  }, [user]);
 
   // Fetch projects and categories from Supabase
   useEffect(() => {
@@ -163,43 +247,53 @@ export default function PortfolioContent() {
     fetchData()
   }, [user, toast])
 
-  useEffect(() => {
-    const baseUrl = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
-    const shareId = Math.random().toString(36).substring(2, 10)
-    setShareLink(`${baseUrl}/share/portfolio/${shareId}`)
-  }, [])
-
-  // Add function to save share link to database
+  // Update portfolio share link
   const handleCreateShareLink = async () => {
-    if (!user) return
-
-    try {
-      // Extract the share ID from the link
-      const shareId = shareLink.split("/").pop()
-
-      // Save the share link to the database
-      const { error } = await supabase.from("shared_links").insert({
-        user_id: user.id,
-        share_id: shareId,
-        content_type: "portfolio",
-        is_public: isPublic,
-      })
-
-      if (error) throw error
-
+    if (!user) {
       toast({
-        title: "Share link created",
-        description: "Your portfolio can now be shared with others.",
-      })
-    } catch (error) {
-      console.error("Error creating share link:", error)
-      toast({
-        title: "Error creating share link",
-        description: "There was a problem creating your share link.",
+        title: "Authentication required",
+        description: "Please sign in to create a share link.",
         variant: "destructive",
-      })
+      });
+      return;
     }
-  }
+    
+    setIsLoading(true);
+    try {
+      let expiresAt: Date | null = null;
+      if (expiryOption === "date" && expiryDate) {
+        expiresAt = expiryDate;
+      }
+      
+      // Use existing share ID if available
+      const currentShareId = existingShareLink?.share_id || shareId;
+      
+      const { success, error } = await createOrUpdateShareLink({
+        userId: user.id,
+        contentType: "portfolio",
+        contentId: null,
+        isPublic,
+        expiresAt,
+        existingShareId: currentShareId,
+      });
+      
+      if (error) throw error;
+
+      toast({
+        title: "Share link saved",
+        description: "Your portfolio share settings have been updated.",
+      });
+    } catch (error) {
+      console.error("Error creating/updating share link:", error);
+      toast({
+        title: "Error with share link",
+        description: "There was a problem updating your share settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -730,14 +824,17 @@ export default function PortfolioContent() {
           </DialogContent>
         </Dialog>
 
-        {/* Share Portfolio Dialog */}
+        {/* Share Portfolio Dialog - REPLACE the existing one with this enhanced version */}
         <Dialog open={isSharingPortfolio} onOpenChange={setIsSharingPortfolio}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
+          <DialogContent className="w-full max-w-[90vw] sm:max-w-[500px]">
+            <DialogHeader className="pt-6">
               <DialogTitle>Share Your Portfolio</DialogTitle>
-              <DialogDescription>Control who can see your portfolio and share it with others.</DialogDescription>
+              <DialogDescription>
+                Create a shareable link to your portfolio projects
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-6 py-4">
+
+            <div className="space-y-6 py-4 overflow-y-auto max-h-[60vh] pr-2">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <h3 className="font-medium">Portfolio Visibility</h3>
@@ -748,8 +845,50 @@ export default function PortfolioContent() {
                 <Switch checked={isPublic} onCheckedChange={togglePortfolioVisibility} />
               </div>
 
+              <Separator className="my-4" />
+
+              <div className="space-y-3">
+                <Label>Link Expiration</Label>
+                <RadioGroup value={expiryOption} onValueChange={setExpiryOption}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="never" id="never" />
+                    <Label htmlFor="never">Never expires</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="date" id="date" />
+                    <Label htmlFor="date">Expires on specific date</Label>
+                  </div>
+                </RadioGroup>
+                {expiryOption === "date" && (
+                  <div className="pt-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !expiryDate && "text-muted-foreground"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {expiryDate ? format(expiryDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={expiryDate}
+                          onSelect={setExpiryDate}
+                          initialFocus
+                          disabled={(date) => date < new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
-                <Label>Share Link</Label>
                 <div className="flex gap-2">
                   <Input value={shareLink} readOnly className="flex-grow" />
                   <Button variant="outline" size="icon" onClick={copyShareLink}>
@@ -763,9 +902,17 @@ export default function PortfolioContent() {
                 </p>
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={handleCreateShareLink}>Create Share Link</Button>
-              <Button onClick={() => setIsSharingPortfolio(false)}>Done</Button>
+
+            <DialogFooter className="pt-4 border-t">
+              <p className="text-xs text-amber-500 mr-4 hidden sm:block">
+                Remember to click "Update Share Link" to save visibility settings
+              </p>
+              <Button onClick={handleCreateShareLink} disabled={isLoading}>
+                {isLoading ? "Processing..." : "Update Share Link"}
+              </Button>
+              <Button variant="outline" onClick={() => setIsSharingPortfolio(false)}>
+                Done
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1071,38 +1218,13 @@ export default function PortfolioContent() {
                                 <img
                                   src={image || "/placeholder.svg"}
                                   alt={`Gallery ${index}`}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-24 object-cover rounded-md"
                                 />
-                                {index === 2 && project.gallery.length > 3 && (
-                                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-medium">
-                                    +{project.gallery.length - 3}
-                                  </div>
-                                )}
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
-
-                      <div className="mt-auto">
-                        {project.link && (
-                          <Button variant="outline" className="w-full" asChild>
-                            <a
-                              href={project.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-center"
-                            >
-                              {project.link.includes("github") ? (
-                                <Github className="h-4 w-4 mr-2" />
-                              ) : (
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                              )}
-                              View Project
-                            </a>
-                          </Button>
-                        )}
-                      </div>
                     </CardContent>
                   </Card>
                 ))
@@ -1111,26 +1233,6 @@ export default function PortfolioContent() {
           </TabsContent>
         </Tabs>
       </div>
-
-      <ConfirmationDialog
-        open={!!confirmDeleteProject}
-        onOpenChange={(open) => !open && setConfirmDeleteProject(null)}
-        title="Delete Project"
-        description="Are you sure you want to delete this project? This action cannot be undone."
-        confirmText="Delete"
-        onConfirm={() => confirmDeleteProject && deleteProject(confirmDeleteProject)}
-        variant="destructive"
-      />
-
-      <ConfirmationDialog
-        open={!!confirmDeleteCategory}
-        onOpenChange={(open) => !open && setConfirmDeleteCategory(null)}
-        title="Delete Category"
-        description="Are you sure you want to delete this category? This action cannot be undone."
-        confirmText="Delete"
-        onConfirm={() => confirmDeleteCategory && deleteCategory(confirmDeleteCategory)}
-        variant="destructive"
-      />
     </>
   )
 }

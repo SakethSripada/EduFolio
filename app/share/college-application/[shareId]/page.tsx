@@ -626,8 +626,8 @@ export default function SharedCollegeApplicationPage() {
                             </div>
                             <div className="border-t pt-4">
                               <h4 className="text-sm font-medium text-muted-foreground mb-1">Essay Content</h4>
-                              <div className="prose prose-sm max-w-none">
-                                <p>{essay.content?.substring(0, 300)}...</p>
+                              <div className="prose prose-sm dark:prose-invert max-w-none">
+                                <p className="text-foreground dark:text-foreground whitespace-pre-wrap">{essay.content}</p>
                               </div>
                             </div>
                           </CardContent>
