@@ -100,7 +100,6 @@ export default function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar>
-                    <AvatarImage src="https://github.com/shadcn.png" />
                     <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                   {isPremium && (
@@ -121,9 +120,17 @@ export default function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/subscription">
                     <Sparkles className="mr-2 h-4 w-4" />
-                    {isPremium ? 'Premium Active' : `AI Credits: ${remainingCredits}`}
+                    {isPremium ? 'Premium Plan' : 'Subscription'}
                   </Link>
                 </DropdownMenuItem>
+                {!isPremium && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/subscription" className="text-primary font-medium">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Upgrade to Premium
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut()}>
                   <LogOut className="mr-2 h-4 w-4" />
