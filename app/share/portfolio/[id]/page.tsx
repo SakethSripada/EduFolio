@@ -257,6 +257,15 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
     })
   }
 
+  // Helper function to get user initials
+  const getUserInitials = (name: string | undefined): string => {
+    if (!name) return 'U';
+    
+    const names = name.split(' ');
+    if (names.length === 1) return names[0].charAt(0).toUpperCase();
+    return (names[0].charAt(0) + names[names.length > 1 ? 1 : 0].charAt(0)).toUpperCase();
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -306,11 +315,10 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
         </Link>
 
         <div className="flex items-center gap-4 mb-6">
-          <img
-            src={portfolio.owner.avatar || "/placeholder.svg"}
-            alt={portfolio.owner.name}
-            className="w-16 h-16 rounded-full object-cover"
-          />
+          {/* Temporarily disabled avatar in favor of initials */}
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
+            {getUserInitials(portfolio.owner.name)}
+          </div>
           <div>
             <h1 className="text-3xl font-bold">{portfolio.owner.name}'s Portfolio</h1>
             <p className="text-muted-foreground">Shared portfolio</p>

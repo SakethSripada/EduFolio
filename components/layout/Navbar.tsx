@@ -98,10 +98,12 @@ export default function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
+                    {/* Temporarily disabled avatar image in favor of initials
                     <AvatarImage
                       src={user.user_metadata?.avatar_url || ""}
                       alt={user.user_metadata?.full_name || "User"}
                     />
+                    */}
                     <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                 </Button>

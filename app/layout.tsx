@@ -10,6 +10,26 @@ import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
+// Script to prevent theme flashing
+const themeInitializerScript = `
+  (function() {
+    try {
+      // Try to get the theme from localStorage
+      const storedTheme = localStorage.getItem('theme');
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      // Logic to determine which theme to use
+      if (storedTheme === 'dark' || (storedTheme === 'system' && systemPrefersDark) || (!storedTheme && systemPrefersDark)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {
+      console.error('Error setting initial theme', e);
+    }
+  })();
+`;
+
 export const metadata: Metadata = {
   title: "EduFolio - Your Educational Journey, Beautifully Organized",
   description: "Manage your college applications, resume, professional experience, and portfolio with ease.",
@@ -35,8 +55,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/EduFolioLogo.ico" />
+        {/* Add script to prevent theme flash */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitializerScript }} />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <div className="flex flex-col min-h-screen">

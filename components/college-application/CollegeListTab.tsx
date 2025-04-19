@@ -81,41 +81,46 @@ export default function CollegeListTab() {
 
     const fetchData = async () => {
       setIsLoading(true)
+      try {
+        // Fetch colleges
+        const { data: collegesData, error: collegesError } = await supabase
+          .from("colleges")
+          .select("*")
+          .order("name", { ascending: true })
 
-      setTimeout(async () => {
-        try {
-          // Fetch all colleges
-          const { data: collegesData, error: collegesError } = await supabase
-            .from("colleges")
-            .select("*")
-            .order("name", { ascending: true })
+        if (collegesError) {
+          throw collegesError
+        }
 
-          if (collegesError) throw collegesError
+        setColleges(collegesData || [])
 
-          // Fetch user's colleges with college details
+        if (user) {
+          // Fetch user's colleges
           const { data: userCollegesData, error: userCollegesError } = await supabase
             .from("user_colleges")
             .select(`
-          *,
-          college:colleges(*)
-        `)
+              *,
+              college:colleges(*)
+            `)
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
 
-          if (userCollegesError) throw userCollegesError
+          if (userCollegesError) {
+            throw userCollegesError
+          }
 
-          setColleges(collegesData || [])
           setUserColleges(userCollegesData || [])
-        } catch (error) {
-          toast({
-            title: "Error loading colleges",
-            description: handleSupabaseError(error, "There was a problem loading your college list."),
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
         }
-      }, 0)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        toast({
+          title: "Error fetching data",
+          description: handleSupabaseError(error, "There was a problem loading your college list."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     fetchData()
@@ -447,16 +452,29 @@ export default function CollegeListTab() {
     window.location.href = `/college-application/college/${collegeId}`
   }
 
-  // Filter colleges based on active tab
+  // Filter colleges based on active tab and search query
   const filteredColleges = userColleges.filter((userCollege) => {
-    if (activeTab === "all") return true
-    if (activeTab === "favorites") return userCollege.is_favorite
-    if (activeTab === "reach") return userCollege.is_reach
-    if (activeTab === "target") return userCollege.is_target
-    if (activeTab === "safety") return userCollege.is_safety
-    if (activeTab === userCollege.application_status.toLowerCase()) return true
-    return false
-  })
+    // First filter by tab
+    let passesTabFilter = false;
+    if (activeTab === "all") passesTabFilter = true;
+    else if (activeTab === "favorites") passesTabFilter = userCollege.is_favorite;
+    else if (activeTab === "reach") passesTabFilter = userCollege.is_reach;
+    else if (activeTab === "target") passesTabFilter = userCollege.is_target;
+    else if (activeTab === "safety") passesTabFilter = userCollege.is_safety;
+    else if (activeTab === userCollege.application_status.toLowerCase()) passesTabFilter = true;
+    
+    // If doesn't pass tab filter, return false immediately
+    if (!passesTabFilter) return false;
+    
+    // Then filter by search query
+    if (!searchQuery) return true;
+    
+    // Search in college name and location
+    return (
+      userCollege.college.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      userCollege.college.location.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   // Get status badge
   const getStatusBadge = (status: string) => {
@@ -492,32 +510,33 @@ export default function CollegeListTab() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-semibold">My College List</h2>
-        <div className="flex gap-2">
+        <Button className="flex items-center gap-1" onClick={() => setIsAddingCollege(true)}>
+          <PlusCircle className="h-4 w-4" /> Add College
+        </Button>
+      </div>
+
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+          <TabsList className="flex flex-wrap">
+            <TabsTrigger value="all">All Colleges</TabsTrigger>
+            <TabsTrigger value="favorites">Favorites</TabsTrigger>
+            <TabsTrigger value="reach">Reach</TabsTrigger>
+            <TabsTrigger value="target">Target</TabsTrigger>
+            <TabsTrigger value="safety">Safety</TabsTrigger>
+            <TabsTrigger value="researching">Researching</TabsTrigger>
+            <TabsTrigger value="applying">Applying</TabsTrigger>
+            <TabsTrigger value="applied">Applied</TabsTrigger>
+            <TabsTrigger value="waitlisted">Waitlisted</TabsTrigger>
+            <TabsTrigger value="accepted">Accepted</TabsTrigger>
+          </TabsList>
+          
           <Input
             placeholder="Search colleges..."
             className="w-full md:w-64"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <Button className="flex items-center gap-1" onClick={() => setIsAddingCollege(true)}>
-            <PlusCircle className="h-4 w-4" /> Add College
-          </Button>
         </div>
-      </div>
-
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4 flex flex-wrap">
-          <TabsTrigger value="all">All Colleges</TabsTrigger>
-          <TabsTrigger value="favorites">Favorites</TabsTrigger>
-          <TabsTrigger value="reach">Reach</TabsTrigger>
-          <TabsTrigger value="target">Target</TabsTrigger>
-          <TabsTrigger value="safety">Safety</TabsTrigger>
-          <TabsTrigger value="researching">Researching</TabsTrigger>
-          <TabsTrigger value="applying">Applying</TabsTrigger>
-          <TabsTrigger value="applied">Applied</TabsTrigger>
-          <TabsTrigger value="waitlisted">Waitlisted</TabsTrigger>
-          <TabsTrigger value="accepted">Accepted</TabsTrigger>
-        </TabsList>
 
         <TabsContent value={activeTab} className="mt-0">
           {filteredColleges.length === 0 ? (
