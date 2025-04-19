@@ -1,7 +1,7 @@
 # EduFolio: Your Educational Journey, Beautifully Organized
 
 <div align="center">
-  <img src="public/edufolio-logo.png" alt="EduFolio Logo" width="120" />
+  <img src="public/EduFolioLogo.png" alt="EduFolio Logo" width="120" />
   
   <p>
     <strong>AI-powered platform for organizing and optimizing your college application process</strong>
