@@ -228,6 +228,15 @@ export default function SharedCollegeApplicationPage() {
     fetchData()
   }, [shareId, supabase])
 
+  // Helper function to get user initials
+  const getUserInitials = (name: string | undefined): string => {
+    if (!name) return 'U';
+    
+    const names = name.split(' ');
+    if (names.length === 1) return names[0].charAt(0).toUpperCase();
+    return (names[0].charAt(0) + names[names.length > 1 ? 1 : 0].charAt(0)).toUpperCase();
+  };
+
   if (loading) {
     return (
       <div className="container py-12 flex items-center justify-center">
@@ -274,11 +283,10 @@ export default function SharedCollegeApplicationPage() {
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to EduFolio
         </Link>
         <div className="flex items-center gap-4 mb-6">
-          <img
-            src={studentData.avatar || "/placeholder.svg?height=64&width=64"}
-            alt={studentData.name}
-            className="w-16 h-16 rounded-full object-cover"
-          />
+          {/* Temporarily disabled avatar in favor of initials */}
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
+            {getUserInitials(studentData.name)}
+          </div>
           <div>
             <h1 className="text-3xl font-bold">{studentData.name}'s College Application</h1>
             <p className="text-muted-foreground">

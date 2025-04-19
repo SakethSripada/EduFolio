@@ -388,9 +388,10 @@ return (
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b bg-muted/50">
           <div className="flex items-center gap-2">
-            <Avatar className="h-8 w-8 bg-primary">
+            {/* Temporarily using div instead of Avatar */}
+            <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
               <Bot className="h-4 w-4 text-primary-foreground" />
-            </Avatar>
+            </div>
             <div>
               <h2 className="text-sm font-semibold">EduFolio AI Assistant</h2>
               <p className="text-xs text-muted-foreground">Powered by advanced AI</p>
@@ -438,9 +439,10 @@ return (
                 ))}
                 {isTyping && (
                   <div className="flex gap-3 max-w-[90%]">
-                    <Avatar className="h-8 w-8 mt-1 bg-primary flex-shrink-0">
+                    {/* Temporarily using div instead of Avatar */}
+                    <div className="h-8 w-8 mt-1 bg-primary rounded-full flex-shrink-0 flex items-center justify-center">
                       <Bot className="h-4 w-4 text-primary-foreground" />
-                    </Avatar>
+                    </div>
                     <div className="rounded-lg p-3 bg-muted">
                       <div className="flex items-center gap-1">
                         <div

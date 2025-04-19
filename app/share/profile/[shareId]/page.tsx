@@ -150,7 +150,9 @@ export default function SharedProfilePage() {
         
         <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6">
           <Avatar className="h-24 w-24">
+            {/* Temporarily disabled avatar image in favor of initials
             <AvatarImage src={userData.avatarUrl || "/placeholder.svg"} alt={userData.fullName} />
+            */}
             <AvatarFallback className="text-2xl">{getUserInitials()}</AvatarFallback>
           </Avatar>
           

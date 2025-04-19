@@ -444,7 +444,9 @@ export default function ProfilePage() {
                   <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
                     <div className="relative">
                       <Avatar className="h-20 w-20">
+                        {/* Temporarily disabled avatar image in favor of initials
                         <AvatarImage src={profile.avatarUrl || "/placeholder.svg"} alt={profile.fullName} />
+                        */}
                         <AvatarFallback className="text-lg">{getUserInitials()}</AvatarFallback>
                       </Avatar>
                       {isUploading && (
@@ -459,6 +461,7 @@ export default function ProfilePage() {
                         Your profile picture will be shown across the application
                       </p>
                       <div className="flex flex-wrap gap-2">
+                        {/* Temporarily disabled avatar upload functionality
                         <Button
                           variant="outline"
                           size="sm"
@@ -482,6 +485,8 @@ export default function ProfilePage() {
                         >
                           <Trash2 className="h-4 w-4 mr-1" /> Remove
                         </Button>
+                        */}
+                        <p className="text-sm text-muted-foreground">Sorry! Avatar uploads are temporarily disabled.</p>
                       </div>
                     </div>
                   </div>
