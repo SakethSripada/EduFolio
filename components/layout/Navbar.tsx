@@ -18,13 +18,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, User } from "lucide-react"
+import { LogOut, User, Sparkles } from "lucide-react"
+import { useSubscription } from "@/components/subscription/SubscriptionProvider"
 
 export default function Navbar() {
   const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { theme } = useTheme()
   const { user, signOut, isLoading } = useAuth()
+  const { isPremium, remainingCredits } = useSubscription()
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -97,27 +99,33 @@ export default function Navbar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                  <Avatar className="h-10 w-10">
-                    {/* Temporarily disabled avatar image in favor of initials
-                    <AvatarImage
-                      src={user.user_metadata?.avatar_url || ""}
-                      alt={user.user_metadata?.full_name || "User"}
-                    />
-                    */}
+                  <Avatar>
+                    <AvatarImage src="https://github.com/shadcn.png" />
                     <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
+                  {isPremium && (
+                    <div className="absolute -top-1 -right-1 bg-primary rounded-full p-0.5">
+                      <Sparkles className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
+                  <Link href="/profile">
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut} className="cursor-pointer">
+                <DropdownMenuItem asChild>
+                  <Link href="/subscription">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {isPremium ? 'Premium Active' : `AI Credits: ${remainingCredits}`}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>

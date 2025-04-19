@@ -1,9 +1,33 @@
 import { NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { hasAvailableAICredits, trackAIUsage } from '@/lib/subscription';
 
 export async function POST(request: Request) {
   try {
+    // Initialize supabase client
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // Check if user is authenticated
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user has subscription access
+    const hasAccess = await hasAvailableAICredits(session.user.id);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'No AI credits available' },
+        { status: 403 }
+      );
+    }
+
     const { prompt, max_tokens = 800, temperature = 0.7 } = await request.json();
     
     if (!prompt) {
@@ -28,6 +52,9 @@ export async function POST(request: Request) {
       maxTokens: max_tokens,
       temperature: temperature,
     });
+
+    // Track AI usage
+    await trackAIUsage(session.user.id);
 
     return NextResponse.json({ text });
   } catch (error) {

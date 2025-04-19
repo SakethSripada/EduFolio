@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Session, User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
+import { createInitialSubscription } from "@/lib/subscription"
 
 type AuthContextType = {
   user: User | null
@@ -88,6 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (insertError) {
                   console.error("Error creating profile:", insertError)
+                } else {
+                  // Initialize subscription for new user
+                  await createInitialSubscription(session.user.id)
                 }
               } else {
                 // Update existing profile
