@@ -61,7 +61,7 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="flex flex-col min-h-screen">
+            <div className="flex flex-col min-h-screen app-container">
               <Navbar />
               <main className="flex-grow">{children}</main>
               <Footer />

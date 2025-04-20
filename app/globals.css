@@ -78,8 +78,23 @@
   * {
     @apply border-border;
   }
+  
+  /* Fix scrollbar layout shift issue */
+  html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+  }
+  
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Ensure app maintains width even when scrollbar appears/disappears */
+  #__next, .app-container {
+    width: 100vw;
+    max-width: 100%;
   }
 }
 
@@ -93,7 +108,7 @@
     @apply w-full overflow-x-auto;
   }
 
-  /* Improved scrollbars */
+  /* Improved scrollbars - keeping consistent width */
   ::-webkit-scrollbar {
     @apply w-2 h-2;
   }
