@@ -436,6 +436,11 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
     }
   }
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   if (isLoading && courses.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -451,8 +456,8 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setShowAIAssistant(true)}
+            className="flex items-center gap-2"
+            onClick={() => openAIAssistant()}
           >
             <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
@@ -965,11 +970,10 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
       {/* AI Assistant */}
       {showAIAssistant && (
         <AIAssistant
-          initialContext={{
-            type: "academics",
-            title: "Academic Courses",
-          }}
           showOnLoad={true}
+          initialContext={{
+            type: "academics"
+          }}
           onClose={() => setShowAIAssistant(false)}
         />
       )}

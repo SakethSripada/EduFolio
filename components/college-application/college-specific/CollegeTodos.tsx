@@ -384,6 +384,11 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
     deleteTodoMutation.isLoading ||
     importTodosMutation.isLoading
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   if (isLoadingTodos && !collegeTodos) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -397,11 +402,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-semibold">College Application To-Do List</h2>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setShowAIAssistant(true)}
-          >
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
           <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingTodos(true)}>
@@ -797,9 +798,10 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
       {/* AI Assistant */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
             type: "college",
-            title: `${collegeName} To-Do List`,
+            title: collegeName
           }}
           onClose={() => setShowAIAssistant(false)}
         />

@@ -354,16 +354,17 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
     )
   }
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold">College-Specific Awards and Honors</h2>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setShowAIAssistant(true)}
-          >
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
           <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingAwards(true)}>
@@ -752,9 +753,9 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
       {/* AI Assistant */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
-            type: "award",
-            title: "Awards and Honors",
+            type: "award"
           }}
           onClose={() => setShowAIAssistant(false)}
         />

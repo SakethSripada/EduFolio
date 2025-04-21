@@ -7,7 +7,108 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const Sheet = SheetPrimitive.Root
+// Shared module state for all modal components
+const modalState = {
+  openCount: 0,
+  hasAppliedFix: false,
+  scrollbarWidth: 0,
+  scrollY: 0,
+  bodyPaddingRight: ''
+};
+
+// Reuse the same hook pattern as in dialog.tsx
+const useSheetContentShiftFix = (open: boolean) => {
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (open) {
+      // Increment counter of open modals
+      modalState.openCount++;
+      
+      // Only apply the fix if this is the first modal being opened
+      if (modalState.openCount === 1 && !modalState.hasAppliedFix) {
+        // Save current scroll position and body styles
+        modalState.scrollY = window.scrollY;
+        modalState.bodyPaddingRight = document.body.style.paddingRight;
+        
+        // Get accurate scrollbar width
+        const widthWithScrollbar = document.body.offsetWidth;
+        document.body.style.overflow = 'hidden';
+        const widthWithoutScrollbar = document.body.offsetWidth;
+        modalState.scrollbarWidth = widthWithoutScrollbar - widthWithScrollbar;
+        
+        // Set padding right to compensate for scrollbar disappearance
+        if (modalState.scrollbarWidth > 0) {
+          document.body.style.paddingRight = `${modalState.scrollbarWidth}px`;
+        }
+        
+        // Prevent scroll but maintain layout
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${modalState.scrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+        
+        modalState.hasAppliedFix = true;
+      }
+    } else {
+      // Decrement counter when modal closes
+      if (modalState.openCount > 0) {
+        modalState.openCount--;
+      }
+      
+      // Only remove the fix if all modals are closed
+      if (modalState.openCount === 0 && modalState.hasAppliedFix) {
+        // Restore all styles
+        document.body.style.position = '';
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = modalState.bodyPaddingRight;
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        
+        // Restore scroll position
+        window.scrollTo(0, modalState.scrollY);
+        
+        modalState.hasAppliedFix = false;
+      }
+    }
+    
+    return () => {
+      // Clean up on unmount - treat as if modal closed
+      if (open) {
+        if (modalState.openCount > 0) {
+          modalState.openCount--;
+        }
+        
+        // Only remove the fix if all modals are closed
+        if (modalState.openCount === 0 && modalState.hasAppliedFix) {
+          // Restore all styles
+          document.body.style.position = '';
+          document.body.style.overflow = '';
+          document.body.style.paddingRight = modalState.bodyPaddingRight;
+          document.body.style.top = '';
+          document.body.style.left = '';
+          document.body.style.right = '';
+          document.body.style.width = '';
+          
+          // Restore scroll position
+          window.scrollTo(0, modalState.scrollY);
+          
+          modalState.hasAppliedFix = false;
+        }
+      }
+    };
+  }, [open]);
+};
+
+const Sheet = ({ open, onOpenChange, ...props }: SheetPrimitive.DialogProps) => {
+  // Use our custom hook to prevent content shift
+  useSheetContentShiftFix(open || false);
+  
+  return <SheetPrimitive.Root open={open} onOpenChange={onOpenChange} {...props} />;
+}
 
 const SheetTrigger = SheetPrimitive.Trigger
 

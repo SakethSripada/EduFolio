@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink } from "lucide-react"
-import AIAssistant from "@/components/ai/AIAssistant"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
@@ -21,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import DOMPurify from "dompurify"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import AIAssistant from "@/components/ai/AIAssistant"
 
 type Essay = {
   id: string
@@ -98,6 +98,9 @@ export default function EssaysTab() {
     status: "Draft",
     is_common_app: false
   })
+
+  // Add state variable to track which essay details we're editing
+  const [editingEssayDetails, setEditingEssayDetails] = useState<string | null>(null)
 
   // Function to generate unique IDs
   const generateUniqueId = () => {
@@ -496,30 +499,30 @@ export default function EssaysTab() {
 
   // AI feedback function - opens AI assistant with feedback prompt
   const getAiFeedback = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("feedback")
-    setShowAIAssistant(true)
+    setSelectedEssay(essay);
+    setAiAction("feedback");
+    setShowAIAssistant(true);
   }
 
   // AI grammar check function - opens AI assistant with grammar checking prompt
   const checkGrammarWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("grammar")
-    setShowAIAssistant(true)
+    setSelectedEssay(essay);
+    setAiAction("grammar");
+    setShowAIAssistant(true);
   }
 
   // AI rephrase function - opens AI assistant with rephrasing prompt
   const rephraseWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("rephrase")
-    setShowAIAssistant(true)
+    setSelectedEssay(essay);
+    setAiAction("rephrase");
+    setShowAIAssistant(true);
   }
 
   // General AI assistant without specific function
-  const openAIAssistant = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction(null)
-    setShowAIAssistant(true)
+  const openAIAssistant = () => {
+    setSelectedEssay(null);
+    setAiAction(null);
+    setShowAIAssistant(true);
   }
 
   const deleteEssay = async (essayId: string, index: number) => {
@@ -782,6 +785,17 @@ export default function EssaysTab() {
     )
   }
 
+  // Initialize collapsed essays when essays are loaded
+  useEffect(() => {
+    if (essays.length > 0) {
+      const initialCollapsedState = essays.reduce((acc, essay) => {
+        acc[essay.id] = true; // Set to true to collapse by default
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCollapsedEssays(initialCollapsedState);
+    }
+  }, [essays]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -795,7 +809,7 @@ export default function EssaysTab() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h2 className="text-2xl font-semibold mb-4 sm:mb-0">Your Essays</h2>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => setShowAIAssistant(true)}>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistant
           </Button>
           <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>
@@ -985,6 +999,14 @@ export default function EssaysTab() {
                             {collapsedEssays[essay.id] ? "Expand" : "Collapse"}
                           </span>
                         </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingEssayDetails(essay.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit Details</span>
+                        </Button>
                       </div>
                     </div>
                     <CardDescription className="mt-1">
@@ -1044,156 +1066,6 @@ export default function EssaysTab() {
                       </Button>
                     ) : (
                       <>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4 mr-1" /> Edit Details
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Edit Essay Details</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                              {/* Add fields here for title, prompt, target word count, etc. */}
-                              {/* This is a simplified example */}
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-title">Essay Title</Label>
-                                <Input
-                                  id="edit-title"
-                                  defaultValue={essay.title}
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, title: e.target.value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-prompt">Essay Prompt</Label>
-                                <Textarea
-                                  id="edit-prompt"
-                                  defaultValue={essay.prompt}
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, prompt: e.target.value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-target-word-count">Target Word Count</Label>
-                                <Input
-                                  id="edit-target-word-count"
-                                  type="number"
-                                  defaultValue={essay.target_word_count || ""}
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, target_word_count: e.target.value ? parseInt(e.target.value) : null };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-status">Status</Label>
-                                <Select
-                                  defaultValue={essay.status || "Draft"}
-                                  onValueChange={(value) => {
-                                    const updatedEssay = { ...essay, status: value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                >
-                                  <SelectTrigger id="edit-status">
-                                    <SelectValue placeholder="Select status" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Draft">Draft</SelectItem>
-                                    <SelectItem value="In Progress">In Progress</SelectItem>
-                                    <SelectItem value="Reviewing">Reviewing</SelectItem>
-                                    <SelectItem value="Complete">Complete</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="grid gap-2">
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    id="edit-is-common-app"
-                                    checked={essay.is_common_app || false}
-                                    onCheckedChange={(checked) => {
-                                      const updatedEssay = { ...essay, is_common_app: !!checked };
-                                      const updatedEssays = [...essays];
-                                      updatedEssays[index] = updatedEssay;
-                                      setEssays(updatedEssays);
-                                    }}
-                                  />
-                                  <Label htmlFor="edit-is-common-app">This is a Common App essay</Label>
-                                </div>
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-external-link">External Link</Label>
-                                <Input
-                                  id="edit-external-link"
-                                  type="url"
-                                  defaultValue={essay.external_link || ""}
-                                  placeholder="e.g. https://docs.google.com/document/d/..."
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, external_link: e.target.value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button onClick={async () => {
-                                try {
-                                  setIsLoading(true);
-                                  const { error } = await supabase
-                                    .from("essays")
-                                    .update({
-                                      title: essay.title,
-                                      prompt: essay.prompt,
-                                      external_link: essay.external_link,
-                                      target_word_count: essay.target_word_count,
-                                      status: essay.status,
-                                      is_common_app: essay.is_common_app,
-                                    })
-                                    .eq("id", essay.id);
-                                  
-                                  if (error) throw error;
-                                  
-                                  toast({
-                                    title: "Essay details updated",
-                                    description: "Your essay details have been updated successfully.",
-                                  });
-                                } catch (error) {
-                                  console.error("Error updating essay details:", error);
-                                  toast({
-                                    title: "Error updating essay details",
-                                    description: handleSupabaseError(error, "There was a problem updating the essay details."),
-                                    variant: "destructive",
-                                  });
-                                } finally {
-                                  setIsLoading(false);
-                                }
-                              }} disabled={isLoading}>
-                                {isLoading ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...
-                                  </>
-                                ) : (
-                                  "Save Changes"
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1303,27 +1175,27 @@ export default function EssaysTab() {
         </DialogContent>
       </Dialog>
 
-      {/* AI Assistant */}
+      {/* Add AIAssistant component conditionally */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
             type: "essay",
             id: selectedEssay?.id,
-            title: selectedEssay?.prompt || "Essay Writing",
+            title: selectedEssay?.title || selectedEssay?.prompt || "Essay Writing",
           }}
           initialPrompt={
             selectedEssay && aiAction 
               ? aiAction === "feedback"
-                ? `Please provide feedback on this essay:\n\n${stripHTML(selectedEssay.content)}`
+                ? `Please provide feedback on this essay${selectedEssay.is_common_app ? " (Common App)" : ""}:\n\n${stripHTML(selectedEssay.content)}`
                 : aiAction === "grammar"
-                  ? `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
-                  : `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
+                  ? `Please check this essay${selectedEssay.is_common_app ? " (Common App)" : ""} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
+                  : `Please help me rephrase this essay${selectedEssay.is_common_app ? " (Common App)" : ""} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
               : undefined
           }
-          showOnLoad={true}
           onClose={() => {
-            setShowAIAssistant(false)
-            setAiAction(null)
+            setShowAIAssistant(false);
+            setAiAction(null);
           }}
         />
       )}
@@ -1429,6 +1301,160 @@ export default function EssaysTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add all modal dialogs here */}
+      {essays.map((essay, index) => (
+        <Dialog 
+          key={`edit-dialog-${essay.id}`}
+          open={editingEssayDetails === essay.id} 
+          onOpenChange={(open) => {
+            if (!open) setEditingEssayDetails(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Essay Details</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-title">Essay Title</Label>
+                <Input
+                  id="edit-title"
+                  defaultValue={essay.title}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, title: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-prompt">Essay Prompt</Label>
+                <Textarea
+                  id="edit-prompt"
+                  defaultValue={essay.prompt}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, prompt: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-target-word-count">Target Word Count</Label>
+                <Input
+                  id="edit-target-word-count"
+                  type="number"
+                  defaultValue={essay.target_word_count || ""}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, target_word_count: e.target.value ? parseInt(e.target.value) : null };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  defaultValue={essay.status || "Draft"}
+                  onValueChange={(value) => {
+                    const updatedEssay = { ...essay, status: value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                >
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Reviewing">Reviewing</SelectItem>
+                    <SelectItem value="Complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="edit-is-common-app"
+                    checked={essay.is_common_app || false}
+                    onCheckedChange={(checked) => {
+                      const updatedEssay = { ...essay, is_common_app: !!checked };
+                      const updatedEssays = [...essays];
+                      updatedEssays[index] = updatedEssay;
+                      setEssays(updatedEssays);
+                    }}
+                  />
+                  <Label htmlFor="edit-is-common-app">This is a Common App essay</Label>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-external-link">External Link</Label>
+                <Input
+                  id="edit-external-link"
+                  type="url"
+                  defaultValue={essay.external_link || ""}
+                  placeholder="e.g. https://docs.google.com/document/d/..."
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, external_link: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={async () => {
+                try {
+                  setIsLoading(true);
+                  const { error } = await supabase
+                    .from("essays")
+                    .update({
+                      title: essay.title,
+                      prompt: essay.prompt,
+                      external_link: essay.external_link,
+                      target_word_count: essay.target_word_count,
+                      status: essay.status,
+                      is_common_app: essay.is_common_app,
+                    })
+                    .eq("id", essay.id);
+                  
+                  if (error) throw error;
+                  
+                  toast({
+                    title: "Essay details updated",
+                    description: "Your essay details have been updated successfully.",
+                  });
+                  setEditingEssayDetails(null);
+                } catch (error) {
+                  console.error("Error updating essay details:", error);
+                  toast({
+                    title: "Error updating essay details",
+                    description: handleSupabaseError(error, "There was a problem updating the essay details."),
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
+              }} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ))}
     </div>
   )
 }
