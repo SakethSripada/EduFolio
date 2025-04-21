@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -98,6 +98,9 @@ export default function EssaysTab() {
     status: "Draft",
     is_common_app: false
   })
+
+  // Add state variable to track which essay details we're editing
+  const [editingEssayDetails, setEditingEssayDetails] = useState<string | null>(null)
 
   // Function to generate unique IDs
   const generateUniqueId = () => {
@@ -1024,6 +1027,14 @@ export default function EssaysTab() {
                             {collapsedEssays[essay.id] ? "Expand" : "Collapse"}
                           </span>
                         </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingEssayDetails(essay.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit Details</span>
+                        </Button>
                       </div>
                     </div>
                     <CardDescription className="mt-1">
@@ -1083,156 +1094,6 @@ export default function EssaysTab() {
                       </Button>
                     ) : (
                       <>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4 mr-1" /> Edit Details
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Edit Essay Details</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                              {/* Add fields here for title, prompt, target word count, etc. */}
-                              {/* This is a simplified example */}
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-title">Essay Title</Label>
-                                <Input
-                                  id="edit-title"
-                                  defaultValue={essay.title}
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, title: e.target.value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-prompt">Essay Prompt</Label>
-                                <Textarea
-                                  id="edit-prompt"
-                                  defaultValue={essay.prompt}
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, prompt: e.target.value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-target-word-count">Target Word Count</Label>
-                                <Input
-                                  id="edit-target-word-count"
-                                  type="number"
-                                  defaultValue={essay.target_word_count || ""}
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, target_word_count: e.target.value ? parseInt(e.target.value) : null };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-status">Status</Label>
-                                <Select
-                                  defaultValue={essay.status || "Draft"}
-                                  onValueChange={(value) => {
-                                    const updatedEssay = { ...essay, status: value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                >
-                                  <SelectTrigger id="edit-status">
-                                    <SelectValue placeholder="Select status" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Draft">Draft</SelectItem>
-                                    <SelectItem value="In Progress">In Progress</SelectItem>
-                                    <SelectItem value="Reviewing">Reviewing</SelectItem>
-                                    <SelectItem value="Complete">Complete</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="grid gap-2">
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    id="edit-is-common-app"
-                                    checked={essay.is_common_app || false}
-                                    onCheckedChange={(checked) => {
-                                      const updatedEssay = { ...essay, is_common_app: !!checked };
-                                      const updatedEssays = [...essays];
-                                      updatedEssays[index] = updatedEssay;
-                                      setEssays(updatedEssays);
-                                    }}
-                                  />
-                                  <Label htmlFor="edit-is-common-app">This is a Common App essay</Label>
-                                </div>
-                              </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="edit-external-link">External Link</Label>
-                                <Input
-                                  id="edit-external-link"
-                                  type="url"
-                                  defaultValue={essay.external_link || ""}
-                                  placeholder="e.g. https://docs.google.com/document/d/..."
-                                  onChange={(e) => {
-                                    const updatedEssay = { ...essay, external_link: e.target.value };
-                                    const updatedEssays = [...essays];
-                                    updatedEssays[index] = updatedEssay;
-                                    setEssays(updatedEssays);
-                                  }}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button onClick={async () => {
-                                try {
-                                  setIsLoading(true);
-                                  const { error } = await supabase
-                                    .from("essays")
-                                    .update({
-                                      title: essay.title,
-                                      prompt: essay.prompt,
-                                      external_link: essay.external_link,
-                                      target_word_count: essay.target_word_count,
-                                      status: essay.status,
-                                      is_common_app: essay.is_common_app,
-                                    })
-                                    .eq("id", essay.id);
-                                  
-                                  if (error) throw error;
-                                  
-                                  toast({
-                                    title: "Essay details updated",
-                                    description: "Your essay details have been updated successfully.",
-                                  });
-                                } catch (error) {
-                                  console.error("Error updating essay details:", error);
-                                  toast({
-                                    title: "Error updating essay details",
-                                    description: handleSupabaseError(error, "There was a problem updating the essay details."),
-                                    variant: "destructive",
-                                  });
-                                } finally {
-                                  setIsLoading(false);
-                                }
-                              }} disabled={isLoading}>
-                                {isLoading ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...
-                                  </>
-                                ) : (
-                                  "Save Changes"
-                                )}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1468,6 +1329,160 @@ export default function EssaysTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add all modal dialogs here */}
+      {essays.map((essay, index) => (
+        <Dialog 
+          key={`edit-dialog-${essay.id}`}
+          open={editingEssayDetails === essay.id} 
+          onOpenChange={(open) => {
+            if (!open) setEditingEssayDetails(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Essay Details</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-title">Essay Title</Label>
+                <Input
+                  id="edit-title"
+                  defaultValue={essay.title}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, title: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-prompt">Essay Prompt</Label>
+                <Textarea
+                  id="edit-prompt"
+                  defaultValue={essay.prompt}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, prompt: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-target-word-count">Target Word Count</Label>
+                <Input
+                  id="edit-target-word-count"
+                  type="number"
+                  defaultValue={essay.target_word_count || ""}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, target_word_count: e.target.value ? parseInt(e.target.value) : null };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  defaultValue={essay.status || "Draft"}
+                  onValueChange={(value) => {
+                    const updatedEssay = { ...essay, status: value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                >
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Reviewing">Reviewing</SelectItem>
+                    <SelectItem value="Complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="edit-is-common-app"
+                    checked={essay.is_common_app || false}
+                    onCheckedChange={(checked) => {
+                      const updatedEssay = { ...essay, is_common_app: !!checked };
+                      const updatedEssays = [...essays];
+                      updatedEssays[index] = updatedEssay;
+                      setEssays(updatedEssays);
+                    }}
+                  />
+                  <Label htmlFor="edit-is-common-app">This is a Common App essay</Label>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-external-link">External Link</Label>
+                <Input
+                  id="edit-external-link"
+                  type="url"
+                  defaultValue={essay.external_link || ""}
+                  placeholder="e.g. https://docs.google.com/document/d/..."
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, external_link: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={async () => {
+                try {
+                  setIsLoading(true);
+                  const { error } = await supabase
+                    .from("essays")
+                    .update({
+                      title: essay.title,
+                      prompt: essay.prompt,
+                      external_link: essay.external_link,
+                      target_word_count: essay.target_word_count,
+                      status: essay.status,
+                      is_common_app: essay.is_common_app,
+                    })
+                    .eq("id", essay.id);
+                  
+                  if (error) throw error;
+                  
+                  toast({
+                    title: "Essay details updated",
+                    description: "Your essay details have been updated successfully.",
+                  });
+                  setEditingEssayDetails(null);
+                } catch (error) {
+                  console.error("Error updating essay details:", error);
+                  toast({
+                    title: "Error updating essay details",
+                    description: handleSupabaseError(error, "There was a problem updating the essay details."),
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
+              }} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ))}
     </div>
   )
 }

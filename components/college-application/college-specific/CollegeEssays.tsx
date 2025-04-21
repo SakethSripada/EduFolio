@@ -871,13 +871,6 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                       </Button>
                     ) : (
                       <>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4 mr-1" /> Edit Details
-                            </Button>
-                          </DialogTrigger>
-                        </Dialog>
                         <Button
                           variant="outline"
                           size="sm"
