@@ -258,8 +258,8 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
                       {collegeData.essays && collegeData.essays.length > 0 ? (
                         collegeData.essays.map((essay: any, index: number) => (
                           <div key={index} className="space-y-2">
-                            <h3 className="font-medium">{essay.prompt}</h3>
-                            <div className="p-4 bg-muted/50 rounded-md font-serif">{essay.content}</div>
+                            <h3 className="font-medium mb-2">{essay.prompt}</h3>
+                            <div className="p-4 bg-muted/50 rounded-md font-serif text-foreground">{essay.content}</div>
                             <p className="text-xs text-muted-foreground">Word Count: {essay.word_count}</p>
                           </div>
                         ))

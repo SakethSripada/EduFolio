@@ -268,9 +268,6 @@ export default function CollegeApplicationPage() {
 
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Application Materials</h2>
-            <Button variant="outline" className="flex items-center gap-1" onClick={() => setShowAIAssistant(true)}>
-              <Sparkles className="h-4 w-4" /> AI Assistance
-            </Button>
           </div>
 
           <Card>
@@ -315,14 +312,23 @@ export default function CollegeApplicationPage() {
           </Card>
         </div>
 
-        {/* AI Assistant */}
+        {/* AI Assistant Button - Always visible */}
+        <Button
+          className="fixed bottom-6 right-6 rounded-full w-14 h-14 p-0 shadow-lg z-50 bg-primary hover:bg-primary/90"
+          onClick={() => setShowAIAssistant(true)}
+        >
+          <Sparkles className="h-6 w-6" />
+        </Button>
+
+        {/* AI Assistant Dialog */}
         {showAIAssistant && (
           <AIAssistant
             initialContext={{
-              type: "college-application",
+              type: "college",
               id: collegeId,
               title: `${college.name} Application`,
             }}
+            showOnLoad={true}
             onClose={() => setShowAIAssistant(false)}
           />
         )}

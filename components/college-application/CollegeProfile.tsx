@@ -548,7 +548,7 @@ export default function CollegeProfile({
                               targetWordCount={essay.targetWordCount}
                             />
                           ) : (
-                            <div className="p-4 bg-muted/50 rounded-md font-serif">
+                            <div className="p-4 bg-muted/50 rounded-md font-serif text-foreground">
                               {essay.content || "Start writing your essay..."}
                             </div>
                           )}

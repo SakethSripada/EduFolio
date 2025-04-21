@@ -101,7 +101,8 @@ const [idCounter, setIdCounter] = useState(0);
 
 // Function to generate unique IDs
 const generateUniqueId = () => {
-  const uniqueId = `${Date.now()}-${idCounter}`;
+  // Use Date.now() combined with a random number and the counter for true uniqueness
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${idCounter}`;
   setIdCounter(idCounter + 1);
   return uniqueId;
 };

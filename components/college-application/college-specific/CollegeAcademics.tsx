@@ -9,13 +9,21 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2 } from "lucide-react"
+import { 
+  PlusCircle, 
+  Edit, 
+  Trash2, 
+  Copy, 
+  Loader2,
+  Sparkles 
+} from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired, isValidNumber } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
+import AIAssistant from "@/components/ai/AIAssistant"
 
 type CollegeAcademicsProps = {
   collegeId: string
@@ -41,24 +49,24 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
   const [newCourse, setNewCourse] = useState<Partial<Course>>({
     name: "",
     grade: "",
-    credits: 1,
+    credits: 0,
     level: "Regular",
     grade_level: "11",
-    term: "Year",
+    term: "Fall",
   })
   const [isAddingCourse, setIsAddingCourse] = useState(false)
   const [isEditingCourse, setIsEditingCourse] = useState(false)
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
-  const [activeGradeLevel, setActiveGradeLevel] = useState<string>("all")
-  const [isLoading, setIsLoading] = useState(true)
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [isImportingCourses, setIsImportingCourses] = useState(false)
   const [selectedCourses, setSelectedCourses] = useState<Record<string, boolean>>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeGradeLevel, setActiveGradeLevel] = useState<string>("all")
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [confirmDeleteCourse, setConfirmDeleteCourse] = useState<string | null>(null)
+  // Add AI assistant state variables
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
-
-  // Add state for confirmation dialog
-  const [confirmDeleteCourse, setConfirmDeleteCourse] = useState<string | null>(null)
 
   // Update the useEffect to use setTimeout for Supabase calls
   useEffect(() => {
@@ -319,14 +327,20 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
 
     await performDatabaseOperation(
       async () => {
-        const { error } = await supabase.from("college_courses").delete().eq("id", courseId).eq("college_id", collegeId)
+        const { error } = await supabase
+          .from("college_courses")
+          .delete()
+          .eq("id", courseId)
+          .eq("college_id", collegeId)
 
         if (error) throw error
-        return
+        return { success: true }
       },
       setIsLoading,
       () => {
         setCourses(courses.filter((course) => course.id !== courseId))
+        setConfirmDeleteCourse(null)
+        
         toast({
           title: "Course deleted",
           description: "Your course has been deleted successfully.",
@@ -338,10 +352,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
           description: handleSupabaseError(error, "There was a problem deleting the course."),
           variant: "destructive",
         })
-      },
-      () => {
-        setConfirmDeleteCourse(null)
-      },
+      }
     )
   }
 
@@ -438,6 +449,13 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold">College-Specific Courses</h2>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex items-center gap-1"
+            onClick={() => setShowAIAssistant(true)}
+          >
+            <Sparkles className="h-4 w-4" /> AI Assistance
+          </Button>
           <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingCourses(true)}>
             <Copy className="h-4 w-4" /> Import Courses
           </Button>
@@ -936,9 +954,25 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
         title="Delete Course"
         description="Are you sure you want to delete this course? This action cannot be undone."
         confirmText="Delete"
-        onConfirm={() => confirmDeleteCourse && deleteCourse(confirmDeleteCourse)}
+        onConfirm={() => {
+          if (confirmDeleteCourse) {
+            deleteCourse(confirmDeleteCourse)
+          }
+        }}
         variant="destructive"
       />
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          initialContext={{
+            type: "academics",
+            title: "Academic Courses",
+          }}
+          showOnLoad={true}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }
