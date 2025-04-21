@@ -888,17 +888,35 @@ export default function AcademicsTab() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-card rounded-lg p-4 border shadow-sm">
               <div className="text-sm text-muted-foreground mb-1">Cumulative GPA</div>
-              <div className="text-3xl font-bold">{calculateGPA(false).toFixed(2)}</div>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-[36px]">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="text-3xl font-bold">{calculateGPA(false).toFixed(2)}</div>
+              )}
               <div className="text-xs text-muted-foreground mt-1">Unweighted</div>
             </div>
             <div className="bg-card rounded-lg p-4 border shadow-sm">
               <div className="text-sm text-muted-foreground mb-1">Weighted GPA</div>
-              <div className="text-3xl font-bold">{calculateGPA(true).toFixed(2)}</div>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-[36px]">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="text-3xl font-bold">{calculateGPA(true).toFixed(2)}</div>
+              )}
               <div className="text-xs text-muted-foreground mt-1">Including honors/AP bonus</div>
             </div>
             <div className="bg-card rounded-lg p-4 border shadow-sm">
               <div className="text-sm text-muted-foreground mb-1">UC GPA</div>
-              <div className="text-3xl font-bold">{calculateGPA(true, false).toFixed(2)}</div>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-[36px]">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="text-3xl font-bold">{calculateGPA(true, false).toFixed(2)}</div>
+              )}
               <div className="text-xs text-muted-foreground mt-1">10-12th grade, weighted</div>
             </div>
           </div>
@@ -1519,7 +1537,13 @@ export default function AcademicsTab() {
                   <CardTitle className="text-lg">Unweighted GPA</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <div className="text-3xl font-bold">{calculateGPA(false).toFixed(2)}</div>
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-[36px]">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-bold">{calculateGPA(false).toFixed(2)}</div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">Standard 4.0 scale, all courses equal</p>
                 </CardContent>
               </Card>
@@ -1529,7 +1553,13 @@ export default function AcademicsTab() {
                   <CardTitle className="text-lg">Weighted GPA</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <div className="text-3xl font-bold">{calculateGPA(true).toFixed(2)}</div>
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-[36px]">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-bold">{calculateGPA(true).toFixed(2)}</div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">Honors: +0.5, AP/IB: +1.0</p>
                 </CardContent>
               </Card>
@@ -1553,7 +1583,13 @@ export default function AcademicsTab() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <div className="text-3xl font-bold">{calculateGPA(true, false).toFixed(2)}</div>
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-[36px]">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-bold">{calculateGPA(true, false).toFixed(2)}</div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">10-12th grade only</p>
                 </CardContent>
               </Card>
@@ -1561,36 +1597,42 @@ export default function AcademicsTab() {
 
             <div className="bg-muted/50 p-4 rounded-lg">
               <h3 className="font-medium mb-2">GPA Breakdown by Grade Level</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {["9", "10", "11", "12"].map((grade) => {
-                  const gradeSpecificCourses = courses.filter((c) => c.grade_level === grade)
-                  const hasCoursesInGrade = gradeSpecificCourses.length > 0
+              {isLoading ? (
+                <div className="flex justify-center items-center h-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {["9", "10", "11", "12"].map((grade) => {
+                    const gradeSpecificCourses = courses.filter((c) => c.grade_level === grade)
+                    const hasCoursesInGrade = gradeSpecificCourses.length > 0
 
-                  const gradeUnweighted = hasCoursesInGrade
-                    ? gradeSpecificCourses.reduce((sum, c) => sum + c.grade_points * c.credits, 0) /
-                      gradeSpecificCourses.reduce((sum, c) => sum + c.credits, 0)
-                    : 0
+                    const gradeUnweighted = hasCoursesInGrade
+                      ? gradeSpecificCourses.reduce((sum, c) => sum + c.grade_points * c.credits, 0) /
+                        gradeSpecificCourses.reduce((sum, c) => sum + c.credits, 0)
+                      : 0
 
-                  const gradeWeighted = hasCoursesInGrade
-                    ? gradeSpecificCourses.reduce((sum, c) => sum + c.weighted_grade_points * c.credits, 0) /
-                      gradeSpecificCourses.reduce((sum, c) => sum + c.credits, 0)
-                    : 0
+                    const gradeWeighted = hasCoursesInGrade
+                      ? gradeSpecificCourses.reduce((sum, c) => sum + c.weighted_grade_points * c.credits, 0) /
+                        gradeSpecificCourses.reduce((sum, c) => sum + c.credits, 0)
+                      : 0
 
-                  return (
-                    <div key={grade} className="bg-card p-3 rounded border">
-                      <div className="text-sm font-medium">{grade}th Grade</div>
-                      <div className="flex justify-between text-sm mt-1">
-                        <span>Unweighted:</span>
-                        <span className="font-medium">{hasCoursesInGrade ? gradeUnweighted.toFixed(2) : "N/A"}</span>
+                    return (
+                      <div key={grade} className="bg-card p-3 rounded border">
+                        <div className="text-sm font-medium">{grade}th Grade</div>
+                        <div className="flex justify-between text-sm mt-1">
+                          <span>Unweighted:</span>
+                          <span className="font-medium">{hasCoursesInGrade ? gradeUnweighted.toFixed(2) : "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Weighted:</span>
+                          <span className="font-medium">{hasCoursesInGrade ? gradeWeighted.toFixed(2) : "N/A"}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Weighted:</span>
-                        <span className="font-medium">{hasCoursesInGrade ? gradeWeighted.toFixed(2) : "N/A"}</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
