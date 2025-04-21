@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink } from "lucide-react"
-import AIAssistant from "@/components/ai/AIAssistant"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
@@ -21,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import DOMPurify from "dompurify"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import AIAssistant from "@/components/ai/AIAssistant"
 
 type Essay = {
   id: string
@@ -496,30 +496,58 @@ export default function EssaysTab() {
 
   // AI feedback function - opens AI assistant with feedback prompt
   const getAiFeedback = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("feedback")
-    setShowAIAssistant(true)
+    // Open AI assistant with feedback prompt
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay",
+        id: essay.id,
+        title: essay.title || essay.prompt,
+      },
+      initialPrompt: `Please provide feedback on this essay${essay.is_common_app ? " (Common App)" : ""}:\n\n${stripHTML(essay.content)}`,
+      onClose: () => {}
+    })
   }
 
   // AI grammar check function - opens AI assistant with grammar checking prompt
   const checkGrammarWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("grammar")
-    setShowAIAssistant(true)
+    // Open AI assistant with grammar check prompt
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay",
+        id: essay.id,
+        title: essay.title || essay.prompt,
+      },
+      initialPrompt: `Please check this essay${essay.is_common_app ? " (Common App)" : ""} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(essay.content)}`,
+      onClose: () => {}
+    })
   }
 
   // AI rephrase function - opens AI assistant with rephrasing prompt
   const rephraseWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("rephrase")
-    setShowAIAssistant(true)
+    // Open AI assistant with rephrase prompt
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay",
+        id: essay.id,
+        title: essay.title || essay.prompt,
+      },
+      initialPrompt: `Please help me rephrase this essay${essay.is_common_app ? " (Common App)" : ""} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(essay.content)}`,
+      onClose: () => {}
+    })
   }
 
   // General AI assistant without specific function
-  const openAIAssistant = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction(null)
-    setShowAIAssistant(true)
+  const openAIAssistant = () => {
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay"
+      },
+      onClose: () => {}
+    })
   }
 
   const deleteEssay = async (essayId: string, index: number) => {
@@ -782,6 +810,17 @@ export default function EssaysTab() {
     )
   }
 
+  // Initialize collapsed essays when essays are loaded
+  useEffect(() => {
+    if (essays.length > 0) {
+      const initialCollapsedState = essays.reduce((acc, essay) => {
+        acc[essay.id] = true; // Set to true to collapse by default
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCollapsedEssays(initialCollapsedState);
+    }
+  }, [essays]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -795,7 +834,7 @@ export default function EssaysTab() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h2 className="text-2xl font-semibold mb-4 sm:mb-0">Your Essays</h2>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => setShowAIAssistant(true)}>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistant
           </Button>
           <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>

@@ -184,7 +184,7 @@ useEffect(() => {
   if (initialPrompt) return;
   
   // Only add contextual message once and only if it doesn't already exist
-  if (initialContext && !messages.some((m) => m.context?.id === initialContext.id)) {
+  if (initialContext && messages.length === 0) {
     let contextMessage = ""
 
     switch (initialContext.type) {
@@ -201,14 +201,13 @@ useEffect(() => {
         contextMessage = `How can I help with your academics?`
         break
       case "college":
-        contextMessage = `How can I help with your application to ${initialContext.title}?`
+        contextMessage = `How can I help with your application to ${initialContext.title || "college"}?`
         break
       default:
         contextMessage = "How can I help with your college application today?"
     }
 
-    setMessages((prevMessages) => [
-      ...prevMessages,
+    setMessages([
       {
         id: generateUniqueId(),
         role: "assistant",
@@ -217,11 +216,8 @@ useEffect(() => {
         context: initialContext,
       },
     ])
-    
-    // Do not automatically open the chat when context is provided
-    // Let the user click to open it when they want assistance
   }
-}, [initialContext, messages, idCounter, initialPrompt])
+}, [initialContext, initialPrompt])
 
 // Use useCallback for handleSendMessage to prevent unnecessary re-renders
 const handleSendMessage = useCallback(async () => {

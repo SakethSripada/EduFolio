@@ -431,6 +431,17 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
     )
   }
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "extracurricular"
+      },
+      onClose: () => {}
+    })
+  }
+
   if (isLoading && activities.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -444,11 +455,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold">College-Specific Extracurriculars</h2>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setShowAIAssistant(true)}
-          >
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
           <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingActivities(true)}>
@@ -805,18 +812,6 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         }}
         variant="destructive"
       />
-
-      {/* AI Assistant */}
-      {showAIAssistant && (
-        <AIAssistant
-          initialContext={{
-            type: "extracurricular",
-            title: "Extracurricular Activities",
-          }}
-          showOnLoad={true}
-          onClose={() => setShowAIAssistant(false)}
-        />
-      )}
     </div>
   )
 }

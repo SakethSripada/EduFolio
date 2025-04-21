@@ -252,12 +252,16 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
     setShowAIAssistant(true);
   };
 
-  // Original openAIAssistant can remain as a general function without specific formatting
-  const openAIAssistant = (activity: any) => {
-    setSelectedActivity(activity);
-    setAiAction(null);
-    setShowAIAssistant(true);
-  };
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "extracurricular"
+      },
+      onClose: () => {}
+    })
+  }
 
   const startEditActivity = (activityId: string) => {
     const activityToEdit = activities.find((a) => a.id === activityId)
@@ -822,7 +826,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
-                            openAIAssistantForActivity(activity)
+                            openAIAssistant()
                           }}
                         >
                           <Sparkles className="h-4 w-4 mr-1" /> Improve with AI

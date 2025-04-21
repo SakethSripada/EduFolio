@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -140,6 +140,17 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
     fetchData()
   }, [user, collegeId, toast])
+
+  // Initialize collapsed essays when essays are loaded
+  useEffect(() => {
+    if (essays.length > 0) {
+      const initialCollapsedState = essays.reduce((acc, essay) => {
+        acc[essay.id] = true; // Set to true to collapse by default
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCollapsedEssays(initialCollapsedState);
+    }
+  }, [essays]);
 
   // Validate essay form
   const validateEssayForm = (): boolean => {
@@ -501,23 +512,47 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
   // AI feedback function - opens AI assistant with feedback prompt
   const getAiFeedback = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("feedback")
-    setShowAIAssistant(true)
+    // Open AI assistant with feedback prompt
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay",
+        id: essay.id,
+        title: essay.title || essay.prompt,
+      },
+      initialPrompt: getAIPromptForType("feedback", essay.prompt, essay.content, collegeName),
+      onClose: () => {}
+    })
   }
 
   // AI grammar check function - opens AI assistant with grammar checking prompt
   const checkGrammarWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("grammar")
-    setShowAIAssistant(true)
+    // Open AI assistant with grammar check prompt
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay",
+        id: essay.id,
+        title: essay.title || essay.prompt,
+      },
+      initialPrompt: getAIPromptForType("grammar", essay.prompt, essay.content, collegeName),
+      onClose: () => {}
+    })
   }
 
   // AI rephrase function - opens AI assistant with rephrasing prompt
   const rephraseWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("rephrase")
-    setShowAIAssistant(true)
+    // Open AI assistant with rephrase prompt
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay",
+        id: essay.id,
+        title: essay.title || essay.prompt,
+      },
+      initialPrompt: getAIPromptForType("improve", essay.prompt, essay.content, collegeName),
+      onClose: () => {}
+    })
   }
 
   const addExternalEssay = async () => {
@@ -656,6 +691,17 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     }
   }
 
+  // Update AI button to simply open the assistant without sending specific data
+  const openGenericAIAssistant = () => {
+    AIAssistant({
+      showOnLoad: true,
+      initialContext: {
+        type: "essay"
+      },
+      onClose: () => {}
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -666,30 +712,26 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">Essays for {collegeName}</h2>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setShowAIAssistant(true)}
-          >
-            <Sparkles className="h-4 w-4" /> AI Assistance
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <h2 className="text-xl font-semibold mb-4 sm:mb-0">{collegeName} Essays</h2>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openGenericAIAssistant()}>
+            <Sparkles className="h-4 w-4" /> AI Assistant
           </Button>
-          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingEssays(true)}>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsImportingEssays(true)}>
             <Copy className="h-4 w-4" /> Import Essays
           </Button>
-          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsAddingExternalEssay(true)}>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>
             <ExternalLink className="h-4 w-4" /> Add External Essay
           </Button>
-          <Button className="flex items-center gap-1" onClick={() => setIsAddingEssay(true)}>
+          <Button className="flex items-center gap-2" onClick={() => setIsAddingEssay(true)}>
             <PlusCircle className="h-4 w-4" /> Add Essay
           </Button>
         </div>
       </div>
       
       {essays.length > 0 && (
-        <div className="flex justify-end gap-2 my-2">
+        <div className="flex justify-end gap-2 mb-4">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -720,26 +762,23 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       )}
 
       {essays.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <p className="text-muted-foreground">No essays added yet</p>
-          </CardContent>
-        </Card>
+        <div className="text-center text-muted-foreground py-12 border rounded-md">No essays added yet for {collegeName}</div>
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-6">
           {essays.map((essay, index) => (
-            <Card key={essay.id} className="overflow-hidden border-muted hover:shadow-sm transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
+            <Card key={essay.id} className="overflow-hidden">
+              <CardHeader>
+                <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">
-                        {essay.prompt}
+                      <CardTitle className="flex items-center gap-2">
+                        {essay.title}
+                        {getStatusBadge(essay.status)}
                       </CardTitle>
                       <div className="flex items-center gap-1">
                         <Button 
                           variant="ghost" 
-                          size="sm"
+                          size="sm" 
                           onClick={() => {
                             setEditingEssayId(essay.id);
                             setIsEditingEssay(true);
@@ -748,11 +787,12 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                               prompt: essay.prompt,
                               target_word_count: essay.target_word_count,
                               status: essay.status,
+                              external_link: essay.external_link,
                             });
                           }}
                         >
-                          <Edit className="h-3.5 w-3.5" />
-                          <span className="sr-only">Essay Details</span>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit Details</span>
                         </Button>
                         <Button 
                           variant="ghost" 
@@ -777,35 +817,31 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                     </div>
                     <CardDescription className="mt-1">
                       <div className="flex flex-wrap gap-2 items-center">
-                        <div className="flex gap-2 items-center">
-                          <span className="font-medium">Word Count: {essay.word_count}</span>
-                          {essay.target_word_count && <span>/ {essay.target_word_count}</span>}
-                        </div>
-                        <span className="text-muted-foreground mx-1">•</span>
-                        <span>Last Edited: {new Date(essay.last_edited).toLocaleDateString()}</span>
-                        <span className="text-muted-foreground mx-1">•</span>
-                        {getStatusBadge(essay.status)}
+                        <span>{essay.prompt}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center mt-1">
+                        <span className="font-medium">Word Count: {essay.word_count}</span>
+                        {essay.target_word_count && <span> / {essay.target_word_count}</span>} • 
+                        <span className="ml-1">Last Edited: {new Date(essay.last_edited).toLocaleDateString()}</span>
                         {essay.external_link && (
-                          <>
-                            <span className="text-muted-foreground mx-1">•</span>
-                            <a 
-                              href={essay.external_link} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-primary hover:underline"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 mr-1" />External Document
-                            </a>
-                          </>
+                          <a 
+                            href={essay.external_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center ml-2 text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" /> External Document
+                          </a>
                         )}
                       </div>
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
+              
               {!collapsedEssays[essay.id] && (
                 <>
-                  <CardContent className="pt-0">
+                  <CardContent>
                     {editingEssay === index ? (
                       <SimpleEssayEditor
                         content={essayContent}
@@ -819,23 +855,29 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         onShowHistory={() => setShowVersionHistory(essay.id)}
                       />
                     ) : (
-                      <div className="p-4 bg-muted/20 rounded-md font-serif max-h-[200px] overflow-y-auto mt-2 text-foreground dark:text-foreground">
+                      <div className="prose prose-sm max-w-none dark:text-foreground">
                         {essay.content || "Start writing your essay..."}
                       </div>
                     )}
                   </CardContent>
-                  <div className="px-4 py-3 bg-muted/10 flex flex-wrap justify-end gap-2 border-t">
+                
+                  <CardFooter className="flex flex-wrap justify-end gap-2 p-4 border-t bg-muted/20">
                     {editingEssay === index ? (
-                      <Button
-                        onClick={() => {
-                          setEditingEssay(null)
-                          handleSaveEssayContent(essay, essayContent)
-                        }}
-                      >
-                        <Save className="h-4 w-4 mr-1" /> Save
+                      <Button onClick={() => {
+                        setEditingEssay(null)
+                        handleSaveEssayContent(essay, essayContent)
+                      }}>
+                        <Save className="h-4 w-4 mr-2" /> Save Changes
                       </Button>
                     ) : (
                       <>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4 mr-1" /> Edit Details
+                            </Button>
+                          </DialogTrigger>
+                        </Dialog>
                         <Button
                           variant="outline"
                           size="sm"
@@ -844,30 +886,23 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                             setEssayContent(essay.content)
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-1" /> Edit
+                          <Edit className="h-4 w-4 mr-1" /> Edit Content
                         </Button>
-                        <div className="group relative">
-                          <Button variant="outline" size="sm">
-                            <Sparkles className="h-4 w-4 mr-1" /> AI
-                          </Button>
-                          <div className="absolute bottom-full right-0 mb-2 hidden group-hover:flex flex-col bg-popover shadow-md rounded-md p-1 z-10 w-32">
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => getAiFeedback(essay)}>
-                              Feedback
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => checkGrammarWithAi(essay)}>
-                              Grammar
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => rephraseWithAi(essay)}>
-                              Rephrase
-                            </Button>
-                          </div>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={() => getAiFeedback(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => checkGrammarWithAi(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> Grammar
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => rephraseWithAi(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> Rephrase
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => setConfirmDeleteEssay(essay.id)}>
                           <Trash2 className="h-4 w-4 mr-1" /> Delete
                         </Button>
                       </>
                     )}
-                  </div>
+                  </CardFooter>
                 </>
               )}
             </Card>
