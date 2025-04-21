@@ -587,7 +587,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingActivityId ? "Edit Activity" : "Add New Activity"}</DialogTitle>
           </DialogHeader>
@@ -734,7 +734,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
 
       {/* Import Activities Dialog */}
       <Dialog open={isImportingActivities} onOpenChange={setIsImportingActivities}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Activities</DialogTitle>
           </DialogHeader>

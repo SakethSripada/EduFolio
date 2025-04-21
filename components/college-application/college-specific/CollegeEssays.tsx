@@ -878,7 +878,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       {/* Add Essay Dialog */}
       <Dialog open={isAddingEssay} onOpenChange={setIsAddingEssay}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
+          <DialogHeader className="pb-4">
             <DialogTitle>Add New Essay for {collegeName}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -985,7 +985,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         }}
       >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
+          <DialogHeader className="pb-4">
             <DialogTitle>Edit Essay Details</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -1053,7 +1053,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       {/* Import Essays Dialog */}
       <Dialog open={isImportingEssays} onOpenChange={setIsImportingEssays}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
+          <DialogHeader className="pb-4">
             <DialogTitle>Import Essays</DialogTitle>
           </DialogHeader>
           <div className="py-4">
@@ -1126,7 +1126,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       {/* AI Assistant Dialog */}
       <Dialog open={showAIAssistant} onOpenChange={setShowAIAssistant}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="sticky top-0 bg-background z-10 pb-2">
+          <DialogHeader className="pb-2">
             <DialogTitle>AI Essay Assistant</DialogTitle>
             <DialogDescription>
               Get help with your college essays
@@ -1275,7 +1275,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       {/* Add External Essay Dialog */}
       <Dialog open={isAddingExternalEssay} onOpenChange={setIsAddingExternalEssay}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
+          <DialogHeader className="pb-4">
             <DialogTitle>Add External Essay Link</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">

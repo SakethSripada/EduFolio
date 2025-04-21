@@ -431,7 +431,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                   <PlusCircle className="h-4 w-4" /> Add Activity
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Extracurricular Activity</DialogTitle>
                 </DialogHeader>
@@ -597,7 +597,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                 }
               }}
             >
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Extracurricular Activity</DialogTitle>
                 </DialogHeader>

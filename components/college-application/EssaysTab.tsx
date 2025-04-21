@@ -1232,7 +1232,7 @@ export default function EssaysTab() {
 
       {/* Version History Dialog */}
       <Dialog open={!!showVersionHistory} onOpenChange={(open) => !open && setShowVersionHistory(null)}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <DialogTitle>Version History</DialogTitle>
@@ -1348,7 +1348,7 @@ export default function EssaysTab() {
 
       {/* Add External Essay Dialog */}
       <Dialog open={isAddingExternalEssay} onOpenChange={setIsAddingExternalEssay}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add External Essay Link</DialogTitle>
           </DialogHeader>
