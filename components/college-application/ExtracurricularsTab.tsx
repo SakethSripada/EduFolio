@@ -252,12 +252,12 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
     setShowAIAssistant(true);
   };
 
-  // Original openAIAssistant can remain as a general function without specific formatting
-  const openAIAssistant = (activity: any) => {
-    setSelectedActivity(activity);
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setSelectedActivity(null);
     setAiAction(null);
     setShowAIAssistant(true);
-  };
+  }
 
   const startEditActivity = (activityId: string) => {
     const activityToEdit = activities.find((a) => a.id === activityId)
@@ -431,7 +431,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                   <PlusCircle className="h-4 w-4" /> Add Activity
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Extracurricular Activity</DialogTitle>
                 </DialogHeader>
@@ -597,7 +597,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                 }
               }}
             >
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Extracurricular Activity</DialogTitle>
                 </DialogHeader>
@@ -822,7 +822,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
-                            openAIAssistantForActivity(activity)
+                            openAIAssistant()
                           }}
                         >
                           <Sparkles className="h-4 w-4 mr-1" /> Improve with AI

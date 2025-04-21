@@ -2,19 +2,23 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2, Save } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
+import AIAssistant from "@/components/ai/AIAssistant"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+
+type AiAssistantType = "brainstorm" | "outline" | "feedback" | "grammar" | "improve"
 
 type CollegeEssaysProps = {
   collegeId: string
@@ -31,6 +35,7 @@ type Essay = {
   target_word_count: number | null
   last_edited: string
   status: string
+  external_link?: string | null
 }
 
 // Function to handle Supabase errors
@@ -50,6 +55,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     content: "",
     target_word_count: null,
     status: "Draft",
+    external_link: null,
   })
   const [isAddingEssay, setIsAddingEssay] = useState(false)
   const [isEditingEssay, setIsEditingEssay] = useState(false)
@@ -58,18 +64,38 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const [selectedEssays, setSelectedEssays] = useState<Record<string, boolean>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [confirmDeleteEssay, setConfirmDeleteEssay] = useState<string | null>(null)
+  const [essayContent, setEssayContent] = useState<string>("")
+  const [editingEssay, setEditingEssay] = useState<number | null>(null)
+  const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
+  // Add state for collapsed essays
+  const [collapsedEssays, setCollapsedEssays] = useState<Record<string, boolean>>({})
+  // Add AI assistant state variables
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
+  const [selectedEssay, setSelectedEssay] = useState<any>(null)
+  const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
+  // Add state for adding external essay
+  const [isAddingExternalEssay, setIsAddingExternalEssay] = useState(false)
+  const [externalEssay, setExternalEssay] = useState<{
+    title: string;
+    prompt: string;
+    external_link: string;
+    status: string;
+  }>({
+    title: "",
+    prompt: "",
+    external_link: "",
+    status: "Draft"
+  })
   const { user } = useAuth()
   const { toast } = useToast()
-
-  // Add state for confirmation dialog
-  const [confirmDeleteEssay, setConfirmDeleteEssay] = useState<string | null>(null)
-
-  // Add a new state variable to store the essay content
-  const [essayContent, setEssayContent] = useState<string>("")
-
-  const [editingEssay, setEditingEssay] = useState<number | null>(null)
-
-  const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
+  const [aiAssistantType, setAiAssistantType] = useState<AiAssistantType>("brainstorm")
+  const [aiPrompt, setAiPrompt] = useState("")
+  const [aiEssayContent, setAiEssayContent] = useState("")
+  const [aiResult, setAiResult] = useState("")
+  const [aiIsLoading, setAiIsLoading] = useState(false)
+  const [aiFeedbackFocus, setAiFeedbackFocus] = useState("")
+  const [selectedEssayForAi, setSelectedEssayForAi] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user || !collegeId) return
@@ -114,6 +140,17 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
     fetchData()
   }, [user, collegeId, toast])
+
+  // Initialize collapsed essays when essays are loaded
+  useEffect(() => {
+    if (essays.length > 0) {
+      const initialCollapsedState = essays.reduce((acc, essay) => {
+        acc[essay.id] = true; // Set to true to collapse by default
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCollapsedEssays(initialCollapsedState);
+    }
+  }, [essays]);
 
   // Validate essay form
   const validateEssayForm = (): boolean => {
@@ -162,6 +199,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
             target_word_count: newEssay.target_word_count || null,
             last_edited: new Date().toISOString(),
             status: newEssay.status || "Draft",
+            external_link: newEssay.external_link || null,
           },
         ])
         .select()
@@ -176,6 +214,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           content: "",
           target_word_count: null,
           status: "Draft",
+          external_link: null,
         })
         setIsAddingEssay(false)
 
@@ -228,6 +267,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           target_word_count: newEssay.target_word_count || null,
           last_edited: new Date().toISOString(),
           status: newEssay.status || "Draft",
+          external_link: newEssay.external_link || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", editingEssayId)
@@ -248,6 +288,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               target_word_count: newEssay.target_word_count || null,
               last_edited: new Date().toISOString(),
               status: newEssay.status as string,
+              external_link: newEssay.external_link as string | null,
             }
           }
           return essay
@@ -460,6 +501,164 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     saveEssayContent(essay, content)
   }
 
+  // Add helper functions for text processing
+  const stripHTML = (htmlContent: string) => {
+    // Create a temp div to hold the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent || "";
+    // Return just the text content (strips HTML tags)
+    return tempDiv.textContent || tempDiv.innerText || "";
+  }
+
+  // AI feedback function - opens AI assistant with feedback prompt
+  const getAiFeedback = (essay: any) => {
+    setSelectedEssay(essay);
+    setAiAssistantType("feedback");
+    setShowAIAssistant(true);
+  }
+
+  // AI grammar check function - opens AI assistant with grammar checking prompt
+  const checkGrammarWithAi = (essay: any) => {
+    setSelectedEssay(essay);
+    setAiAssistantType("grammar");
+    setShowAIAssistant(true);
+  }
+
+  // AI rephrase function - opens AI assistant with rephrasing prompt
+  const rephraseWithAi = (essay: any) => {
+    setSelectedEssay(essay);
+    setAiAssistantType("improve");
+    setShowAIAssistant(true);
+  }
+
+  const addExternalEssay = async () => {
+    if (!user || !collegeId) return
+
+    // Validate the form
+    const errors: Record<string, string> = {}
+    if (!externalEssay.title.trim()) errors.title = "Essay title is required"
+    if (!externalEssay.external_link.trim()) errors.external_link = "External link is required"
+    
+    // Simple URL validation
+    if (externalEssay.external_link && 
+        !externalEssay.external_link.match(/^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w- .\/?%&=]*)?$/)) {
+      errors.external_link = "Please enter a valid URL"
+    }
+
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    setIsLoading(true)
+
+    try {
+      const { data, error } = await supabase
+        .from("college_essays")
+        .insert([
+          {
+            user_id: user.id,
+            college_id: collegeId,
+            title: externalEssay.title.trim(),
+            prompt: externalEssay.prompt.trim(),
+            content: "",
+            word_count: 0,
+            character_count: 0,
+            target_word_count: null,
+            last_edited: new Date().toISOString(),
+            status: externalEssay.status,
+            external_link: externalEssay.external_link.trim(),
+          },
+        ])
+        .select()
+
+      if (error) throw error
+
+      if (data) {
+        setEssays([data[0], ...essays])
+        setExternalEssay({
+          title: "",
+          prompt: "",
+          external_link: "",
+          status: "Draft"
+        })
+        setIsAddingExternalEssay(false)
+
+        toast({
+          title: "External essay added",
+          description: "Your linked essay has been added successfully.",
+        })
+      }
+    } catch (error) {
+      console.error("Error adding external essay:", error)
+      toast({
+        title: "Error adding external essay",
+        description: handleSupabaseError(error, "There was a problem adding the external essay link."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAiAssistantSubmit = async () => {
+    if (!user || !collegeId) return
+
+    setAiIsLoading(true);
+
+    try {
+      // Find the selected essay or use the current values
+      const essayId = selectedEssayForAi || (selectedEssay?.id || "");
+      const essayPrompt = aiPrompt || (selectedEssay?.prompt || "");
+      const essayContent = aiEssayContent || (selectedEssay?.content || "");
+      
+      // Set state for the AIAssistant component
+      setSelectedEssay({ 
+        id: essayId,
+        prompt: essayPrompt,
+        content: essayContent
+      });
+      setShowAIAssistant(true);
+      
+      toast({
+        title: "AI Assistant Opened",
+        description: "You can now interact with the AI assistant.",
+      });
+    } catch (error) {
+      console.error("Error handling AI assistant:", error);
+      toast({
+        title: "Error opening AI assistant",
+        description: handleSupabaseError(error, "There was a problem opening the AI assistant."),
+        variant: "destructive",
+      });
+    } finally {
+      setAiIsLoading(false);
+    }
+  }
+
+  // Add a helper function to get the correct AI prompt based on the type
+  const getAIPromptForType = (type: AiAssistantType, prompt: string, content: string, collegeName: string, focus?: string): string => {
+    switch (type) {
+      case "brainstorm":
+        return `Please help me brainstorm ideas for this essay prompt for ${collegeName}: ${prompt}`
+      case "outline":
+        return `Please create an outline for an essay responding to this prompt for ${collegeName}: ${prompt}`
+      case "feedback":
+        return `Please provide feedback on this essay for ${collegeName}${focus ? ` focusing on ${focus}` : ''}:\n\n${stripHTML(content)}`
+      case "grammar":
+        return `Please check this essay for ${collegeName} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(content)}`
+      case "improve":
+        return `Please help me rephrase this essay for ${collegeName} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(content)}`
+      default:
+        return ""
+    }
+  }
+
+  // Update AI button to simply open the assistant without sending specific data
+  const openGenericAIAssistant = () => {
+    setSelectedEssay(null);
+    setAiAssistantType("brainstorm");
+    setShowAIAssistant(true);
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -470,38 +669,135 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">College-Specific Essays</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingEssays(true)}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <h2 className="text-xl font-semibold mb-4 sm:mb-0">{collegeName} Essays</h2>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openGenericAIAssistant()}>
+            <Sparkles className="h-4 w-4" /> AI Assistant
+          </Button>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsImportingEssays(true)}>
             <Copy className="h-4 w-4" /> Import Essays
           </Button>
-          <Button className="flex items-center gap-1" onClick={() => setIsAddingEssay(true)}>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>
+            <ExternalLink className="h-4 w-4" /> Add External Essay
+          </Button>
+          <Button className="flex items-center gap-2" onClick={() => setIsAddingEssay(true)}>
             <PlusCircle className="h-4 w-4" /> Add Essay
           </Button>
         </div>
       </div>
+      
+      {essays.length > 0 && (
+        <div className="flex justify-end gap-2 mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              const allEssayIds = essays.reduce((acc, essay) => {
+                acc[essay.id] = false;
+                return acc;
+              }, {} as Record<string, boolean>);
+              setCollapsedEssays(allEssayIds);
+            }}
+          >
+            <ChevronUp className="h-4 w-4 mr-1" /> Expand All
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              const allEssayIds = essays.reduce((acc, essay) => {
+                acc[essay.id] = true;
+                return acc;
+              }, {} as Record<string, boolean>);
+              setCollapsedEssays(allEssayIds);
+            }}
+          >
+            <ChevronDown className="h-4 w-4 mr-1" /> Collapse All
+          </Button>
+        </div>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Essays for {collegeName}</CardTitle>
-          <CardDescription>Essays you're writing for this specific college</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {essays.length === 0 ? (
-              <div className="col-span-2 text-center text-muted-foreground py-6 border rounded-md">
-                No essays added yet
-              </div>
-            ) : (
-              essays.map((essay, index) => (
-                <Card key={essay.id} className="overflow-hidden">
-                  <CardHeader>
-                    <CardTitle>{essay.prompt}</CardTitle>
-                    <CardDescription>
-                      Word Count: {essay.word_count} • Last Edited: {essay.last_edited}
+      {essays.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 border rounded-md">No essays added yet for {collegeName}</div>
+      ) : (
+        <div className="grid gap-6">
+          {essays.map((essay, index) => (
+            <Card key={essay.id} className="overflow-hidden">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        {essay.title}
+                        {getStatusBadge(essay.status)}
+                      </CardTitle>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => {
+                            setEditingEssayId(essay.id);
+                            setIsEditingEssay(true);
+                            setNewEssay({
+                              title: essay.title,
+                              prompt: essay.prompt,
+                              target_word_count: essay.target_word_count,
+                              status: essay.status,
+                              external_link: essay.external_link,
+                            });
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit Details</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setCollapsedEssays({
+                              ...collapsedEssays, 
+                              [essay.id]: !collapsedEssays[essay.id]
+                            });
+                          }}
+                        >
+                          {collapsedEssays[essay.id] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">
+                            {collapsedEssays[essay.id] ? "Expand" : "Collapse"}
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                    <CardDescription className="mt-1">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <span>{essay.prompt}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center mt-1">
+                        <span className="font-medium">Word Count: {essay.word_count}</span>
+                        {essay.target_word_count && <span> / {essay.target_word_count}</span>} • 
+                        <span className="ml-1">Last Edited: {new Date(essay.last_edited).toLocaleDateString()}</span>
+                        {essay.external_link && (
+                          <a 
+                            href={essay.external_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center ml-2 text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" /> External Document
+                          </a>
+                        )}
+                      </div>
                     </CardDescription>
-                  </CardHeader>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!collapsedEssays[essay.id] && (
+                <>
                   <CardContent>
                     {editingEssay === index ? (
                       <SimpleEssayEditor
@@ -516,41 +812,58 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         onShowHistory={() => setShowVersionHistory(essay.id)}
                       />
                     ) : (
-                      <div className="p-4 bg-muted/50 rounded-md font-serif">
+                      <div className="prose prose-sm max-w-none dark:text-foreground">
                         {essay.content || "Start writing your essay..."}
                       </div>
                     )}
                   </CardContent>
-                  <div className="px-6 py-2 bg-muted/50 flex justify-end space-x-2">
-                    {editingEssay === index ? null : (
+                
+                  <CardFooter className="flex flex-wrap justify-end gap-2 p-4 border-t bg-muted/20">
+                    {editingEssay === index ? (
+                      <Button onClick={() => {
+                        setEditingEssay(null)
+                        handleSaveEssayContent(essay, essayContent)
+                      }}>
+                        <Save className="h-4 w-4 mr-2" /> Save Changes
+                      </Button>
+                    ) : (
                       <>
                         <Button
                           variant="outline"
+                          size="sm"
                           onClick={() => {
-                            startEditEssay(essay.id)
                             setEditingEssay(index)
                             setEssayContent(essay.content)
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-1" /> Edit
+                          <Edit className="h-4 w-4 mr-1" /> Edit Content
                         </Button>
-                        <Button variant="outline" onClick={() => setConfirmDeleteEssay(essay.id)}>
+                        <Button variant="outline" size="sm" onClick={() => getAiFeedback(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => checkGrammarWithAi(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> Grammar
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => rephraseWithAi(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> Rephrase
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setConfirmDeleteEssay(essay.id)}>
                           <Trash2 className="h-4 w-4 mr-1" /> Delete
                         </Button>
                       </>
                     )}
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                  </CardFooter>
+                </>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Add Essay Dialog */}
       <Dialog open={isAddingEssay} onOpenChange={setIsAddingEssay}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
             <DialogTitle>Add New Essay for {collegeName}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -586,28 +899,44 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               <Label htmlFor="status">Status</Label>
               <select
                 id="status"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={newEssay.status || "Draft"}
                 onChange={(e) => setNewEssay({ ...newEssay, status: e.target.value })}
               >
                 <option value="Draft">Draft</option>
                 <option value="In Progress">In Progress</option>
-                <option value="Review">Review</option>
+                <option value="Reviewing">Reviewing</option>
                 <option value="Complete">Complete</option>
               </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="externalLink">External Link (Optional)</Label>
+              <Input
+                id="externalLink"
+                type="url"
+                placeholder="e.g. https://docs.google.com/document/d/..."
+                value={newEssay.external_link || ""}
+                onChange={(e) => setNewEssay({ ...newEssay, external_link: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Add a link to an external document (Google Docs, Microsoft Word, etc.)
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="content">Essay Content (Optional)</Label>
               <Textarea
                 id="content"
-                rows={8}
+                rows={6}
                 value={newEssay.content || ""}
                 onChange={(e) => setNewEssay({ ...newEssay, content: e.target.value })}
                 placeholder="Start writing your essay here..."
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 bg-background pt-2">
+            <Button variant="outline" onClick={() => setIsAddingEssay(false)} className="mr-2">
+              Cancel
+            </Button>
             <Button onClick={addEssay} disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -622,14 +951,13 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         </DialogContent>
       </Dialog>
 
-      {/* Edit Essay Dialog */}
+      {/* Edit Essay Details Dialog */}
       <Dialog
         open={isEditingEssay}
         onOpenChange={(open) => {
           if (!open) {
             setIsEditingEssay(false)
             setEditingEssayId(null)
-            setFormErrors({})
             setNewEssay({
               title: "",
               prompt: "",
@@ -637,12 +965,13 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               target_word_count: null,
               status: "Draft",
             })
+            setFormErrors({})
           }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Essay for {collegeName}</DialogTitle>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle>Edit Essay Details</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -661,6 +990,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                 value={newEssay.prompt || ""}
                 onChange={(e) => setNewEssay({ ...newEssay, prompt: e.target.value })}
               />
+              {formErrors.prompt && <p className="text-sm text-red-500">{formErrors.prompt}</p>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
@@ -668,55 +998,47 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                 id="targetWordCount"
                 type="number"
                 value={newEssay.target_word_count || ""}
-                onChange={(e) =>
-                  setNewEssay({ ...newEssay, target_word_count: e.target.value ? Number(e.target.value) : null })
-                }
+                onChange={(e) => setNewEssay({ ...newEssay, target_word_count: Number(e.target.value) || null })}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
               <select
                 id="status"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={newEssay.status || "Draft"}
                 onChange={(e) => setNewEssay({ ...newEssay, status: e.target.value })}
               >
                 <option value="Draft">Draft</option>
                 <option value="In Progress">In Progress</option>
-                <option value="Review">Review</option>
+                <option value="Reviewing">Reviewing</option>
                 <option value="Complete">Complete</option>
               </select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="content">Essay Content</Label>
-              <Textarea
-                id="content"
-                rows={8}
-                value={newEssay.content || ""}
-                onChange={(e) => setNewEssay({ ...newEssay, content: e.target.value })}
-                placeholder="Start writing your essay here..."
+              <Label htmlFor="externalLink">External Link (Optional)</Label>
+              <Input
+                id="externalLink"
+                type="url"
+                placeholder="e.g. https://docs.google.com/document/d/..."
+                value={newEssay.external_link || ""}
+                onChange={(e) => setNewEssay({ ...newEssay, external_link: e.target.value })}
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={updateEssay} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
+          <DialogFooter className="sticky bottom-0 bg-background pt-2">
+            <Button variant="outline" onClick={() => setIsEditingEssay(false)} className="mr-2">
+              Cancel
             </Button>
+            <Button onClick={updateEssay}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Import Essays Dialog */}
       <Dialog open={isImportingEssays} onOpenChange={setIsImportingEssays}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
             <DialogTitle>Import Essays</DialogTitle>
           </DialogHeader>
           <div className="py-4">
@@ -728,14 +1050,14 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                 <p className="text-muted-foreground">No general essays found to import.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {generalEssays.map((essay) => (
-                  <div key={essay.id} className="flex items-start space-x-3 p-3 border rounded-md">
+                  <div key={essay.id} className="flex items-start p-3 border rounded-md hover:bg-muted/30 transition-colors">
                     <input
                       type="checkbox"
                       checked={!!selectedEssays[essay.id]}
                       onChange={(e) => setSelectedEssays({ ...selectedEssays, [essay.id]: e.target.checked })}
-                      className="h-4 w-4 mt-1 rounded border-gray-300"
+                      className="h-4 w-4 mt-1 rounded border-gray-300 mr-3"
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">{essay.title}</h4>
@@ -750,8 +1072,8 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsImportingEssays(false)} disabled={isLoading}>
+          <DialogFooter className="sticky bottom-0 bg-background pt-2">
+            <Button variant="outline" onClick={() => setIsImportingEssays(false)} disabled={isLoading} className="mr-2">
               Cancel
             </Button>
             <Button onClick={importEssays} disabled={isLoading || !generalEssays || generalEssays.length === 0}>
@@ -785,6 +1107,242 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         }}
         variant="destructive"
       />
+
+      {/* AI Assistant Dialog */}
+      <Dialog open={showAIAssistant} onOpenChange={setShowAIAssistant}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
+            <DialogTitle>AI Essay Assistant</DialogTitle>
+            <DialogDescription>
+              Get help with your college essays
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-4">
+              <div>
+                <Label htmlFor="ai-prompt" className="text-base">What would you like help with?</Label>
+                <Select value={aiAssistantType} onValueChange={(value) => setAiAssistantType(value as AiAssistantType)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type of assistance" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="brainstorm">Brainstorm essay ideas</SelectItem>
+                    <SelectItem value="outline">Create an essay outline</SelectItem>
+                    <SelectItem value="feedback">Get feedback on my essay</SelectItem>
+                    <SelectItem value="grammar">Check grammar and clarity</SelectItem>
+                    <SelectItem value="improve">Improve my essay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {aiAssistantType === 'brainstorm' && (
+                <div className="space-y-2">
+                  <Label htmlFor="prompt" className="text-base">Essay Prompt</Label>
+                  <Textarea 
+                    id="prompt" 
+                    value={aiPrompt} 
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Enter the essay prompt"
+                    className="min-h-[100px]"
+                  />
+                </div>
+              )}
+              
+              {aiAssistantType === 'outline' && (
+                <div className="space-y-2">
+                  <Label htmlFor="prompt" className="text-base">Essay Prompt</Label>
+                  <Textarea 
+                    id="prompt" 
+                    value={aiPrompt} 
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Enter the essay prompt"
+                    className="min-h-[100px]"
+                  />
+                </div>
+              )}
+              
+              {(aiAssistantType === 'feedback' || aiAssistantType === 'grammar' || aiAssistantType === 'improve') && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="essay-content" className="text-base">Essay Content</Label>
+                    <Select
+                      value={selectedEssayForAi || ""}
+                      onValueChange={(value) => {
+                        setSelectedEssayForAi(value);
+                        const essay = essays.find(e => e.id === value);
+                        if (essay) {
+                          setAiPrompt(essay.prompt);
+                          setAiEssayContent(essay.content);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Select an essay" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {essays.map(essay => (
+                          <SelectItem key={essay.id} value={essay.id}>
+                            {essay.prompt.substring(0, 30)}...
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Textarea 
+                    id="essay-content" 
+                    value={aiEssayContent} 
+                    onChange={(e) => setAiEssayContent(e.target.value)}
+                    placeholder="Paste your essay here"
+                    className="min-h-[200px] font-serif"
+                  />
+                </div>
+              )}
+              
+              {aiAssistantType === 'feedback' && (
+                <div className="space-y-2">
+                  <Label htmlFor="feedback-focus" className="text-base">Focus Areas (Optional)</Label>
+                  <Textarea 
+                    id="feedback-focus" 
+                    value={aiFeedbackFocus} 
+                    onChange={(e) => setAiFeedbackFocus(e.target.value)}
+                    placeholder="What specific areas would you like feedback on? (e.g., clarity, structure, persuasiveness)"
+                    className="min-h-[80px]"
+                  />
+                </div>
+              )}
+            </div>
+            
+            {aiResult && (
+              <div className="border rounded-lg p-4 mt-4 bg-muted/20">
+                <h3 className="text-sm font-medium mb-2">AI Response:</h3>
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap">
+                  {aiResult}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="sticky bottom-0 bg-background pt-2 mt-4">
+            <div className="flex w-full items-center justify-between gap-2">
+              <div className="flex-1">
+                {aiIsLoading && <p className="text-sm text-muted-foreground">Generating response...</p>}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => {
+                  setShowAIAssistant(false);
+                  setAiResult('');
+                }}>
+                  Close
+                </Button>
+                <Button
+                  onClick={handleAiAssistantSubmit}
+                  disabled={aiIsLoading || 
+                    (aiAssistantType === 'brainstorm' && !aiPrompt) ||
+                    (aiAssistantType === 'outline' && !aiPrompt) ||
+                    ((aiAssistantType === 'feedback' || aiAssistantType === 'grammar' || aiAssistantType === 'improve') && !aiEssayContent)
+                  }
+                >
+                  {aiIsLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing
+                    </>
+                  ) : (
+                    <>Generate</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add External Essay Dialog */}
+      <Dialog open={isAddingExternalEssay} onOpenChange={setIsAddingExternalEssay}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle>Add External Essay Link</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="ext-title">Essay Title</Label>
+              <Input
+                id="ext-title"
+                value={externalEssay.title}
+                onChange={(e) => setExternalEssay({ ...externalEssay, title: e.target.value })}
+                placeholder="e.g., Why This College Essay"
+              />
+              {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-prompt">Essay Prompt (Optional)</Label>
+              <Textarea
+                id="ext-prompt"
+                value={externalEssay.prompt}
+                onChange={(e) => setExternalEssay({ ...externalEssay, prompt: e.target.value })}
+                placeholder="Enter the essay prompt or question..."
+                rows={2}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-link">External Link <span className="text-red-500">*</span></Label>
+              <Input
+                id="ext-link"
+                type="url"
+                value={externalEssay.external_link}
+                onChange={(e) => setExternalEssay({ ...externalEssay, external_link: e.target.value })}
+                placeholder="e.g., https://docs.google.com/document/d/..."
+              />
+              {formErrors.external_link && <p className="text-sm text-red-500">{formErrors.external_link}</p>}
+              <p className="text-xs text-muted-foreground">
+                Add a link to where your essay is stored (Google Docs, Microsoft Word, etc.)
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-status">Status</Label>
+              <select
+                id="ext-status"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={externalEssay.status}
+                onChange={(e) => setExternalEssay({ ...externalEssay, status: e.target.value })}
+              >
+                <option value="Draft">Draft</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Reviewing">Reviewing</option>
+                <option value="Complete">Complete</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter className="sticky bottom-0 bg-background pt-2">
+            <Button variant="outline" onClick={() => setIsAddingExternalEssay(false)} className="mr-2">
+              Cancel
+            </Button>
+            <Button onClick={addExternalEssay} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
+                </>
+              ) : (
+                "Add External Essay"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "essay",
+            id: selectedEssay?.id,
+            title: selectedEssay?.title || selectedEssay?.prompt,
+          }}
+          initialPrompt={selectedEssay ? getAIPromptForType(aiAssistantType, selectedEssay.prompt, selectedEssay.content, collegeName, aiFeedbackFocus) : undefined}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

@@ -21,13 +21,15 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Copy, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Copy, Loader2, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
+import AIAssistant from "@/components/ai/AIAssistant"
 
 type CollegeExtracurricularsProps = {
   collegeId: string
@@ -53,15 +55,15 @@ type Activity = {
 export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurricularsProps) {
   const [activities, setActivities] = useState<Activity[]>([])
   const [generalActivities, setGeneralActivities] = useState<Activity[]>([])
-  const [newActivity, setNewActivity] = useState({
+  const [newActivity, setNewActivity] = useState<Partial<Activity>>({
     activity_type: "",
     position: "",
     organization: "",
     description: "",
     grade_levels: "",
     participation_timing: "",
-    hours_per_week: "",
-    weeks_per_year: "",
+    hours_per_week: 0,
+    weeks_per_year: 0,
     continue_in_college: false,
     impact_statement: "",
     is_current: false,
@@ -73,11 +75,10 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
   const [selectedActivities, setSelectedActivities] = useState<Record<string, boolean>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null)
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
-
-  // Add state for confirmation dialog
-  const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null)
 
   // Update the useEffect to use setTimeout for Supabase calls
   useEffect(() => {
@@ -201,8 +202,8 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
             description: "",
             grade_levels: "",
             participation_timing: "",
-            hours_per_week: "",
-            weeks_per_year: "",
+            hours_per_week: 0,
+            weeks_per_year: 0,
             continue_in_college: false,
             impact_statement: "",
             is_current: false,
@@ -238,8 +239,8 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         description: activityToEdit.description || "",
         grade_levels: activityToEdit.grade_levels,
         participation_timing: activityToEdit.participation_timing,
-        hours_per_week: activityToEdit.hours_per_week.toString(),
-        weeks_per_year: activityToEdit.weeks_per_year.toString(),
+        hours_per_week: activityToEdit.hours_per_week,
+        weeks_per_year: activityToEdit.weeks_per_year,
         continue_in_college: activityToEdit.continue_in_college,
         impact_statement: activityToEdit.impact_statement || "",
         is_current: activityToEdit.is_current || false,
@@ -257,49 +258,48 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         const { error } = await supabase
           .from("college_extracurricular_activities")
           .update({
-            activity_type: newActivity.activity_type,
-            position: newActivity.position,
-            organization: newActivity.organization,
+            activity_type: newActivity.activity_type as string,
+            position: newActivity.position as string,
+            organization: newActivity.organization as string,
             description: newActivity.description || null,
-            grade_levels: newActivity.grade_levels,
-            participation_timing: newActivity.participation_timing,
+            grade_levels: newActivity.grade_levels as string,
+            participation_timing: newActivity.participation_timing as string,
             hours_per_week: Number(newActivity.hours_per_week),
             weeks_per_year: Number(newActivity.weeks_per_year),
-            continue_in_college: newActivity.continue_in_college,
+            continue_in_college: newActivity.continue_in_college === undefined ? false : newActivity.continue_in_college,
             impact_statement: newActivity.impact_statement || null,
-            is_current: newActivity.is_current,
+            is_current: newActivity.is_current === undefined ? false : newActivity.is_current,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingActivityId)
           .eq("college_id", collegeId)
 
         if (error) throw error
-
         return { success: true }
       },
       setIsLoading,
       () => {
-        setActivities(
-          activities.map((activity) => {
-            if (activity.id === editingActivityId) {
-              return {
-                ...activity,
-                activity_type: newActivity.activity_type,
-                position: newActivity.position,
-                organization: newActivity.organization,
-                description: newActivity.description || null,
-                grade_levels: newActivity.grade_levels,
-                participation_timing: newActivity.participation_timing,
-                hours_per_week: Number(newActivity.hours_per_week),
-                weeks_per_year: Number(newActivity.weeks_per_year),
-                continue_in_college: newActivity.continue_in_college,
-                impact_statement: newActivity.impact_statement || null,
-                is_current: newActivity.is_current,
-              }
-            }
-            return activity
-          }),
-        )
+        const updatedActivities = activities.map((activity) => {
+          if (activity.id === editingActivityId) {
+            return {
+              ...activity,
+              activity_type: newActivity.activity_type as string,
+              position: newActivity.position as string,
+              organization: newActivity.organization as string,
+              description: newActivity.description || null,
+              grade_levels: newActivity.grade_levels as string,
+              participation_timing: newActivity.participation_timing as string,
+              hours_per_week: Number(newActivity.hours_per_week),
+              weeks_per_year: Number(newActivity.weeks_per_year),
+              continue_in_college: newActivity.continue_in_college === undefined ? false : newActivity.continue_in_college,
+              impact_statement: newActivity.impact_statement || null,
+              is_current: newActivity.is_current === undefined ? false : newActivity.is_current,
+            } as Activity
+          }
+          return activity
+        });
+        
+        setActivities(updatedActivities);
         setIsEditingActivity(false)
         setEditingActivityId(null)
         setNewActivity({
@@ -309,8 +309,8 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
           description: "",
           grade_levels: "",
           participation_timing: "",
-          hours_per_week: "",
-          weeks_per_year: "",
+          hours_per_week: 0,
+          weeks_per_year: 0,
           continue_in_college: false,
           impact_statement: "",
           is_current: false,
@@ -431,6 +431,11 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
     )
   }
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   if (isLoading && activities.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -444,6 +449,9 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold">College-Specific Extracurriculars</h2>
         <div className="flex gap-2">
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
+            <Sparkles className="h-4 w-4" /> AI Assistance
+          </Button>
           <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingActivities(true)}>
             <Copy className="h-4 w-4" /> Import Activities
           </Button>
@@ -570,8 +578,8 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
               description: "",
               grade_levels: "",
               participation_timing: "",
-              hours_per_week: "",
-              weeks_per_year: "",
+              hours_per_week: 0,
+              weeks_per_year: 0,
               continue_in_college: false,
               impact_statement: "",
               is_current: false,
@@ -580,7 +588,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingActivityId ? "Edit Activity" : "Add New Activity"}</DialogTitle>
           </DialogHeader>
@@ -633,7 +641,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
               <Textarea
                 id="description"
                 maxLength={150}
-                value={newActivity.description}
+                value={newActivity.description || ''}
                 onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
               />
             </div>
@@ -643,7 +651,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
                 id="impact"
                 maxLength={200}
                 placeholder="Describe the impact of your involvement..."
-                value={newActivity.impact_statement}
+                value={newActivity.impact_statement || ''}
                 onChange={(e) => setNewActivity({ ...newActivity, impact_statement: e.target.value })}
               />
             </div>
@@ -678,22 +686,22 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
                 )}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="hoursPerWeek">Hours Spent Per Week</Label>
+                <Label htmlFor="hours">Hours Spent Per Week</Label>
                 <Input
-                  id="hoursPerWeek"
+                  id="hours"
                   type="number"
                   value={newActivity.hours_per_week}
-                  onChange={(e) => setNewActivity({ ...newActivity, hours_per_week: e.target.value })}
+                  onChange={(e) => setNewActivity({ ...newActivity, hours_per_week: Number(e.target.value) })}
                 />
                 {formErrors.hours_per_week && <p className="text-sm text-red-500">{formErrors.hours_per_week}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="weeksPerYear">Weeks Spent Per Year</Label>
+                <Label htmlFor="weeks">Weeks Spent Per Year</Label>
                 <Input
-                  id="weeksPerYear"
+                  id="weeks"
                   type="number"
                   value={newActivity.weeks_per_year}
-                  onChange={(e) => setNewActivity({ ...newActivity, weeks_per_year: e.target.value })}
+                  onChange={(e) => setNewActivity({ ...newActivity, weeks_per_year: Number(e.target.value) })}
                 />
                 {formErrors.weeks_per_year && <p className="text-sm text-red-500">{formErrors.weeks_per_year}</p>}
               </div>
@@ -701,7 +709,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="isCurrent"
-                checked={newActivity.is_current}
+                checked={!!newActivity.is_current}
                 onCheckedChange={(checked) => setNewActivity({ ...newActivity, is_current: checked as boolean })}
               />
               <Label htmlFor="isCurrent">I am currently involved in this activity</Label>
@@ -727,7 +735,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
 
       {/* Import Activities Dialog */}
       <Dialog open={isImportingActivities} onOpenChange={setIsImportingActivities}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Activities</DialogTitle>
           </DialogHeader>
@@ -791,9 +799,24 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         title="Delete Activity"
         description="Are you sure you want to delete this activity? This action cannot be undone."
         confirmText="Delete"
-        onConfirm={() => confirmDeleteActivity && deleteActivity(confirmDeleteActivity)}
+        onConfirm={() => {
+          if (confirmDeleteActivity) {
+            deleteActivity(confirmDeleteActivity)
+          }
+        }}
         variant="destructive"
       />
+
+      {/* AI Assistant Dialog */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "extracurricular"
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

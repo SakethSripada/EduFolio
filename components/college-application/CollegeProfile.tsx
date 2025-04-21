@@ -286,6 +286,11 @@ export default function CollegeProfile({
     }
   }
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   return (
     <div className="space-y-6">
       {/* Add a share button to the top of the component */}
@@ -319,7 +324,7 @@ export default function CollegeProfile({
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Academic Profile for {collegeName}</h3>
-                  <Button variant="outline" className="gap-1" onClick={() => setShowAIAssistant(true)}>
+                  <Button variant="outline" className="gap-1" onClick={() => openAIAssistant()}>
                     <Sparkles className="h-4 w-4" /> AI Recommendations
                   </Button>
                 </div>
@@ -381,7 +386,7 @@ export default function CollegeProfile({
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Extracurriculars for {collegeName}</h3>
-                  <Button variant="outline" className="gap-1" onClick={() => setShowAIAssistant(true)}>
+                  <Button variant="outline" className="gap-1" onClick={() => openAIAssistant()}>
                     <Sparkles className="h-4 w-4" /> AI Recommendations
                   </Button>
                 </div>
@@ -462,7 +467,7 @@ export default function CollegeProfile({
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">Awards for {collegeName}</h3>
-                  <Button variant="outline" className="gap-1" onClick={() => setShowAIAssistant(true)}>
+                  <Button variant="outline" className="gap-1" onClick={() => openAIAssistant()}>
                     <Sparkles className="h-4 w-4" /> AI Recommendations
                   </Button>
                 </div>
@@ -515,7 +520,7 @@ export default function CollegeProfile({
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium">{collegeName} Essays</h3>
                   <div className="flex gap-2">
-                    <Button variant="outline" className="gap-1" onClick={() => setShowAIAssistant(true)}>
+                    <Button variant="outline" className="gap-1" onClick={() => openAIAssistant()}>
                       <Sparkles className="h-4 w-4" /> AI Essay Help
                     </Button>
                     <Button className="gap-1" onClick={() => setIsAddingEssay(true)}>
@@ -548,7 +553,7 @@ export default function CollegeProfile({
                               targetWordCount={essay.targetWordCount}
                             />
                           ) : (
-                            <div className="p-4 bg-muted/50 rounded-md font-serif">
+                            <div className="p-4 bg-muted/50 rounded-md font-serif text-foreground">
                               {essay.content || "Start writing your essay..."}
                             </div>
                           )}
@@ -563,7 +568,7 @@ export default function CollegeProfile({
                               <Button
                                 variant="outline"
                                 className="mb-2 sm:mb-0"
-                                onClick={() => setShowAIAssistant(true)}
+                                onClick={() => openAIAssistant()}
                               >
                                 <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
                               </Button>
@@ -620,10 +625,12 @@ export default function CollegeProfile({
       {/* AI Assistant */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
             type: "college",
-            title: collegeName,
+            title: collegeName
           }}
+          onClose={() => setShowAIAssistant(false)}
         />
       )}
 

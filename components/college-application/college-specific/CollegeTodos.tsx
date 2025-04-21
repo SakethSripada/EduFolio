@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2, Calendar, CheckCircle2 } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Copy, Loader2, Calendar, CheckCircle2, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
@@ -18,6 +18,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { useSupabaseQuery } from "@/lib/hooks/use-supabase-query"
 import { useSupabaseMutation } from "@/lib/hooks/use-supabase-mutation"
+import AIAssistant from "@/components/ai/AIAssistant"
 // Import the safeSupabaseCall utility
 import { safeSupabaseCall } from "@/lib/safe-supabase"
 
@@ -48,6 +49,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [confirmDeleteTodo, setConfirmDeleteTodo] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState<"all" | "pending" | "completed">("all")
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -382,6 +384,11 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
     deleteTodoMutation.isLoading ||
     importTodosMutation.isLoading
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   if (isLoadingTodos && !collegeTodos) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -393,20 +400,16 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">College-Specific To-Do List</h2>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setIsImportingTodos(true)}
-            disabled={isLoading || !generalTodos || generalTodos.length === 0}
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-            Import Tasks
+        <h2 className="text-2xl font-semibold">College Application To-Do List</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
+            <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
-          <Button className="flex items-center gap-1" onClick={() => setIsAddingTodo(true)} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />}
-            Add Task
+          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingTodos(true)}>
+            <Copy className="h-4 w-4" /> Import Tasks
+          </Button>
+          <Button className="flex items-center gap-1" onClick={() => setIsAddingTodo(true)}>
+            <PlusCircle className="h-4 w-4" /> Add Task
           </Button>
         </div>
       </div>
@@ -783,10 +786,26 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
         onOpenChange={(open) => !open && setConfirmDeleteTodo(null)}
         title="Delete Task"
         description="Are you sure you want to delete this task? This action cannot be undone."
-        confirmText={deleteTodoMutation.isLoading ? "Deleting..." : "Delete"}
-        onConfirm={() => confirmDeleteTodo && deleteTodo(confirmDeleteTodo)}
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDeleteTodo) {
+            deleteTodoMutation.mutate(confirmDeleteTodo)
+          }
+        }}
         variant="destructive"
       />
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "college",
+            title: collegeName
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

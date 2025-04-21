@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info } from "lucide-react"
-import AIAssistant from "@/components/ai/AIAssistant"
+import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase, handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
@@ -21,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import DOMPurify from "dompurify"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import AIAssistant from "@/components/ai/AIAssistant"
 
 type Essay = {
   id: string
@@ -34,6 +34,7 @@ type Essay = {
   college_id: string | null
   is_common_app: boolean | null
   status: string | null
+  external_link: string | null
 }
 
 type EssayVersion = {
@@ -56,6 +57,7 @@ export default function EssaysTab() {
     target_word_count: "",
     is_common_app: false,
     status: "Draft",
+    external_link: "",
   })
   const [editingEssay, setEditingEssay] = useState<number | null>(null)
   const [showAIAssistant, setShowAIAssistant] = useState(false)
@@ -65,6 +67,7 @@ export default function EssaysTab() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [idCounter, setIdCounter] = useState(0)
   const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
+  const [collapsedEssays, setCollapsedEssays] = useState<Record<string, boolean>>({})
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -85,6 +88,19 @@ export default function EssaysTab() {
 
   // Add a maximum number of versions to keep per essay
   const MAX_VERSIONS_PER_ESSAY = 10;
+
+  // Add state for adding external essay
+  const [isAddingExternalEssay, setIsAddingExternalEssay] = useState(false)
+  const [externalEssay, setExternalEssay] = useState({
+    title: "",
+    prompt: "",
+    external_link: "",
+    status: "Draft",
+    is_common_app: false
+  })
+
+  // Add state variable to track which essay details we're editing
+  const [editingEssayDetails, setEditingEssayDetails] = useState<string | null>(null)
 
   // Function to generate unique IDs
   const generateUniqueId = () => {
@@ -262,69 +278,58 @@ export default function EssaysTab() {
   const addEssay = async () => {
     if (!user || !validateEssayForm()) return
 
-    setIsLoading(true)
+    performDatabaseOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("essays")
+          .insert([
+            {
+              user_id: user.id,
+              title: newEssay.title.trim(),
+              prompt: newEssay.prompt.trim(),
+              content: newEssay.content,
+              word_count: calculateWordCount(newEssay.content),
+              character_count: calculateCharacterCount(newEssay.content),
+              target_word_count: newEssay.target_word_count ? parseInt(newEssay.target_word_count) : null,
+              last_edited: new Date().toISOString(),
+              is_common_app: newEssay.is_common_app,
+              status: newEssay.status,
+              external_link: newEssay.external_link || null,
+            },
+          ])
+          .select()
 
-    try {
-      const wordCount = calculateWordCount(newEssay.content)
-      const charCount = calculateCharacterCount(newEssay.content)
-
-      const { data, error } = await supabase
-        .from("essays")
-        .insert([
-          {
-            user_id: user.id,
-            title: newEssay.title,
-            prompt: newEssay.prompt,
-            content: newEssay.content,
-            word_count: wordCount,
-            character_count: charCount,
-            target_word_count: newEssay.target_word_count ? Number(newEssay.target_word_count) : null,
-            last_edited: new Date().toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            }),
-            is_common_app: newEssay.is_common_app,
-            status: newEssay.status,
-          },
-        ])
-        .select()
-
-      if (error) throw error
-
-      if (data) {
-        setEssays([data[0], ...essays])
-
-        // Create initial version if there's content
-        if (newEssay.content) {
-          const { error: versionError } = await supabase.from("essay_versions").insert({
-            essay_id: data[0].id,
-            content: newEssay.content,
-            word_count: wordCount,
-            character_count: charCount,
-            version_name: "Initial Draft",
-          })
-
-          if (versionError) {
-            console.error("Error creating essay version:", versionError)
-          } else {
-            setEssayVersions({
-              ...essayVersions,
-              [data[0].id]: [
-                {
-                  id: generateUniqueId(), // Use the unique ID generator instead of Date.now()
-                  essay_id: data[0].id,
-                  content: newEssay.content,
-                  word_count: wordCount,
-                  character_count: charCount,
-                  version_name: "Initial Draft",
-                  created_at: new Date().toISOString(),
-                },
-              ],
-            })
-          }
+        if (error) throw error
+        
+        // Create an initial version of the essay if it has content
+        if (data && data[0] && newEssay.content.trim()) {
+          const { error: versionError } = await supabase
+            .from("essay_versions")
+            .insert([
+              {
+                essay_id: data[0].id,
+                content: newEssay.content,
+                word_count: calculateWordCount(newEssay.content),
+                character_count: calculateCharacterCount(newEssay.content),
+                version_name: "Initial Version",
+              },
+            ])
+  
+          if (versionError) throw versionError
         }
 
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          setEssays([data[0], ...essays])
+          // Add this essay to last saved content
+          setLastSavedContent({
+            ...lastSavedContent,
+            [data[0].id]: data[0].content
+          });
+        }
         setNewEssay({
           title: "",
           prompt: "",
@@ -332,23 +337,22 @@ export default function EssaysTab() {
           target_word_count: "",
           is_common_app: false,
           status: "Draft",
+          external_link: "",
         })
 
         toast({
           title: "Essay added",
           description: "Your essay has been added successfully.",
         })
-      }
-    } catch (error) {
-      console.error("Error adding essay:", error)
-      toast({
-        title: "Error adding essay",
-        description: handleSupabaseError(error, "There was a problem adding the essay."),
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+      },
+      (error) => {
+        toast({
+          title: "Error adding essay",
+          description: handleSupabaseError(error, "There was a problem adding the essay."),
+          variant: "destructive",
+        })
+      },
+    )
   }
 
   const updateEssayContent = async (index: number, content: string) => {
@@ -495,30 +499,30 @@ export default function EssaysTab() {
 
   // AI feedback function - opens AI assistant with feedback prompt
   const getAiFeedback = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("feedback")
-    setShowAIAssistant(true)
+    setSelectedEssay(essay);
+    setAiAction("feedback");
+    setShowAIAssistant(true);
   }
 
   // AI grammar check function - opens AI assistant with grammar checking prompt
   const checkGrammarWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("grammar")
-    setShowAIAssistant(true)
+    setSelectedEssay(essay);
+    setAiAction("grammar");
+    setShowAIAssistant(true);
   }
 
   // AI rephrase function - opens AI assistant with rephrasing prompt
   const rephraseWithAi = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction("rephrase")
-    setShowAIAssistant(true)
+    setSelectedEssay(essay);
+    setAiAction("rephrase");
+    setShowAIAssistant(true);
   }
 
   // General AI assistant without specific function
-  const openAIAssistant = (essay: any) => {
-    setSelectedEssay(essay)
-    setAiAction(null)
-    setShowAIAssistant(true)
+  const openAIAssistant = () => {
+    setSelectedEssay(null);
+    setAiAction(null);
+    setShowAIAssistant(true);
   }
 
   const deleteEssay = async (essayId: string, index: number) => {
@@ -706,6 +710,92 @@ export default function EssaysTab() {
     }
   };
 
+  const addExternalEssay = async () => {
+    if (!user) return
+
+    // Validate the form
+    const errors: Record<string, string> = {}
+    if (!externalEssay.title.trim()) errors.title = "Essay title is required"
+    if (!externalEssay.external_link.trim()) errors.external_link = "External link is required"
+    
+    // Simple URL validation
+    if (externalEssay.external_link && 
+        !externalEssay.external_link.match(/^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w- .\/?%&=]*)?$/)) {
+      errors.external_link = "Please enter a valid URL"
+    }
+
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    performDatabaseOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("essays")
+          .insert([
+            {
+              user_id: user.id,
+              title: externalEssay.title.trim(),
+              prompt: externalEssay.prompt.trim(),
+              content: "",
+              word_count: 0,
+              character_count: 0,
+              target_word_count: null,
+              last_edited: new Date().toISOString(),
+              status: externalEssay.status,
+              is_common_app: externalEssay.is_common_app,
+              external_link: externalEssay.external_link.trim(),
+            },
+          ])
+          .select()
+
+        if (error) throw error
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          setEssays([data[0], ...essays])
+          // Add this essay to last saved content
+          setLastSavedContent({
+            ...lastSavedContent,
+            [data[0].id]: ""
+          });
+        }
+        setExternalEssay({
+          title: "",
+          prompt: "",
+          external_link: "",
+          status: "Draft",
+          is_common_app: false
+        })
+        setIsAddingExternalEssay(false)
+
+        toast({
+          title: "External essay added",
+          description: "Your linked essay has been added successfully.",
+        })
+      },
+      (error) => {
+        toast({
+          title: "Error adding external essay",
+          description: handleSupabaseError(error, "There was a problem adding the external essay link."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  // Initialize collapsed essays when essays are loaded
+  useEffect(() => {
+    if (essays.length > 0) {
+      const initialCollapsedState = essays.reduce((acc, essay) => {
+        acc[essay.id] = true; // Set to true to collapse by default
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCollapsedEssays(initialCollapsedState);
+    }
+  }, [essays]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -716,26 +806,22 @@ export default function EssaysTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Application Essays</h2>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => {
-              setSelectedEssay(null)
-              setShowAIAssistant(true)
-            }}
-          >
-            <Sparkles className="h-4 w-4" /> AI Essay Help
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <h2 className="text-2xl font-semibold mb-4 sm:mb-0">Your Essays</h2>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
+            <Sparkles className="h-4 w-4" /> AI Assistant
+          </Button>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>
+            <ExternalLink className="h-4 w-4" /> Add External Essay
           </Button>
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-1">
+              <Button className="flex items-center gap-2">
                 <PlusCircle className="h-4 w-4" /> Add Essay
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Essay</DialogTitle>
               </DialogHeader>
@@ -746,6 +832,7 @@ export default function EssaysTab() {
                     id="title"
                     value={newEssay.title}
                     onChange={(e) => setNewEssay({ ...newEssay, title: e.target.value })}
+                    placeholder="e.g., Common App Personal Statement"
                   />
                   {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
                 </div>
@@ -755,162 +842,261 @@ export default function EssaysTab() {
                     id="prompt"
                     value={newEssay.prompt}
                     onChange={(e) => setNewEssay({ ...newEssay, prompt: e.target.value })}
+                    placeholder="Enter the essay prompt or question..."
                   />
                   {formErrors.prompt && <p className="text-sm text-red-500">{formErrors.prompt}</p>}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
-                    <Input
-                      id="targetWordCount"
-                      type="number"
-                      value={newEssay.target_word_count}
-                      onChange={(e) => setNewEssay({ ...newEssay, target_word_count: e.target.value })}
+                <div className="grid gap-2">
+                  <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
+                  <Input
+                    id="targetWordCount"
+                    type="number"
+                    value={newEssay.target_word_count}
+                    onChange={(e) => setNewEssay({ ...newEssay, target_word_count: e.target.value })}
+                    placeholder="e.g., 650"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    defaultValue={newEssay.status}
+                    onValueChange={(value) => setNewEssay({ ...newEssay, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Draft">Draft</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Reviewing">Reviewing</SelectItem>
+                      <SelectItem value="Complete">Complete</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="isCommonApp"
+                      checked={newEssay.is_common_app}
+                      onCheckedChange={(checked) => setNewEssay({ ...newEssay, is_common_app: !!checked })}
                     />
-                    {formErrors.target_word_count && (
-                      <p className="text-sm text-red-500">{formErrors.target_word_count}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={newEssay.status}
-                      onValueChange={(value) => setNewEssay({ ...newEssay, status: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Draft">Draft</SelectItem>
-                        <SelectItem value="In Progress">In Progress</SelectItem>
-                        <SelectItem value="Review">Review</SelectItem>
-                        <SelectItem value="Complete">Complete</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="isCommonApp">This is a Common App essay</Label>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isCommonApp"
-                    checked={newEssay.is_common_app}
-                    onCheckedChange={(checked) => setNewEssay({ ...newEssay, is_common_app: checked as boolean })}
+                <div className="grid gap-2">
+                  <Label htmlFor="externalLink">External Link (Optional)</Label>
+                  <Input
+                    id="externalLink"
+                    type="url"
+                    placeholder="e.g. https://docs.google.com/document/d/..."
+                    value={newEssay.external_link}
+                    onChange={(e) => setNewEssay({ ...newEssay, external_link: e.target.value })}
                   />
-                  <Label htmlFor="isCommonApp">This is a Common App essay</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Add a link to an external document (Google Docs, Microsoft Word, etc.)
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="content">Initial Content (Optional)</Label>
                   <Textarea
                     id="content"
-                    rows={5}
+                    rows={8}
                     value={newEssay.content}
                     onChange={(e) => setNewEssay({ ...newEssay, content: e.target.value })}
+                    placeholder="Start writing your essay here..."
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={addEssay}>Add Essay</Button>
+                <Button onClick={addEssay} disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
+                    </>
+                  ) : (
+                    "Add Essay"
+                  )}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
+      {essays.length > 0 && (
+        <div className="flex justify-end gap-2 mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              const allEssayIds = essays.reduce((acc, essay) => {
+                acc[essay.id] = false;
+                return acc;
+              }, {} as Record<string, boolean>);
+              setCollapsedEssays(allEssayIds);
+            }}
+          >
+            <ChevronUp className="h-4 w-4 mr-1" /> Expand All
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              const allEssayIds = essays.reduce((acc, essay) => {
+                acc[essay.id] = true;
+                return acc;
+              }, {} as Record<string, boolean>);
+              setCollapsedEssays(allEssayIds);
+            }}
+          >
+            <ChevronDown className="h-4 w-4 mr-1" /> Collapse All
+          </Button>
+        </div>
+      )}
+
       {essays.length === 0 ? (
         <div className="text-center text-muted-foreground py-12 border rounded-md">No essays added yet</div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid gap-6">
           {essays.map((essay, index) => (
             <Card key={essay.id} className="overflow-hidden">
               <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{essay.title}</CardTitle>
-                    <CardDescription>
-                      Word Count: {essay.word_count}
-                      {essay.target_word_count ? ` / ${essay.target_word_count}` : ""} • Character Count:{" "}
-                      {essay.character_count} • Last Edited: {essay.last_edited}
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        {essay.title}
+                        {essay.is_common_app && (
+                          <Badge className="bg-blue-500">Common App</Badge>
+                        )}
+                        {getStatusBadge(essay.status)}
+                      </CardTitle>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setShowVersionHistory(essay.id)}
+                        >
+                          <History className="h-4 w-4" />
+                          <span className="sr-only">Version History</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setCollapsedEssays({
+                              ...collapsedEssays, 
+                              [essay.id]: !collapsedEssays[essay.id]
+                            });
+                          }}
+                        >
+                          {collapsedEssays[essay.id] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">
+                            {collapsedEssays[essay.id] ? "Expand" : "Collapse"}
+                          </span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingEssayDetails(essay.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit Details</span>
+                        </Button>
+                      </div>
+                    </div>
+                    <CardDescription className="mt-1">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <span>{essay.prompt}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center mt-1">
+                        <span className="font-medium">Word Count: {essay.word_count}</span>
+                        {essay.target_word_count && <span> / {essay.target_word_count}</span>} • 
+                        <span className="ml-1">Last Edited: {new Date(essay.last_edited).toLocaleDateString()}</span>
+                        {essay.external_link && (
+                          <a 
+                            href={essay.external_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center ml-2 text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" /> External Document
+                          </a>
+                        )}
+                      </div>
                     </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {essay.is_common_app && <Badge className="bg-primary">Common App</Badge>}
-                    {getStatusBadge(essay.status)}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="mb-2 text-sm text-muted-foreground">
-                  <strong>Prompt:</strong> {essay.prompt}
-                </div>
-                {editingEssay === index ? (
-                  <SimpleEssayEditor
-                    content={essayContent}
-                    onChange={handleEssayContentChange}
-                    onSave={() => {
-                      setEditingEssay(null)
-                      handleSaveEssayContent(essay, essayContent)
-                    }}
-                    wordCount={calculateWordCount(essayContent)}
-                    targetWordCount={essay.target_word_count}
-                    onShowHistory={() => setShowVersionHistory(essay.id)}
-                  />
-                ) : (
-                  <div 
-                    className="p-4 bg-muted/50 rounded-md font-serif"
-                    dangerouslySetInnerHTML={{ __html: renderSafeHTML(essay.content || "Start writing your essay...") }}
-                  />
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-end space-x-2 bg-muted/20">
-                {editingEssay === index ? null : (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="ml-2"
-                      onClick={() => setShowVersionHistory(essay.id)}
-                      disabled={!essayVersions[essay.id] || essayVersions[essay.id].length === 0}
-                    >
-                      <div className="flex items-center gap-1">
-                        <History className="h-4 w-4" />
-                        <span>Version History</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="inline-flex ml-1">
-                                <Info className="h-4 w-4 text-muted-foreground" />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p>Smart versioning enabled. New versions are created only when significant changes are made, reducing clutter in version history.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </Button>
-                    <Button variant="outline" onClick={() => getAiFeedback(essay)}>
-                      <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
-                    </Button>
-                    <Button variant="outline" onClick={() => checkGrammarWithAi(essay)}>
-                      <Sparkles className="h-4 w-4 mr-1" /> Check Grammar
-                    </Button>
-                    <Button variant="outline" onClick={() => rephraseWithAi(essay)}>
-                      <Sparkles className="h-4 w-4 mr-1" /> Rephrase
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setEditingEssay(index)
-                        setEssayContent(essay.content)
-                      }}
-                    >
-                      <Edit className="h-4 w-4 mr-1" /> Edit
-                    </Button>
-                    <Button variant="outline" onClick={() => setConfirmDeleteEssay(essay.id)}>
-                      <Trash2 className="h-4 w-4 mr-1" /> Delete
-                    </Button>
-                  </>
-                )}
-              </CardFooter>
+              
+              {!collapsedEssays[essay.id] && (
+                <>
+                  <CardContent>
+                    {editingEssay === index ? (
+                      <SimpleEssayEditor
+                        content={essayContent}
+                        onChange={handleEssayContentChange}
+                        onSave={() => {
+                          setEditingEssay(null)
+                          handleSaveEssayContent(essay, essayContent)
+                        }}
+                        wordCount={calculateWordCount(essayContent)}
+                        targetWordCount={essay.target_word_count || undefined}
+                        onShowHistory={() => setShowVersionHistory(essay.id)}
+                      />
+                    ) : (
+                      <div 
+                        className="prose prose-sm max-w-none dark:text-foreground"
+                        dangerouslySetInnerHTML={{ __html: renderSafeHTML(essay.content || "") }}
+                      />
+                    )}
+                  </CardContent>
+                
+                  <CardFooter className="flex flex-wrap justify-end gap-2 p-4 border-t bg-muted/20">
+                    {editingEssay === index ? (
+                      <Button onClick={() => {
+                        setEditingEssay(null)
+                        handleSaveEssayContent(essay, essayContent)
+                      }}>
+                        <Save className="h-4 w-4 mr-2" /> Save Changes
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingEssay(index)
+                            setEssayContent(essay.content)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" /> Edit Content
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => getAiFeedback(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => checkGrammarWithAi(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> Grammar
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => rephraseWithAi(essay)}>
+                          <Sparkles className="h-4 w-4 mr-1" /> Rephrase
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfirmDeleteEssay(essay.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                        </Button>
+                      </>
+                    )}
+                  </CardFooter>
+                </>
+              )}
             </Card>
           ))}
         </div>
@@ -918,7 +1104,7 @@ export default function EssaysTab() {
 
       {/* Version History Dialog */}
       <Dialog open={!!showVersionHistory} onOpenChange={(open) => !open && setShowVersionHistory(null)}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <DialogTitle>Version History</DialogTitle>
@@ -989,27 +1175,27 @@ export default function EssaysTab() {
         </DialogContent>
       </Dialog>
 
-      {/* AI Assistant */}
+      {/* Add AIAssistant component conditionally */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
             type: "essay",
             id: selectedEssay?.id,
-            title: selectedEssay?.prompt || "Essay Writing",
+            title: selectedEssay?.title || selectedEssay?.prompt || "Essay Writing",
           }}
           initialPrompt={
             selectedEssay && aiAction 
               ? aiAction === "feedback"
-                ? `Please provide feedback on this essay:\n\n${stripHTML(selectedEssay.content)}`
+                ? `Please provide feedback on this essay${selectedEssay.is_common_app ? " (Common App)" : ""}:\n\n${stripHTML(selectedEssay.content)}`
                 : aiAction === "grammar"
-                  ? `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
-                  : `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
+                  ? `Please check this essay${selectedEssay.is_common_app ? " (Common App)" : ""} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
+                  : `Please help me rephrase this essay${selectedEssay.is_common_app ? " (Common App)" : ""} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
               : undefined
           }
-          showOnLoad={true}
           onClose={() => {
-            setShowAIAssistant(false)
-            setAiAction(null)
+            setShowAIAssistant(false);
+            setAiAction(null);
           }}
         />
       )}
@@ -1031,6 +1217,244 @@ export default function EssaysTab() {
         }}
         variant="destructive"
       />
+
+      {/* Add External Essay Dialog */}
+      <Dialog open={isAddingExternalEssay} onOpenChange={setIsAddingExternalEssay}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add External Essay Link</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="ext-title">Essay Title</Label>
+              <Input
+                id="ext-title"
+                value={externalEssay.title}
+                onChange={(e) => setExternalEssay({ ...externalEssay, title: e.target.value })}
+                placeholder="e.g., Common App Personal Statement"
+              />
+              {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-prompt">Essay Prompt (Optional)</Label>
+              <Textarea
+                id="ext-prompt"
+                value={externalEssay.prompt}
+                onChange={(e) => setExternalEssay({ ...externalEssay, prompt: e.target.value })}
+                placeholder="Enter the essay prompt or question..."
+                rows={2}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-link">External Link <span className="text-red-500">*</span></Label>
+              <Input
+                id="ext-link"
+                type="url"
+                value={externalEssay.external_link}
+                onChange={(e) => setExternalEssay({ ...externalEssay, external_link: e.target.value })}
+                placeholder="e.g., https://docs.google.com/document/d/..."
+              />
+              {formErrors.external_link && <p className="text-sm text-red-500">{formErrors.external_link}</p>}
+              <p className="text-xs text-muted-foreground">
+                Add a link to where your essay is stored (Google Docs, Microsoft Word, etc.)
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-status">Status</Label>
+              <Select
+                value={externalEssay.status}
+                onValueChange={(value) => setExternalEssay({ ...externalEssay, status: value })}
+              >
+                <SelectTrigger id="ext-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Reviewing">Reviewing</SelectItem>
+                  <SelectItem value="Complete">Complete</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="ext-common-app"
+                checked={externalEssay.is_common_app}
+                onCheckedChange={(checked) => setExternalEssay({ ...externalEssay, is_common_app: !!checked })}
+              />
+              <Label htmlFor="ext-common-app">This is a Common App essay</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddingExternalEssay(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addExternalEssay} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
+                </>
+              ) : (
+                "Add External Essay"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add all modal dialogs here */}
+      {essays.map((essay, index) => (
+        <Dialog 
+          key={`edit-dialog-${essay.id}`}
+          open={editingEssayDetails === essay.id} 
+          onOpenChange={(open) => {
+            if (!open) setEditingEssayDetails(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Essay Details</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-title">Essay Title</Label>
+                <Input
+                  id="edit-title"
+                  defaultValue={essay.title}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, title: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-prompt">Essay Prompt</Label>
+                <Textarea
+                  id="edit-prompt"
+                  defaultValue={essay.prompt}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, prompt: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-target-word-count">Target Word Count</Label>
+                <Input
+                  id="edit-target-word-count"
+                  type="number"
+                  defaultValue={essay.target_word_count || ""}
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, target_word_count: e.target.value ? parseInt(e.target.value) : null };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  defaultValue={essay.status || "Draft"}
+                  onValueChange={(value) => {
+                    const updatedEssay = { ...essay, status: value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                >
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Reviewing">Reviewing</SelectItem>
+                    <SelectItem value="Complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="edit-is-common-app"
+                    checked={essay.is_common_app || false}
+                    onCheckedChange={(checked) => {
+                      const updatedEssay = { ...essay, is_common_app: !!checked };
+                      const updatedEssays = [...essays];
+                      updatedEssays[index] = updatedEssay;
+                      setEssays(updatedEssays);
+                    }}
+                  />
+                  <Label htmlFor="edit-is-common-app">This is a Common App essay</Label>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-external-link">External Link</Label>
+                <Input
+                  id="edit-external-link"
+                  type="url"
+                  defaultValue={essay.external_link || ""}
+                  placeholder="e.g. https://docs.google.com/document/d/..."
+                  onChange={(e) => {
+                    const updatedEssay = { ...essay, external_link: e.target.value };
+                    const updatedEssays = [...essays];
+                    updatedEssays[index] = updatedEssay;
+                    setEssays(updatedEssays);
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={async () => {
+                try {
+                  setIsLoading(true);
+                  const { error } = await supabase
+                    .from("essays")
+                    .update({
+                      title: essay.title,
+                      prompt: essay.prompt,
+                      external_link: essay.external_link,
+                      target_word_count: essay.target_word_count,
+                      status: essay.status,
+                      is_common_app: essay.is_common_app,
+                    })
+                    .eq("id", essay.id);
+                  
+                  if (error) throw error;
+                  
+                  toast({
+                    title: "Essay details updated",
+                    description: "Your essay details have been updated successfully.",
+                  });
+                  setEditingEssayDetails(null);
+                } catch (error) {
+                  console.error("Error updating essay details:", error);
+                  toast({
+                    title: "Error updating essay details",
+                    description: handleSupabaseError(error, "There was a problem updating the essay details."),
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
+              }} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ))}
     </div>
   )
 }

@@ -26,6 +26,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { getShareLink } from "@/lib/supabase/utils"
 import { format } from "date-fns"
 import * as React from 'react'
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 // Define types for portfolio data
 type Project = {
@@ -392,7 +393,17 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
                       <span>{project.date}</span>
                     </div>
                     <h3 className="text-xl font-semibold mb-2 line-clamp-1">{project.title}</h3>
-                    <p className="text-muted-foreground mb-4 line-clamp-2">{project.description}</p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <p className="text-muted-foreground mb-4 line-clamp-2 cursor-pointer hover:text-primary transition-colors">
+                          {project.description}
+                        </p>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 max-h-60 overflow-y-auto">
+                        <div className="font-medium mb-2">Description</div>
+                        <p className="text-sm text-muted-foreground">{project.description}</p>
+                      </PopoverContent>
+                    </Popover>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {project.tags && project.tags.slice(0, 3).map((tag, index) => (
                         <Badge key={index} variant="secondary" className="font-normal">
@@ -400,9 +411,23 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
                         </Badge>
                       ))}
                       {project.tags && project.tags.length > 3 && (
-                        <Badge variant="outline" className="font-normal">
-                          +{project.tags.length - 3} more
-                        </Badge>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Badge variant="outline" className="font-normal cursor-pointer hover:bg-accent transition-colors">
+                              +{project.tags.length - 3} more
+                            </Badge>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 max-h-60 overflow-y-auto">
+                            <div className="font-medium mb-2">All Tags</div>
+                            <div className="flex flex-wrap gap-2">
+                              {project.tags.map((tag, index) => (
+                                <Badge key={index} variant="secondary" className="font-normal">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </div>
 

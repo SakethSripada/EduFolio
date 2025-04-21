@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2 } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Copy, Loader2, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
@@ -18,6 +18,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { useSupabaseQuery } from "@/lib/hooks/use-supabase-query"
 import { useSupabaseMutation } from "@/lib/hooks/use-supabase-mutation"
+import AIAssistant from "@/components/ai/AIAssistant"
 // Import the safeSupabaseCall utility
 import { safeSupabaseCall } from "@/lib/safe-supabase"
 
@@ -44,6 +45,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
   const [selectedAwards, setSelectedAwards] = useState<Record<string, boolean>>({})
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [confirmDeleteAward, setConfirmDeleteAward] = useState<string | null>(null)
+  const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -352,23 +354,24 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
     )
   }
 
+  // Add a simple function to open the AI Assistant without specific data
+  const openAIAssistant = () => {
+    setShowAIAssistant(true);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">College-Specific Awards</h2>
+        <h2 className="text-xl font-semibold">College-Specific Awards and Honors</h2>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1"
-            onClick={() => setIsImportingAwards(true)}
-            disabled={isLoading || !generalAwards || generalAwards.length === 0}
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
-            Import Awards
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
+            <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
-          <Button className="flex items-center gap-1" onClick={() => setIsAddingAward(true)} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <PlusCircle className="h-4 w-4 mr-1" />}
-            Add Award
+          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingAwards(true)}>
+            <Copy className="h-4 w-4" /> Import Awards
+          </Button>
+          <Button className="flex items-center gap-1" onClick={() => setIsAddingAward(true)}>
+            <PlusCircle className="h-4 w-4" /> Add Award
           </Button>
         </div>
       </div>
@@ -738,10 +741,25 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
         onOpenChange={(open) => !open && setConfirmDeleteAward(null)}
         title="Delete Award"
         description="Are you sure you want to delete this award? This action cannot be undone."
-        confirmText={deleteAwardMutation.isLoading ? "Deleting..." : "Delete"}
-        onConfirm={() => confirmDeleteAward && deleteAward(confirmDeleteAward)}
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDeleteAward) {
+            deleteAwardMutation.mutate(confirmDeleteAward)
+          }
+        }}
         variant="destructive"
       />
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "award"
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

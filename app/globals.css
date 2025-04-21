@@ -82,20 +82,23 @@
   /* Fix scrollbar layout shift issue */
   html {
     scrollbar-gutter: stable;
-    overflow-y: scroll;
+    overflow-y: scroll; /* Always show scrollbar to prevent layout shift */
   }
   
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
+    position: relative; /* Needed for proper positioning when modal is open */
   }
   
   /* Ensure app maintains width even when scrollbar appears/disappears */
   #__next, .app-container {
-    width: 100vw;
+    width: 100%;
     max-width: 100%;
   }
+
+  /* Removing outdated dialog/modal fix as it's now handled in the dialog component */
 }
 
 @layer components {
