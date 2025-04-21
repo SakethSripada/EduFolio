@@ -288,13 +288,7 @@ export default function CollegeProfile({
 
   // Add a simple function to open the AI Assistant without specific data
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "college"
-      },
-      onClose: () => {}
-    })
+    setShowAIAssistant(true);
   }
 
   return (
@@ -631,10 +625,12 @@ export default function CollegeProfile({
       {/* AI Assistant */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
             type: "college",
-            title: collegeName,
+            title: collegeName
           }}
+          onClose={() => setShowAIAssistant(false)}
         />
       )}
 

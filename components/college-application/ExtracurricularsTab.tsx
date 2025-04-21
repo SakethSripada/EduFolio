@@ -254,13 +254,9 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
 
   // Add a simple function to open the AI Assistant without specific data
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "extracurricular"
-      },
-      onClose: () => {}
-    })
+    setSelectedActivity(null);
+    setAiAction(null);
+    setShowAIAssistant(true);
   }
 
   const startEditActivity = (activityId: string) => {

@@ -1,5 +1,13 @@
 "use client"
 
+/**
+ * AIAssistant Component
+ * 
+ * Note: This component must be defined with arrow function syntax to avoid React Hook errors.
+ * Using function declaration syntax would cause "Invalid hook call" errors because
+ * hooks must be called from React function components or custom hooks.
+ */
+
 import React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
@@ -81,7 +89,7 @@ const MessageComponent = React.memo(({ message }: { message: Message }) => (
 </div>
 ))
 
-export default function AIAssistant({ initialContext, initialPrompt, onClose, showOnLoad = false }: AIAssistantProps) {
+const AIAssistant = ({ initialContext, initialPrompt, onClose, showOnLoad = false }: AIAssistantProps) => {
 const [isOpen, setIsOpen] = useState(showOnLoad)
 const [isExpanded, setIsExpanded] = useState(false)
 const [activeTab, setActiveTab] = useState<string>("chat")
@@ -584,3 +592,5 @@ return (
   </>
 )
 }
+
+export default AIAssistant

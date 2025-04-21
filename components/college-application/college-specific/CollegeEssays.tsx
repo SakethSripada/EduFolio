@@ -512,47 +512,23 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
   // AI feedback function - opens AI assistant with feedback prompt
   const getAiFeedback = (essay: any) => {
-    // Open AI assistant with feedback prompt
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay",
-        id: essay.id,
-        title: essay.title || essay.prompt,
-      },
-      initialPrompt: getAIPromptForType("feedback", essay.prompt, essay.content, collegeName),
-      onClose: () => {}
-    })
+    setSelectedEssay(essay);
+    setAiAssistantType("feedback");
+    setShowAIAssistant(true);
   }
 
   // AI grammar check function - opens AI assistant with grammar checking prompt
   const checkGrammarWithAi = (essay: any) => {
-    // Open AI assistant with grammar check prompt
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay",
-        id: essay.id,
-        title: essay.title || essay.prompt,
-      },
-      initialPrompt: getAIPromptForType("grammar", essay.prompt, essay.content, collegeName),
-      onClose: () => {}
-    })
+    setSelectedEssay(essay);
+    setAiAssistantType("grammar");
+    setShowAIAssistant(true);
   }
 
   // AI rephrase function - opens AI assistant with rephrasing prompt
   const rephraseWithAi = (essay: any) => {
-    // Open AI assistant with rephrase prompt
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay",
-        id: essay.id,
-        title: essay.title || essay.prompt,
-      },
-      initialPrompt: getAIPromptForType("improve", essay.prompt, essay.content, collegeName),
-      onClose: () => {}
-    })
+    setSelectedEssay(essay);
+    setAiAssistantType("improve");
+    setShowAIAssistant(true);
   }
 
   const addExternalEssay = async () => {
@@ -626,50 +602,35 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const handleAiAssistantSubmit = async () => {
     if (!user || !collegeId) return
 
-    setAiIsLoading(true)
+    setAiIsLoading(true);
 
     try {
       // Find the selected essay or use the current values
-      const essayId = selectedEssayForAi || (selectedEssay?.id || "")
-      const essayPrompt = aiPrompt || (selectedEssay?.prompt || "")
-      const essayContent = aiEssayContent || (selectedEssay?.content || "")
-
-      // Call the AI assistant component
-      const aiResponse = await AIAssistant({
-        showOnLoad: true,
-        initialContext: {
-          type: "essay",
-          id: essayId,
-          title: essayPrompt,
-        },
-        initialPrompt: getAIPromptForType(aiAssistantType, essayPrompt, essayContent, collegeName, aiFeedbackFocus),
-        onClose: () => {}
-      })
-
-      if (aiResponse) {
-        // Make sure we handle the response properly based on its type
-        const responseText = typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse)
-        setAiResult(responseText)
-        setAiIsLoading(false)
-        setAiPrompt("")
-        setAiEssayContent("")
-        setSelectedEssayForAi(null)
-        setAiFeedbackFocus("")
-
-        toast({
-          title: "AI Response",
-          description: "AI response generated successfully.",
-        })
-      }
-    } catch (error) {
-      console.error("Error handling AI assistant:", error)
+      const essayId = selectedEssayForAi || (selectedEssay?.id || "");
+      const essayPrompt = aiPrompt || (selectedEssay?.prompt || "");
+      const essayContent = aiEssayContent || (selectedEssay?.content || "");
+      
+      // Set state for the AIAssistant component
+      setSelectedEssay({ 
+        id: essayId,
+        prompt: essayPrompt,
+        content: essayContent
+      });
+      setShowAIAssistant(true);
+      
       toast({
-        title: "Error handling AI assistant",
-        description: handleSupabaseError(error, "There was a problem handling the AI assistant."),
+        title: "AI Assistant Opened",
+        description: "You can now interact with the AI assistant.",
+      });
+    } catch (error) {
+      console.error("Error handling AI assistant:", error);
+      toast({
+        title: "Error opening AI assistant",
+        description: handleSupabaseError(error, "There was a problem opening the AI assistant."),
         variant: "destructive",
-      })
+      });
     } finally {
-      setAiIsLoading(false)
+      setAiIsLoading(false);
     }
   }
 
@@ -693,13 +654,9 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
   // Update AI button to simply open the assistant without sending specific data
   const openGenericAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay"
-      },
-      onClose: () => {}
-    })
+    setSelectedEssay(null);
+    setAiAssistantType("brainstorm");
+    setShowAIAssistant(true);
   }
 
   if (isLoading) {
@@ -1372,6 +1329,20 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "essay",
+            id: selectedEssay?.id,
+            title: selectedEssay?.title || selectedEssay?.prompt,
+          }}
+          initialPrompt={selectedEssay ? getAIPromptForType(aiAssistantType, selectedEssay.prompt, selectedEssay.content, collegeName, aiFeedbackFocus) : undefined}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

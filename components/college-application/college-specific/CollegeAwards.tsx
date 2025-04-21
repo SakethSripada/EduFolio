@@ -356,13 +356,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
 
   // Add a simple function to open the AI Assistant without specific data
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "award"
-      },
-      onClose: () => {}
-    })
+    setShowAIAssistant(true);
   }
 
   return (
@@ -755,6 +749,17 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
         }}
         variant="destructive"
       />
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "award"
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

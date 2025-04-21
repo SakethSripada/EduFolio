@@ -386,13 +386,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
 
   // Add a simple function to open the AI Assistant without specific data
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "college"
-      },
-      onClose: () => {}
-    })
+    setShowAIAssistant(true);
   }
 
   if (isLoadingTodos && !collegeTodos) {
@@ -800,6 +794,18 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
         }}
         variant="destructive"
       />
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "college",
+            title: collegeName
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

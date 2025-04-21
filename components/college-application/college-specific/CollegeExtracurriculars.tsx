@@ -433,13 +433,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
 
   // Add a simple function to open the AI Assistant without specific data
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "extracurricular"
-      },
-      onClose: () => {}
-    })
+    setShowAIAssistant(true);
   }
 
   if (isLoading && activities.length === 0) {
@@ -812,6 +806,17 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         }}
         variant="destructive"
       />
+
+      {/* AI Assistant Dialog */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "extracurricular"
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }

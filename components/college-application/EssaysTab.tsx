@@ -499,58 +499,30 @@ export default function EssaysTab() {
 
   // AI feedback function - opens AI assistant with feedback prompt
   const getAiFeedback = (essay: any) => {
-    // Open AI assistant with feedback prompt
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay",
-        id: essay.id,
-        title: essay.title || essay.prompt,
-      },
-      initialPrompt: `Please provide feedback on this essay${essay.is_common_app ? " (Common App)" : ""}:\n\n${stripHTML(essay.content)}`,
-      onClose: () => {}
-    })
+    setSelectedEssay(essay);
+    setAiAction("feedback");
+    setShowAIAssistant(true);
   }
 
   // AI grammar check function - opens AI assistant with grammar checking prompt
   const checkGrammarWithAi = (essay: any) => {
-    // Open AI assistant with grammar check prompt
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay",
-        id: essay.id,
-        title: essay.title || essay.prompt,
-      },
-      initialPrompt: `Please check this essay${essay.is_common_app ? " (Common App)" : ""} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(essay.content)}`,
-      onClose: () => {}
-    })
+    setSelectedEssay(essay);
+    setAiAction("grammar");
+    setShowAIAssistant(true);
   }
 
   // AI rephrase function - opens AI assistant with rephrasing prompt
   const rephraseWithAi = (essay: any) => {
-    // Open AI assistant with rephrase prompt
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay",
-        id: essay.id,
-        title: essay.title || essay.prompt,
-      },
-      initialPrompt: `Please help me rephrase this essay${essay.is_common_app ? " (Common App)" : ""} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(essay.content)}`,
-      onClose: () => {}
-    })
+    setSelectedEssay(essay);
+    setAiAction("rephrase");
+    setShowAIAssistant(true);
   }
 
   // General AI assistant without specific function
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "essay"
-      },
-      onClose: () => {}
-    })
+    setSelectedEssay(null);
+    setAiAction(null);
+    setShowAIAssistant(true);
   }
 
   const deleteEssay = async (essayId: string, index: number) => {
@@ -1203,27 +1175,27 @@ export default function EssaysTab() {
         </DialogContent>
       </Dialog>
 
-      {/* AI Assistant */}
+      {/* Add AIAssistant component conditionally */}
       {showAIAssistant && (
         <AIAssistant
+          showOnLoad={true}
           initialContext={{
             type: "essay",
             id: selectedEssay?.id,
-            title: selectedEssay?.prompt || "Essay Writing",
+            title: selectedEssay?.title || selectedEssay?.prompt || "Essay Writing",
           }}
           initialPrompt={
             selectedEssay && aiAction 
               ? aiAction === "feedback"
-                ? `Please provide feedback on this essay:\n\n${stripHTML(selectedEssay.content)}`
+                ? `Please provide feedback on this essay${selectedEssay.is_common_app ? " (Common App)" : ""}:\n\n${stripHTML(selectedEssay.content)}`
                 : aiAction === "grammar"
-                  ? `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
-                  : `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
+                  ? `Please check this essay${selectedEssay.is_common_app ? " (Common App)" : ""} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
+                  : `Please help me rephrase this essay${selectedEssay.is_common_app ? " (Common App)" : ""} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
               : undefined
           }
-          showOnLoad={true}
           onClose={() => {
-            setShowAIAssistant(false)
-            setAiAction(null)
+            setShowAIAssistant(false);
+            setAiAction(null);
           }}
         />
       )}

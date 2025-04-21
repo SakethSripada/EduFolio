@@ -438,13 +438,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
 
   // Add a simple function to open the AI Assistant without specific data
   const openAIAssistant = () => {
-    AIAssistant({
-      showOnLoad: true,
-      initialContext: {
-        type: "academics"
-      },
-      onClose: () => {}
-    })
+    setShowAIAssistant(true);
   }
 
   if (isLoading && courses.length === 0) {
@@ -972,6 +966,17 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
         }}
         variant="destructive"
       />
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "academics"
+          }}
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }
