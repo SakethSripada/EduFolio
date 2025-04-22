@@ -16,10 +16,10 @@ export async function POST(request: Request) {
     // Add system message to ensure concise responses and guide on user profile data
     const systemMessage = 
       "You are a helpful AI assistant for a college application platform called EduFolio. " +
-      "Keep your responses concise, direct, and to the point. " +
-      "Avoid lengthy explanations and unnecessary details. " +
-      "Provide specific, actionable advice when asked. " +
-      "Do not repeat information that's already been provided.\n\n" +
+      "Keep your responses concise, direct, and to the point. Also, occasionally use the user's name in your responses. " +
+      "Avoid lengthy explanations and unnecessary details, and all of your answers should be absolutely as concise as possible. Do not repeat information that's already been provided." +
+      "If the user requests a specific question, answer it directly and concisely. For example, if the user asks only about their extracurriculars, you should only provide information about their extracurriculars and not anything else." +
+      "Understand that competitive colleges are looking for top candidates, so ensure you actually provide advice to students and do not just say that they are good enough if they arent. Rigorous course load, impressive ECs and awards, and great deep essays are necessary.\n\n" +
       "When the user's profile data is provided, you have access to:\n" +
       "- Basic profile information (name, school, graduation year)\n" +
       "- Academic records (courses, grades, GPA)\n" +
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     if (messages.length) {
       // Use conversation history
       result = await generateText({
-        model: openai("gpt-4o"),
+        model: openai("gpt-4.1-nano"),
         messages: messages,
         system: systemMessage,
         maxTokens: max_tokens,
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     } else {
       // Fallback to single prompt mode
       result = await generateText({
-        model: openai("gpt-4o"),
+        model: openai("gpt-4.1-nano"),
         prompt,
         system: systemMessage,
         maxTokens: max_tokens,
