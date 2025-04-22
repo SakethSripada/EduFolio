@@ -17,6 +17,8 @@ import { validateRequired } from "@/lib/validation"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import AIAssistant from "@/components/ai/AIAssistant"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { debounce } from "@/lib/utils"
+import { useRef } from "react"
 
 type AiAssistantType = "brainstorm" | "outline" | "feedback" | "grammar" | "improve"
 
@@ -70,10 +72,14 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
   // Add state for collapsed essays
   const [collapsedEssays, setCollapsedEssays] = useState<Record<string, boolean>>({})
+  // Add initialization flag
+  const [didInitCollapse, setDidInitCollapse] = useState(false)
   // Add AI assistant state variables
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const [selectedEssay, setSelectedEssay] = useState<any>(null)
   const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
+  // Add state to track if an essay is being saved
+  const [savingEssay, setSavingEssay] = useState<string | null>(null)
   // Add state for adding external essay
   const [isAddingExternalEssay, setIsAddingExternalEssay] = useState(false)
   const [externalEssay, setExternalEssay] = useState<{
@@ -96,6 +102,17 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const [aiIsLoading, setAiIsLoading] = useState(false)
   const [aiFeedbackFocus, setAiFeedbackFocus] = useState("")
   const [selectedEssayForAi, setSelectedEssayForAi] = useState<string | null>(null)
+  
+  // Constants
+  const SAVE_DEBOUNCE_DELAY = 2000; // 2 seconds
+  
+  // Create a debounced version of saveEssayContent
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSaveEssayContent = useRef(
+    debounce(async (essay: any, content: string, showToast: boolean) => {
+      saveEssayContent(essay, content, showToast);
+    }, SAVE_DEBOUNCE_DELAY)
+  ).current;
 
   useEffect(() => {
     if (!user || !collegeId) return
@@ -141,16 +158,30 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     fetchData()
   }, [user, collegeId, toast])
 
-  // Initialize collapsed essays when essays are loaded
+  // Initialize collapsed essays ONLY ONCE when essays are first loaded
   useEffect(() => {
-    if (essays.length > 0) {
+    if (!didInitCollapse && essays.length > 0) {
       const initialCollapsedState = essays.reduce((acc, essay) => {
         acc[essay.id] = true; // Set to true to collapse by default
         return acc;
       }, {} as Record<string, boolean>);
       setCollapsedEssays(initialCollapsedState);
+      setDidInitCollapse(true);
     }
-  }, [essays]);
+  }, [essays, didInitCollapse]);
+
+  // Auto-expand the card being edited
+  useEffect(() => {
+    if (editingEssay !== null && essays.length > 0) {
+      const essayId = essays[editingEssay]?.id;
+      if (essayId) {
+        setCollapsedEssays(prev => ({
+          ...prev,
+          [essayId]: false // Ensure the edited essay is expanded
+        }));
+      }
+    }
+  }, [editingEssay, essays]);
 
   // Validate essay form
   const validateEssayForm = (): boolean => {
@@ -435,8 +466,12 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   }
 
   // Add a new function to save the essay content to the database
-  const saveEssayContent = async (essay: any, content: string) => {
+  const saveEssayContent = async (essay: any, content: string, showToast: boolean = false) => {
     if (!user) return
+    
+    // Track if we're saving
+    const savingId = essay.id;
+    setSavingEssay(savingId);
 
     const wordCount = calculateWordCount(content)
     const charCount = calculateCharacterCount(content)
@@ -458,36 +493,45 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         throw error
       }
 
-      // Update local state immediately after successful database update
-      setEssays((prevEssays) =>
-        prevEssays.map((e) =>
-          e.id === essay.id
-            ? {
-                ...e,
-                content: content,
-                word_count: wordCount,
-                character_count: charCount,
-                last_edited: new Date().toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                }),
-              }
-            : e,
-        ),
-      )
+      // Update local state using functional update to preserve editing state
+      setEssays((prevEssays) => {
+        return prevEssays.map((e) => {
+          if (e.id === essay.id) {
+            return {
+              ...e,
+              content: content,
+              word_count: wordCount,
+              character_count: charCount,
+              last_edited: new Date().toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              }),
+            };
+          }
+          return e;
+        });
+      });
 
-      toast({
-        title: "Essay updated",
-        description: "Your essay has been updated successfully.",
-      })
+      // Only show toast for manual saves, not auto-saves
+      if (showToast) {
+        toast({
+          title: "Essay updated",
+          description: "Your essay has been updated successfully.",
+        })
+      }
     } catch (error) {
       console.error("Error updating essay:", error)
-      toast({
-        title: "Error updating essay",
-        description: handleSupabaseError(error, "There was a problem updating the essay."),
-        variant: "destructive",
-      })
+      if (showToast) {
+        toast({
+          title: "Error updating essay",
+          description: handleSupabaseError(error, "There was a problem updating the essay."),
+          variant: "destructive",
+        })
+      }
+    } finally {
+      // Clear saving state
+      setSavingEssay(null);
     }
   }
 
@@ -497,8 +541,15 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   }
 
   // Add a new function to handle the save essay content
-  const handleSaveEssayContent = (essay: any, content: string) => {
-    saveEssayContent(essay, content)
+  const handleSaveEssayContent = (essay: any, content: string, showToast: boolean = false) => {
+    if (showToast) {
+      // For manual saves, don't use debounce
+      saveEssayContent(essay, content, showToast)
+    } else {
+      // For auto-saves, use debounce
+      debouncedSaveEssayContent(essay, content, showToast)
+    }
+    // NEVER set editingEssay to null here - this ensures the editor stays open
   }
 
   // Add helper functions for text processing
@@ -659,6 +710,21 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     setShowAIAssistant(true);
   }
 
+  // Add a new function to handle save and exit
+  const handleSaveAndExit = (essay: any, content: string) => {
+    // First save the content (don't use debounce for this, we want immediate saving)
+    saveEssayContent(essay, content, true).then(() => {
+      // After saving completes, close the editor by setting editingEssay to null
+      setEditingEssay(null);
+      
+      // Collapse the essay card
+      setCollapsedEssays(prev => ({
+        ...prev,
+        [essay.id]: true
+      }));
+    });
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -802,14 +868,25 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                     {editingEssay === index ? (
                       <SimpleEssayEditor
                         content={essayContent}
-                        onChange={handleEssayContentChange}
+                        onChange={(content) => {
+                          // Update local state without triggering save yet
+                          // (the editor will handle autosave timing)
+                          setEssayContent(content)
+                        }}
                         onSave={() => {
-                          setEditingEssay(null)
-                          handleSaveEssayContent(essay, essayContent)
+                          // This will be called both on manual save button click
+                          // and when auto-save timer fires
+                          handleSaveEssayContent(essay, essayContent, true)
+                        }}
+                        onSaveAndExit={() => {
+                          // This will be called when the "Save & Exit" button is clicked
+                          handleSaveAndExit(essay, essayContent)
                         }}
                         wordCount={calculateWordCount(essayContent)}
                         targetWordCount={essay.target_word_count}
                         onShowHistory={() => setShowVersionHistory(essay.id)}
+                        autoSave={true}
+                        autoSaveDelay={SAVE_DEBOUNCE_DELAY}
                       />
                     ) : (
                       <div className="prose prose-sm max-w-none dark:text-foreground">
@@ -821,10 +898,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                   <CardFooter className="flex flex-wrap justify-end gap-2 p-4 border-t bg-muted/20">
                     {editingEssay === index ? (
                       <Button onClick={() => {
-                        setEditingEssay(null)
-                        handleSaveEssayContent(essay, essayContent)
+                        // Save without closing editor
+                        handleSaveEssayContent(essay, essayContent, true)
+                        // Do NOT set editingEssay to null here
                       }}>
-                        <Save className="h-4 w-4 mr-2" /> Save Changes
+                        <Save className="h-4 w-4 mr-2" /> Save
                       </Button>
                     ) : (
                       <>

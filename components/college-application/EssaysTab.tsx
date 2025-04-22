@@ -101,6 +101,10 @@ export default function EssaysTab() {
 
   // Add state variable to track which essay details we're editing
   const [editingEssayDetails, setEditingEssayDetails] = useState<string | null>(null)
+  // Add state to track if essay is being saved
+  const [savingEssay, setSavingEssay] = useState<string | null>(null)
+  // Add a state for initializing collapsedEssays only once
+  const [didInitCollapse, setDidInitCollapse] = useState(false)
 
   // Function to generate unique IDs
   const generateUniqueId = () => {
@@ -368,14 +372,14 @@ export default function EssaysTab() {
   // Create a debounced version of saveEssayContent
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSaveEssayContent = useRef(
-    debounce(async (essay: any, content: string) => {
-      saveEssayContent(essay, content);
+    debounce(async (essay: any, content: string, showToast: boolean) => {
+      saveEssayContent(essay, content, showToast);
     }, SAVE_DEBOUNCE_DELAY)
   ).current;
 
   // Add a new function to save the essay content to the database
-  const saveEssayContent = async (essay: any, content: string) => {
-    if (!user) return
+  const saveEssayContent = async (essay: any, content: string, showToast: boolean = false) => {
+    if (!user) return Promise.resolve(); // Return resolved promise if no user
 
     const wordCount = calculateWordCount(content)
     const charCount = calculateCharacterCount(content)
@@ -473,10 +477,14 @@ export default function EssaysTab() {
         ),
       )
 
-      toast({
-        title: "Essay updated",
-        description: "Your essay has been updated successfully.",
-      })
+      if (showToast) {
+        toast({
+          title: "Essay updated",
+          description: "Your essay has been updated successfully.",
+        })
+      }
+      
+      return Promise.resolve(); // Return resolved promise on success
     } catch (error) {
       console.error("Error updating essay:", error)
       toast({
@@ -484,6 +492,8 @@ export default function EssaysTab() {
         description: handleSupabaseError(error, "There was a problem updating the essay."),
         variant: "destructive",
       })
+      
+      return Promise.reject(error); // Return rejected promise on error
     }
   }
 
@@ -493,8 +503,38 @@ export default function EssaysTab() {
   }
 
   // Add a new function to handle the save essay content
-  const handleSaveEssayContent = (essay: any, content: string) => {
-    debouncedSaveEssayContent(essay, content)
+  const handleSaveEssayContent = (essay: any, content: string, showToast: boolean = false): Promise<void> => {
+    if (showToast) {
+      // For manual saves, don't use debounce
+      return saveEssayContent(essay, content, showToast);
+    } else {
+      // For auto-saves, use debounce - this doesn't return a Promise directly
+      debouncedSaveEssayContent(essay, content, showToast);
+      // Return a resolved promise anyway so we can chain
+      return Promise.resolve();
+    }
+    // NEVER set editingEssay to null here - this keeps the editor open
+  }
+
+  // Add a new function to handle save and exit
+  const handleSaveAndExit = (essay: any, content: string) => {
+    // First save the content (don't use debounce for this, we want immediate saving)
+    saveEssayContent(essay, content, true).then(() => {
+      // After saving completes, close the editor by setting editingEssay to null
+      setEditingEssay(null);
+      
+      // Collapse the essay card if it exists in our state
+      if (essay && essay.id) {
+        setCollapsedEssays(prev => ({
+          ...prev,
+          [essay.id]: true
+        }));
+      }
+    }).catch(error => {
+      console.error("Error in handleSaveAndExit:", error);
+      // Still close the editor even if there was an error saving
+      setEditingEssay(null);
+    });
   }
 
   // AI feedback function - opens AI assistant with feedback prompt
@@ -785,16 +825,30 @@ export default function EssaysTab() {
     )
   }
 
-  // Initialize collapsed essays when essays are loaded
+  // Initialize collapsed essays ONLY ONCE when essays are first loaded
   useEffect(() => {
-    if (essays.length > 0) {
+    if (!didInitCollapse && essays.length > 0) {
       const initialCollapsedState = essays.reduce((acc, essay) => {
         acc[essay.id] = true; // Set to true to collapse by default
         return acc;
       }, {} as Record<string, boolean>);
       setCollapsedEssays(initialCollapsedState);
+      setDidInitCollapse(true);
     }
-  }, [essays]);
+  }, [essays, didInitCollapse]);
+
+  // Auto-expand the card being edited
+  useEffect(() => {
+    if (editingEssay !== null && essays.length > 0) {
+      const essayId = essays[editingEssay]?.id;
+      if (essayId) {
+        setCollapsedEssays((prev) => ({
+          ...prev,
+          [essayId]: false, // Ensure the edited essay is expanded
+        }));
+      }
+    }
+  }, [editingEssay, essays]);
 
   if (isLoading) {
     return (
@@ -1039,14 +1093,25 @@ export default function EssaysTab() {
                     {editingEssay === index ? (
                       <SimpleEssayEditor
                         content={essayContent}
-                        onChange={handleEssayContentChange}
+                        onChange={(content) => {
+                          // Update local state without triggering save yet
+                          // (the editor will handle autosave timing)
+                          setEssayContent(content)
+                        }}
                         onSave={() => {
-                          setEditingEssay(null)
-                          handleSaveEssayContent(essay, essayContent)
+                          // This will be called both on manual save button click
+                          // and when auto-save timer fires
+                          handleSaveEssayContent(essay, essayContent, true)
+                        }}
+                        onSaveAndExit={() => {
+                          // This will be called when the "Save & Exit" button is clicked
+                          handleSaveAndExit(essay, essayContent)
                         }}
                         wordCount={calculateWordCount(essayContent)}
-                        targetWordCount={essay.target_word_count || undefined}
+                        targetWordCount={essay.target_word_count}
                         onShowHistory={() => setShowVersionHistory(essay.id)}
+                        autoSave={true}
+                        autoSaveDelay={SAVE_DEBOUNCE_DELAY}
                       />
                     ) : (
                       <div 
@@ -1059,8 +1124,9 @@ export default function EssaysTab() {
                   <CardFooter className="flex flex-wrap justify-end gap-2 p-4 border-t bg-muted/20">
                     {editingEssay === index ? (
                       <Button onClick={() => {
-                        setEditingEssay(null)
-                        handleSaveEssayContent(essay, essayContent)
+                        // Save without closing editor
+                        handleSaveEssayContent(essay, essayContent, true)
+                        // Do NOT set editingEssay to null here
                       }}>
                         <Save className="h-4 w-4 mr-2" /> Save Changes
                       </Button>

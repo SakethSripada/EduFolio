@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Save, History, Eye, EyeOff, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight } from "lucide-react"
+import { Save, History, Eye, EyeOff, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, CheckCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import DOMPurify from "dompurify"
 
@@ -11,34 +11,90 @@ interface SimpleEssayEditorProps {
   content: string
   onChange: (content: string) => void
   onSave: () => void
+  onSaveAndExit?: () => void
   wordCount: number
   targetWordCount?: number | null
   showPreview?: boolean
   onShowHistory?: () => void
   className?: string
+  autoSave?: boolean
+  autoSaveDelay?: number
 }
 
 export default function SimpleEssayEditor({
   content,
   onChange,
   onSave,
+  onSaveAndExit,
   wordCount,
   targetWordCount,
   showPreview = true,
   onShowHistory,
   className = "",
+  autoSave = false,
+  autoSaveDelay = 2000,
 }: SimpleEssayEditorProps) {
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const [isInitialized, setIsInitialized] = useState(false)
+  const [lastContent, setLastContent] = useState(content)
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const savedStatusTimerRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Reset save status to idle after a delay
+  const resetSaveStatus = () => {
+    if (savedStatusTimerRef.current) {
+      clearTimeout(savedStatusTimerRef.current)
+    }
+    
+    // After showing "Saved" for 3 seconds, clear the status
+    savedStatusTimerRef.current = setTimeout(() => {
+      setSaveStatus('idle')
+    }, 3000)
+  }
 
   const handleEditorChange = () => {
     if (editorRef.current) {
-      onChange(editorRef.current.innerHTML)
+      const newContent = editorRef.current.innerHTML
+      onChange(newContent)
+      
+      // Update last content
+      setLastContent(newContent)
+      
+      // Set up auto-save if enabled
+      if (autoSave) {
+        // Clear any existing timer
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current)
+        }
+        
+        // Show saving indicator immediately when typing starts
+        setSaveStatus('saving')
+        
+        // Set new timer
+        autoSaveTimerRef.current = setTimeout(() => {
+          onSave()
+          setSaveStatus('saved')
+          resetSaveStatus()
+        }, autoSaveDelay)
+      }
     }
   }
+
+  // Clean up auto-save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+      }
+      if (savedStatusTimerRef.current) {
+        clearTimeout(savedStatusTimerRef.current)
+      }
+    }
+  }, [])
 
   // Initialize editor content on first render
   useEffect(() => {
@@ -74,11 +130,33 @@ export default function SimpleEssayEditor({
   }
 
   const handleSave = () => {
+    // Show saving indicator
+    setSaveStatus('saving')
+    
+    // Call the onSave callback
     onSave()
+    
+    // Show success indicator and toast
+    setSaveStatus('saved')
     toast({
       title: "Essay saved",
       description: "Your changes have been saved successfully.",
     })
+    
+    // Reset status after a delay
+    resetSaveStatus()
+  }
+
+  const handleSaveAndExit = () => {
+    // Show saving indicator
+    setSaveStatus('saving')
+    
+    // Call the onSaveAndExit callback (which will save and close the editor)
+    if (onSaveAndExit) {
+      onSaveAndExit()
+    }
+    
+    // No need to reset status as we're exiting the editor
   }
 
   // Function to handle editor focusing
@@ -145,6 +223,19 @@ export default function SimpleEssayEditor({
                 )}
               </Button>
             )}
+            {/* Add saving status indicator */}
+            <div className="text-xs flex items-center text-muted-foreground">
+              {saveStatus === 'saving' && (
+                <span className="flex items-center">
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" /> Saving...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="flex items-center text-green-600 dark:text-green-400">
+                  <CheckCircle className="h-3 w-3 mr-1" /> All changes saved
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {onShowHistory && (
@@ -152,8 +243,22 @@ export default function SimpleEssayEditor({
                 <History className="h-4 w-4" /> History
               </Button>
             )}
-            <Button variant="default" size="sm" onClick={handleSave} className="gap-2">
-              <Save className="h-4 w-4" /> Save
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={handleSaveAndExit} 
+              className="gap-2"
+              disabled={saveStatus === 'saving'}
+            >
+              {saveStatus === 'saving' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" /> Save & Exit
+                </>
+              )}
             </Button>
           </div>
         </div>
