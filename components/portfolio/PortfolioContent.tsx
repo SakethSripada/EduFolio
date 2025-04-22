@@ -1257,6 +1257,27 @@ export default function PortfolioContent() {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Add Confirmation Dialogs */}
+      <ConfirmationDialog
+        open={!!confirmDeleteProject}
+        onOpenChange={() => setConfirmDeleteProject(null)}
+        title="Delete Project"
+        description="Are you sure you want to delete this project? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel" 
+        onConfirm={() => confirmDeleteProject && deleteProject(confirmDeleteProject)}
+      />
+
+      <ConfirmationDialog
+        open={!!confirmDeleteCategory}
+        onOpenChange={() => setConfirmDeleteCategory(null)}
+        title="Delete Category"
+        description="Are you sure you want to delete this category? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={() => confirmDeleteCategory && deleteCategory(confirmDeleteCategory)}
+      />
     </>
   )
 }

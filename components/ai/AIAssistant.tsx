@@ -35,7 +35,7 @@ const openaiConfig = {
 
 type Message = {
 id: string
-role: "user" | "assistant"
+role: "user" | "assistant" | "system"
 content: string
 timestamp: Date
 status?: "sending" | "sent" | "error"
@@ -239,6 +239,7 @@ const handleSendMessage = useCallback(async () => {
     status: "sending",
   }
 
+  // Add user message to the conversation
   setMessages((prev) => [...prev, userMessage])
   setInput("")
   setIsTyping(true)
@@ -251,25 +252,34 @@ const handleSendMessage = useCallback(async () => {
       input.includes("rephrase") ||
       input.includes("check this essay");
     
-    // Construct a prompt with instructions to keep the AI concise
-    let prompt = `${input}\n\n` +
-      `IMPORTANT: Provide a concise, direct response that addresses the query efficiently. ` +
-      `Avoid unnecessary explanations, lengthy introductions, or redundant content. ` +
-      `Focus on providing precise, valuable information in as few words as possible while still being helpful and complete.`;
-
-    // Append profile data to the prompt if applicable
+    // Format messages for the API
+    const formattedMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+    
+    // Add the current user message
+    formattedMessages.push({
+      role: "user",
+      content: input
+    });
+    
+    // Append profile data as system message if available
     if (profileData) {
-      prompt += `\n\nUser Profile Data:\n${JSON.stringify(profileData, null, 2)}`
+      formattedMessages.push({
+        role: "system",
+        content: `User Profile Data:\n${JSON.stringify(profileData, null, 2)}`
+      });
     }
 
-    // Call our secure API route instead of directly using OpenAI
+    // Call our secure API route with conversation history
     const response = await fetch('/api/ai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        prompt: prompt,
+        messages: formattedMessages,
         max_tokens: isSpecificTask ? 700 : 500, // Allow more tokens for specific tasks
         temperature: isSpecificTask ? 0.5 : 0.7 // Lower temperature for more focused responses on specific tasks
       }),
@@ -300,7 +310,7 @@ const handleSendMessage = useCallback(async () => {
   } finally {
     setIsTyping(false)
   }
-}, [input, toast, profileData, idCounter, generateUniqueId])
+}, [input, toast, profileData, messages, idCounter, generateUniqueId])
 
 // Update isOpen when showOnLoad or initialPrompt changes
 useEffect(() => {
@@ -322,7 +332,7 @@ useEffect(() => {
     
     return () => clearTimeout(timer);
   }
-}, [initialPrompt, input, handleSendMessage, isOpen]);
+}, [initialPrompt, input, handleSendMessage, isOpen, messages]);
 
 // Use useCallback for handleKeyDown to prevent unnecessary re-renders
 const handleKeyDown = useCallback(

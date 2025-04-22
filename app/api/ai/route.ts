@@ -4,11 +4,11 @@ import { openai } from '@ai-sdk/openai';
 
 export async function POST(request: Request) {
   try {
-    const { prompt, max_tokens = 800, temperature = 0.7 } = await request.json();
+    const { messages = [], prompt, max_tokens = 800, temperature = 0.7 } = await request.json();
     
-    if (!prompt) {
+    if (!messages.length && !prompt) {
       return NextResponse.json(
-        { error: 'Prompt is required' },
+        { error: 'Either messages or prompt is required' },
         { status: 400 }
       );
     }
@@ -21,15 +21,30 @@ export async function POST(request: Request) {
       "Provide specific, actionable advice when asked. " +
       "Do not repeat information that's already been provided.";
 
-    const { text } = await generateText({
-      model: openai("gpt-4o"),
-      prompt,
-      system: systemMessage,
-      maxTokens: max_tokens,
-      temperature: temperature,
-    });
+    // Use conversation history if provided, otherwise use single prompt
+    let result;
+    
+    if (messages.length) {
+      // Use conversation history
+      result = await generateText({
+        model: openai("gpt-4o"),
+        messages: messages,
+        system: systemMessage,
+        maxTokens: max_tokens,
+        temperature: temperature,
+      });
+    } else {
+      // Fallback to single prompt mode
+      result = await generateText({
+        model: openai("gpt-4o"),
+        prompt,
+        system: systemMessage,
+        maxTokens: max_tokens,
+        temperature: temperature,
+      });
+    }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ text: result.text });
   } catch (error) {
     console.error('Error in AI API route:', error);
     return NextResponse.json(
