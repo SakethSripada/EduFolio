@@ -13,13 +13,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Add system message to ensure concise responses
+    // Add system message to ensure concise responses and guide on user profile data
     const systemMessage = 
-      "You are a helpful AI assistant for a college application platform. " +
+      "You are a helpful AI assistant for a college application platform called EduFolio. " +
       "Keep your responses concise, direct, and to the point. " +
       "Avoid lengthy explanations and unnecessary details. " +
       "Provide specific, actionable advice when asked. " +
-      "Do not repeat information that's already been provided.";
+      "Do not repeat information that's already been provided.\n\n" +
+      "When the user's profile data is provided, you have access to:\n" +
+      "- Basic profile information (name, school, graduation year)\n" +
+      "- Academic records (courses, grades, GPA)\n" +
+      "- Test scores (SAT, ACT, AP, etc.)\n" +
+      "- Extracurricular activities\n" +
+      "- Awards and honors\n" +
+      "- Essays (drafts and completed)\n" +
+      "- College-specific application materials\n" +
+      "- Todos and application deadlines\n\n" +
+      "Use this information to provide personalized, relevant advice for college applications, " +
+      "essay writing, activity description improvements, and application strategy.";
 
     // Use conversation history if provided, otherwise use single prompt
     let result;
