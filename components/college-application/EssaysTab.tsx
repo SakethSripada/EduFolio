@@ -21,6 +21,8 @@ import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import DOMPurify from "dompurify"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import AIAssistant from "@/components/ai/AIAssistant"
+import { RequiredLabel } from "@/components/ui/required-label"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
 
 type Essay = {
   id: string
@@ -65,6 +67,7 @@ export default function EssaysTab() {
   const [isLoading, setIsLoading] = useState(true)
   const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
   const [idCounter, setIdCounter] = useState(0)
   const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
   const [collapsedEssays, setCollapsedEssays] = useState<Record<string, boolean>>({})
@@ -280,7 +283,13 @@ export default function EssaysTab() {
   }
 
   const addEssay = async () => {
-    if (!user || !validateEssayForm()) return
+    if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateEssayForm()) {
+      return
+    }
 
     performDatabaseOperation(
       async () => {
@@ -343,6 +352,7 @@ export default function EssaysTab() {
           status: "Draft",
           external_link: "",
         })
+        setFormSubmitted(false)
 
         toast({
           title: "Essay added",
@@ -752,6 +762,8 @@ export default function EssaysTab() {
 
   const addExternalEssay = async () => {
     if (!user) return
+    
+    setFormSubmitted(true)
 
     // Validate the form
     const errors: Record<string, string> = {}
@@ -809,6 +821,7 @@ export default function EssaysTab() {
           is_common_app: false
         })
         setIsAddingExternalEssay(false)
+        setFormSubmitted(false)
 
         toast({
           title: "External essay added",
@@ -879,26 +892,29 @@ export default function EssaysTab() {
               <DialogHeader>
                 <DialogTitle>Add New Essay</DialogTitle>
               </DialogHeader>
+              
+              <FormErrorSummary errors={formErrors} show={formSubmitted} />
+              
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="title">Essay Title</Label>
+                  <RequiredLabel htmlFor="title">Essay Title</RequiredLabel>
                   <Input
                     id="title"
                     value={newEssay.title}
                     onChange={(e) => setNewEssay({ ...newEssay, title: e.target.value })}
                     placeholder="e.g., Common App Personal Statement"
                   />
-                  {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+                  {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="prompt">Essay Prompt</Label>
+                  <RequiredLabel htmlFor="prompt">Essay Prompt</RequiredLabel>
                   <Textarea
                     id="prompt"
                     value={newEssay.prompt}
                     onChange={(e) => setNewEssay({ ...newEssay, prompt: e.target.value })}
                     placeholder="Enter the essay prompt or question..."
                   />
-                  {formErrors.prompt && <p className="text-sm text-red-500">{formErrors.prompt}</p>}
+                  {formErrors.prompt && <p className="text-xs text-destructive">{formErrors.prompt}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
@@ -909,6 +925,7 @@ export default function EssaysTab() {
                     onChange={(e) => setNewEssay({ ...newEssay, target_word_count: e.target.value })}
                     placeholder="e.g., 650"
                   />
+                  {formErrors.target_word_count && <p className="text-xs text-destructive">{formErrors.target_word_count}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="status">Status</Label>
@@ -1290,16 +1307,19 @@ export default function EssaysTab() {
           <DialogHeader>
             <DialogTitle>Add External Essay Link</DialogTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="ext-title">Essay Title</Label>
+              <RequiredLabel htmlFor="ext-title">Essay Title</RequiredLabel>
               <Input
                 id="ext-title"
                 value={externalEssay.title}
                 onChange={(e) => setExternalEssay({ ...externalEssay, title: e.target.value })}
                 placeholder="e.g., Common App Personal Statement"
               />
-              {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+              {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="ext-prompt">Essay Prompt (Optional)</Label>
@@ -1312,17 +1332,17 @@ export default function EssaysTab() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="ext-link">External Link <span className="text-red-500">*</span></Label>
+              <RequiredLabel htmlFor="ext-link">External Link</RequiredLabel>
               <Input
                 id="ext-link"
                 type="url"
                 value={externalEssay.external_link}
                 onChange={(e) => setExternalEssay({ ...externalEssay, external_link: e.target.value })}
-                placeholder="e.g., https://docs.google.com/document/d/..."
+                placeholder="e.g. https://docs.google.com/document/d/..."
               />
-              {formErrors.external_link && <p className="text-sm text-red-500">{formErrors.external_link}</p>}
+              {formErrors.external_link && <p className="text-xs text-destructive">{formErrors.external_link}</p>}
               <p className="text-xs text-muted-foreground">
-                Add a link to where your essay is stored (Google Docs, Microsoft Word, etc.)
+                Add a link to your essay in Google Docs, Microsoft Word, etc.
               </p>
             </div>
             <div className="grid gap-2">

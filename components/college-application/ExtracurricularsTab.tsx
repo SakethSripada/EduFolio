@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RequiredLabel } from "@/components/ui/required-label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -18,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
 
 type Activity = {
   id: string
@@ -72,6 +74,7 @@ export default function ExtracurricularsTab() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -147,7 +150,14 @@ export default function ExtracurricularsTab() {
   }
 
   const addActivity = async () => {
-    if (!user || !validateActivityForm(false)) return
+    if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateActivityForm(false)) {
+      // Form validation failed, error summary will be shown
+      return
+    }
 
     await performDatabaseOperation(
       async () => {
@@ -191,6 +201,7 @@ export default function ExtracurricularsTab() {
             impact_statement: "",
             is_current: false,
           })
+          setFormSubmitted(false)
         }
         toast({
           title: "Activity added",
@@ -281,82 +292,91 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
   }
 
   const updateActivity = async () => {
-    if (!user || !editingActivityId || !validateActivityForm(true)) return
-
-    setIsLoading(true)
-
-    try {
-      const { error } = await supabase
-        .from("extracurricular_activities")
-        .update({
-          activity_type: editingActivity.activity_type,
-          position: editingActivity.position,
-          organization: editingActivity.organization,
-          description: editingActivity.description || null,
-          grade_levels: editingActivity.grade_levels,
-          participation_timing: editingActivity.participation_timing,
-          hours_per_week: Number(editingActivity.hours_per_week),
-          weeks_per_year: Number(editingActivity.weeks_per_year),
-          continue_in_college: editingActivity.continue_in_college,
-          impact_statement: editingActivity.impact_statement || null,
-          is_current: editingActivity.is_current,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", editingActivityId)
-
-      if (error) throw error
-
-      setActivities(
-        activities.map((activity) => {
-          if (activity.id === editingActivityId) {
-            return {
-              ...activity,
-              activity_type: editingActivity.activity_type,
-              position: editingActivity.position,
-              organization: editingActivity.organization,
-              description: editingActivity.description || null,
-              grade_levels: editingActivity.grade_levels,
-              participation_timing: editingActivity.participation_timing,
-              hours_per_week: Number(editingActivity.hours_per_week),
-              weeks_per_year: Number(editingActivity.weeks_per_year),
-              continue_in_college: editingActivity.continue_in_college,
-              impact_statement: editingActivity.impact_statement || null,
-              is_current: editingActivity.is_current,
-            }
-          }
-          return activity
-        }),
-      )
-      setIsEditingActivity(false)
-      setEditingActivityId(null)
-      setEditingActivity({
-        activity_type: "",
-        position: "",
-        organization: "",
-        description: "",
-        grade_levels: "",
-        participation_timing: "",
-        hours_per_week: "",
-        weeks_per_year: "",
-        continue_in_college: false,
-        impact_statement: "",
-        is_current: false,
-      })
-
-      toast({
-        title: "Activity updated",
-        description: "Your extracurricular activity has been updated successfully.",
-      })
-    } catch (error) {
-      console.error("Error updating activity:", error)
-      toast({
-        title: "Error updating activity",
-        description: handleSupabaseError(error, "There was a problem updating the activity."),
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
+    if (!user || !editingActivityId) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateActivityForm(true)) {
+      // Form validation failed, error summary will be shown
+      return
     }
+
+    await performDatabaseOperation(
+      async () => {
+        const { error } = await supabase
+          .from("extracurricular_activities")
+          .update({
+            activity_type: editingActivity.activity_type,
+            position: editingActivity.position,
+            organization: editingActivity.organization,
+            description: editingActivity.description || null,
+            grade_levels: editingActivity.grade_levels,
+            participation_timing: editingActivity.participation_timing,
+            hours_per_week: Number(editingActivity.hours_per_week),
+            weeks_per_year: Number(editingActivity.weeks_per_year),
+            continue_in_college: editingActivity.continue_in_college,
+            impact_statement: editingActivity.impact_statement || null,
+            is_current: editingActivity.is_current,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingActivityId)
+
+        if (error) throw error
+
+        setActivities(
+          activities.map((activity) => {
+            if (activity.id === editingActivityId) {
+              return {
+                ...activity,
+                activity_type: editingActivity.activity_type,
+                position: editingActivity.position,
+                organization: editingActivity.organization,
+                description: editingActivity.description || null,
+                grade_levels: editingActivity.grade_levels,
+                participation_timing: editingActivity.participation_timing,
+                hours_per_week: Number(editingActivity.hours_per_week),
+                weeks_per_year: Number(editingActivity.weeks_per_year),
+                continue_in_college: editingActivity.continue_in_college,
+                impact_statement: editingActivity.impact_statement || null,
+                is_current: editingActivity.is_current,
+              }
+            }
+            return activity
+          }),
+        )
+        setIsEditingActivity(false)
+        setEditingActivityId(null)
+        setEditingActivity({
+          activity_type: "",
+          position: "",
+          organization: "",
+          description: "",
+          grade_levels: "",
+          participation_timing: "",
+          hours_per_week: "",
+          weeks_per_year: "",
+          continue_in_college: false,
+          impact_statement: "",
+          is_current: false,
+        })
+        setFormSubmitted(false)
+      },
+      setIsLoading,
+      () => {
+        toast({
+          title: "Activity updated",
+          description: "Your extracurricular activity has been updated successfully.",
+        })
+      },
+      (error) => {
+        console.error("Error updating activity:", error)
+        toast({
+          title: "Error updating activity",
+          description: handleSupabaseError(error, "There was a problem updating the activity."),
+          variant: "destructive",
+        })
+      },
+    )
   }
 
   const deleteActivity = async (activityId: string) => {
@@ -435,10 +455,13 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                 <DialogHeader>
                   <DialogTitle>Add New Extracurricular Activity</DialogTitle>
                 </DialogHeader>
+                
+                <FormErrorSummary errors={formErrors} show={formSubmitted} />
+                
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="type">Activity Type</Label>
+                      <RequiredLabel htmlFor="type">Activity Type</RequiredLabel>
                       <Select
                         onValueChange={(value) => setNewActivity({ ...newActivity, activity_type: value })}
                         value={newActivity.activity_type}
@@ -459,7 +482,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                       {formErrors.activity_type && <p className="text-sm text-red-500">{formErrors.activity_type}</p>}
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="position">Position/Leadership</Label>
+                      <RequiredLabel htmlFor="position">Position/Leadership</RequiredLabel>
                       <Input
                         id="position"
                         maxLength={50}
@@ -469,7 +492,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                       {formErrors.position && <p className="text-sm text-red-500">{formErrors.position}</p>}
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="organization">Organization Name</Label>
+                      <RequiredLabel htmlFor="organization">Organization Name</RequiredLabel>
                       <Input
                         id="organization"
                         maxLength={100}
@@ -500,7 +523,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="grades">Participation Grade Levels</Label>
+                      <RequiredLabel htmlFor="grades">Participation Grade Levels</RequiredLabel>
                       <Input
                         id="grades"
                         placeholder="e.g. 9, 10, 11"
@@ -510,7 +533,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                       {formErrors.grade_levels && <p className="text-sm text-red-500">{formErrors.grade_levels}</p>}
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="timing">Timing of Participation</Label>
+                      <RequiredLabel htmlFor="timing">Timing of Participation</RequiredLabel>
                       <Select
                         onValueChange={(value) => setNewActivity({ ...newActivity, participation_timing: value })}
                         value={newActivity.participation_timing}
@@ -529,7 +552,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                       )}
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="hoursPerWeek">Hours Spent Per Week</Label>
+                      <RequiredLabel htmlFor="hoursPerWeek">Hours Spent Per Week</RequiredLabel>
                       <Input
                         id="hoursPerWeek"
                         type="number"
@@ -539,7 +562,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                       {formErrors.hours_per_week && <p className="text-sm text-red-500">{formErrors.hours_per_week}</p>}
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="weeksPerYear">Weeks Spent Per Year</Label>
+                      <RequiredLabel htmlFor="weeksPerYear">Weeks Spent Per Year</RequiredLabel>
                       <Input
                         id="weeksPerYear"
                         type="number"
@@ -593,7 +616,7 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                     impact_statement: "",
                     is_current: false,
                   })
-                  setFormErrors({})
+                  setFormSubmitted(false)
                 }
               }}
             >
@@ -601,6 +624,9 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                 <DialogHeader>
                   <DialogTitle>Edit Extracurricular Activity</DialogTitle>
                 </DialogHeader>
+                
+                <FormErrorSummary errors={formErrors} show={formSubmitted} />
+                
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">

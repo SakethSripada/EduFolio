@@ -61,6 +61,9 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { createOrUpdateShareLink, generateShareUrl } from "@/lib/supabase/utils"
 import { Separator } from "@/components/ui/separator"
+import { RequiredLabel } from "@/components/ui/required-label"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
+import { validateRequired } from "@/lib/validation"
 
 export default function PortfolioContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -107,6 +110,9 @@ export default function PortfolioContent() {
   // Add state for confirmation dialogs
   const [confirmDeleteProject, setConfirmDeleteProject] = useState<string | null>(null)
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string | null>(null)
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
 
   // Check for existing share link on component mount
   useEffect(() => {
@@ -343,204 +349,229 @@ export default function PortfolioContent() {
     })
   }
 
+  const validateProjectForm = (): boolean => {
+    const errors: Record<string, string> = {}
+
+    const titleError = validateRequired(newProject.title, "Project title")
+    if (titleError) errors.title = titleError
+
+    const descriptionError = validateRequired(newProject.description, "Description")
+    if (descriptionError) errors.description = descriptionError
+
+    const categoryError = validateRequired(newProject.category, "Category")
+    if (categoryError) errors.category = categoryError
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleAddProject = async () => {
     if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateProjectForm()) {
+      return
+    }
 
-    if (newProject.title && newProject.description && newProject.category) {
-      performDatabaseOperation(
-        async () => {
-          // Upload image if exists
-          let imagePath = "/placeholder.svg?height=400&width=600"
-          if (newProject.image) {
-            const fileExt = newProject.image.name.split(".").pop()
-            const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-            const filePath = `${user.id}/projects/${fileName}`
+    performDatabaseOperation(
+      async () => {
+        // Upload image if exists
+        let imagePath = "/placeholder.svg?height=400&width=600"
+        if (newProject.image) {
+          const fileExt = newProject.image.name.split(".").pop()
+          const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+          const filePath = `${user.id}/projects/${fileName}`
 
-            const { error: uploadError } = await supabase.storage
-              .from("project-images")
-              .upload(filePath, newProject.image)
+          const { error: uploadError } = await supabase.storage
+            .from("project-images")
+            .upload(filePath, newProject.image)
 
-            if (uploadError) throw uploadError
+          if (uploadError) throw uploadError
 
-            const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-            imagePath = data.publicUrl
+          const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
+          imagePath = data.publicUrl
+        }
+
+        // Upload gallery images if exist
+        const galleryPaths: string[] = []
+        if (newProject.gallery.length > 0) {
+          for (const item of newProject.gallery) {
+            if (item.file) {
+              const fileExt = item.file.name.split(".").pop()
+              const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+              const filePath = `${user.id}/gallery/${fileName}`
+
+              const { error: uploadError } = await supabase.storage.from("project-images").upload(filePath, item.file)
+
+              if (uploadError) throw uploadError
+
+              const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
+              galleryPaths.push(data.publicUrl)
+            }
           }
+        }
 
-          // Upload gallery images if exist
-          const galleryPaths: string[] = []
-          if (newProject.gallery.length > 0) {
+        // Create project in database
+        const projectToAdd = {
+          user_id: user.id,
+          title: newProject.title,
+          description: newProject.description,
+          category: newProject.category,
+          tags: newProject.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          link: newProject.link,
+          image: imagePath,
+          gallery: galleryPaths.length > 0 ? galleryPaths : [],
+          date: new Date().toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          }),
+        }
+
+        const { data, error } = await supabase.from("projects").insert(projectToAdd).select()
+
+        if (error) throw error
+
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data) {
+          setProjects([data[0], ...projects])
+          resetProjectForm()
+          setIsAddingProject(false)
+          setFormSubmitted(false)
+          toast({
+            title: "Project added",
+            description: "Your project has been added successfully.",
+          })
+        }
+      },
+      (error) => {
+        console.error("Error adding project:", error)
+        toast({
+          title: "Error adding project",
+          description: handleSupabaseError(error, "There was a problem adding your project."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  const handleEditProject = async () => {
+    if (!user || !editingProjectId) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateProjectForm()) {
+      return
+    }
+
+    performDatabaseOperation(
+      async () => {
+        const projectToUpdate = projects.find((p) => p.id === editingProjectId)
+
+        // Upload image if changed
+        let imagePath = projectToUpdate.image
+        if (newProject.image) {
+          const fileExt = newProject.image.name.split(".").pop()
+          const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+          const filePath = `${user.id}/projects/${fileName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from("project-images")
+            .upload(filePath, newProject.image)
+
+          if (uploadError) throw uploadError
+
+          const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
+          imagePath = data.publicUrl
+        }
+
+        // Upload new gallery images if exist
+        let galleryPaths = projectToUpdate.gallery || []
+        if (newProject.gallery.length > 0) {
+          // Only upload new images (those with file property)
+          const newImages = newProject.gallery.filter((item) => item.file)
+
+          if (newImages.length > 0) {
+            galleryPaths = [] // Reset if we have new images
+
             for (const item of newProject.gallery) {
               if (item.file) {
                 const fileExt = item.file.name.split(".").pop()
                 const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
                 const filePath = `${user.id}/gallery/${fileName}`
 
-                const { error: uploadError } = await supabase.storage.from("project-images").upload(filePath, item.file)
+                const { error: uploadError } = await supabase.storage
+                  .from("project-images")
+                  .upload(filePath, item.file)
 
                 if (uploadError) throw uploadError
 
                 const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
                 galleryPaths.push(data.publicUrl)
+              } else if (item.preview.startsWith("http")) {
+                // Keep existing gallery images
+                galleryPaths.push(item.preview)
               }
             }
           }
+        }
 
-          // Create project in database
-          const projectToAdd = {
-            user_id: user.id,
-            title: newProject.title,
-            description: newProject.description,
-            category: newProject.category,
-            tags: newProject.tags
-              .split(",")
-              .map((tag) => tag.trim())
-              .filter(Boolean),
-            link: newProject.link,
-            image: imagePath,
-            gallery: galleryPaths.length > 0 ? galleryPaths : [],
-            date: new Date().toLocaleDateString("en-US", {
-              month: "long",
-              year: "numeric",
-            }),
-          }
+        // Update project in database
+        const projectUpdates = {
+          title: newProject.title,
+          description: newProject.description,
+          category: newProject.category,
+          tags: newProject.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          link: newProject.link,
+          image: imagePath,
+          gallery: galleryPaths,
+          updated_at: new Date().toISOString(),
+        }
 
-          const { data, error } = await supabase.from("projects").insert(projectToAdd).select()
+        const { error } = await supabase.from("projects").update(projectUpdates).eq("id", editingProjectId)
 
-          if (error) throw error
+        if (error) throw error
 
-          return data
-        },
-        setIsLoading,
-        (data) => {
-          if (data) {
-            setProjects([data[0], ...projects])
-            resetProjectForm()
-            setIsAddingProject(false)
-            toast({
-              title: "Project added",
-              description: "Your project has been added successfully.",
-            })
-          }
-        },
-        (error) => {
-          console.error("Error adding project:", error)
-          toast({
-            title: "Error adding project",
-            description: handleSupabaseError(error, "There was a problem adding your project."),
-            variant: "destructive",
-          })
-        },
-      )
-    }
-  }
-
-  const handleEditProject = async () => {
-    if (!user || !editingProjectId) return
-
-    if (newProject.title && newProject.description && newProject.category) {
-      performDatabaseOperation(
-        async () => {
-          const projectToUpdate = projects.find((p) => p.id === editingProjectId)
-
-          // Upload image if changed
-          let imagePath = projectToUpdate.image
-          if (newProject.image) {
-            const fileExt = newProject.image.name.split(".").pop()
-            const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-            const filePath = `${user.id}/projects/${fileName}`
-
-            const { error: uploadError } = await supabase.storage
-              .from("project-images")
-              .upload(filePath, newProject.image)
-
-            if (uploadError) throw uploadError
-
-            const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-            imagePath = data.publicUrl
-          }
-
-          // Upload new gallery images if exist
-          let galleryPaths = projectToUpdate.gallery || []
-          if (newProject.gallery.length > 0) {
-            // Only upload new images (those with file property)
-            const newImages = newProject.gallery.filter((item) => item.file)
-
-            if (newImages.length > 0) {
-              galleryPaths = [] // Reset if we have new images
-
-              for (const item of newProject.gallery) {
-                if (item.file) {
-                  const fileExt = item.file.name.split(".").pop()
-                  const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-                  const filePath = `${user.id}/gallery/${fileName}`
-
-                  const { error: uploadError } = await supabase.storage
-                    .from("project-images")
-                    .upload(filePath, item.file)
-
-                  if (uploadError) throw uploadError
-
-                  const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-                  galleryPaths.push(data.publicUrl)
-                } else if (item.preview.startsWith("http")) {
-                  // Keep existing gallery images
-                  galleryPaths.push(item.preview)
-                }
-              }
+        return { projectUpdates }
+      },
+      setIsLoading,
+      (data) => {
+        // Update local state
+        setProjects(
+          projects.map((project) => {
+            if (project.id === editingProjectId) {
+              return { ...project, ...data.projectUpdates }
             }
-          }
+            return project
+          }),
+        )
 
-          // Update project in database
-          const projectUpdates = {
-            title: newProject.title,
-            description: newProject.description,
-            category: newProject.category,
-            tags: newProject.tags
-              .split(",")
-              .map((tag) => tag.trim())
-              .filter(Boolean),
-            link: newProject.link,
-            image: imagePath,
-            gallery: galleryPaths,
-            updated_at: new Date().toISOString(),
-          }
-
-          const { error } = await supabase.from("projects").update(projectUpdates).eq("id", editingProjectId)
-
-          if (error) throw error
-
-          return { projectUpdates }
-        },
-        setIsLoading,
-        (data) => {
-          // Update local state
-          setProjects(
-            projects.map((project) => {
-              if (project.id === editingProjectId) {
-                return { ...project, ...data.projectUpdates }
-              }
-              return project
-            }),
-          )
-
-          resetProjectForm()
-          setIsEditingProject(false)
-          setEditingProjectId(null)
-          toast({
-            title: "Project updated",
-            description: "Your project has been updated successfully.",
-          })
-        },
-        (error) => {
-          console.error("Error updating project:", error)
-          toast({
-            title: "Error updating project",
-            description: handleSupabaseError(error, "There was a problem updating your project."),
-            variant: "destructive",
-          })
-        },
-      )
-    }
+        resetProjectForm()
+        setIsEditingProject(false)
+        setEditingProjectId(null)
+        toast({
+          title: "Project updated",
+          description: "Your project has been updated successfully.",
+        })
+      },
+      (error) => {
+        console.error("Error updating project:", error)
+        toast({
+          title: "Error updating project",
+          description: handleSupabaseError(error, "There was a problem updating your project."),
+          variant: "destructive",
+        })
+      },
+    )
   }
 
   const startEditProject = (projectId: string) => {
@@ -603,6 +634,8 @@ export default function PortfolioContent() {
       imagePreview: "",
       gallery: [],
     })
+    setFormErrors({})
+    setFormSubmitted(false)
   }
 
   const handleAddCategory = async () => {
@@ -933,30 +966,35 @@ export default function PortfolioContent() {
             <DialogHeader>
               <DialogTitle>{isEditingProject ? "Edit Project" : "Add New Project"}</DialogTitle>
             </DialogHeader>
+            
+            <FormErrorSummary errors={formErrors} show={formSubmitted} />
+            
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="title">Project Title</Label>
+                <RequiredLabel htmlFor="title">Project Title</RequiredLabel>
                 <Input
                   id="title"
                   value={newProject.title}
                   onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
                 />
+                {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
+                <RequiredLabel htmlFor="description">Description</RequiredLabel>
                 <Textarea
                   id="description"
                   value={newProject.description}
                   onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
                 />
+                {formErrors.description && <p className="text-xs text-destructive">{formErrors.description}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
+                <RequiredLabel htmlFor="category">Category</RequiredLabel>
                 <Select
                   value={newProject.category}
                   onValueChange={(value) => setNewProject({ ...newProject, category: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -970,6 +1008,7 @@ export default function PortfolioContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                {formErrors.category && <p className="text-xs text-destructive">{formErrors.category}</p>}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="tags">Tags (comma separated)</Label>

@@ -18,6 +18,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
+import { RequiredLabel } from "@/components/ui/required-label"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
 
 type College = {
   id: string
@@ -57,6 +59,7 @@ export default function CollegeListTab() {
   const [activeTab, setActiveTab] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
   const [collegeSearchQuery, setCollegeSearchQuery] = useState("")
@@ -267,8 +270,109 @@ export default function CollegeListTab() {
     }
   }
 
+  // Add a single college to user's list with validation
+  const addCollegeToUserList = async (collegeId: string) => {
+    if (!user) return;
+    
+    setFormSubmitted(true);
+    
+    // Set the selected college ID
+    setNewUserCollege(prev => ({ ...prev, college_id: collegeId }));
+    
+    if (!validateCollegeForm()) {
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const selectedCollege = colleges.find((c) => c.id === collegeId);
+      if (!selectedCollege) return;
+      
+      // Check if college is already in user's list
+      const { data: existingCollege, error: checkError } = await supabase
+        .from("user_colleges")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("college_id", collegeId)
+        .maybeSingle();
+      
+      if (checkError) throw checkError;
+      
+      if (existingCollege) {
+        toast({
+          title: "College already in list",
+          description: `${selectedCollege.name} is already in your list.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Add college to user's list
+      const { error } = await supabase.from("user_colleges").insert([
+        {
+          user_id: user.id,
+          college_id: collegeId,
+          application_status: newUserCollege.application_status,
+          is_reach: newUserCollege.is_reach,
+          is_target: newUserCollege.is_target,
+          is_safety: newUserCollege.is_safety,
+          is_favorite: newUserCollege.is_favorite,
+          notes: newUserCollege.notes || null,
+          application_deadline_display: newUserCollege.application_deadline_display || null,
+        },
+      ]);
+      
+      if (error) throw error;
+      
+      // Refresh user's colleges
+      const { data: userCollegesData, error: userCollegesError } = await supabase
+        .from("user_colleges")
+        .select(`
+          *,
+          college:colleges(*)
+        `)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      
+      if (userCollegesError) throw userCollegesError;
+      
+      setUserColleges(userCollegesData || []);
+      setIsAddingCollege(false);
+      setFormSubmitted(false);
+      setNewUserCollege({
+        college_id: "",
+        application_status: "Researching",
+        application_deadline_display: "",
+        is_reach: false,
+        is_target: false,
+        is_safety: false,
+        is_favorite: false,
+        notes: "",
+      });
+      
+      toast({
+        title: "College added",
+        description: `${selectedCollege.name} has been added to your list.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error adding college",
+        description: handleSupabaseError(error, "There was a problem adding the college to your list."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const updateCollege = async () => {
-    if (!user || !editingCollegeId || !validateCollegeForm()) return
+    if (!user || !editingCollegeId) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateCollegeForm()) {
+      return
+    }
 
     await performDatabaseOperation(
       async () => {
@@ -325,6 +429,7 @@ export default function CollegeListTab() {
         setIsEditingCollege(false)
         setEditingCollegeId(null)
         setFormErrors({})
+        setFormSubmitted(false)
 
         toast({
           title: "College updated",
@@ -648,9 +753,12 @@ export default function CollegeListTab() {
           <DialogHeader>
             <DialogTitle>Add Colleges to Your List</DialogTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="college-search">Search Colleges</Label>
+              <RequiredLabel htmlFor="college-search">Search Colleges</RequiredLabel>
               <Input
                 id="college-search"
                 placeholder="Search by name or location..."
@@ -711,11 +819,101 @@ export default function CollegeListTab() {
                   </div>
                 </div>
               )}
+              
+              {selectedColleges.length === 1 && (
+                <div className="grid gap-4 mt-4 border-t pt-4">
+                  <p className="font-medium">Additional details for {colleges.find(c => c.id === selectedColleges[0])?.name}</p>
+                  
+                  <div className="grid gap-2">
+                    <RequiredLabel htmlFor="singleStatus">Application Status</RequiredLabel>
+                    <Select
+                      value={newUserCollege.application_status}
+                      onValueChange={(value) => setNewUserCollege({ ...newUserCollege, application_status: value })}
+                    >
+                      <SelectTrigger id="singleStatus">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Researching">Researching</SelectItem>
+                        <SelectItem value="Applying">Applying</SelectItem>
+                        <SelectItem value="Applied">Applied</SelectItem>
+                        <SelectItem value="Waitlisted">Waitlisted</SelectItem>
+                        <SelectItem value="Accepted">Accepted</SelectItem>
+                        <SelectItem value="Rejected">Rejected</SelectItem>
+                        <SelectItem value="Committed">Committed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formErrors.application_status && <p className="text-xs text-destructive">{formErrors.application_status}</p>}
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="singleDeadline">Application Deadline (Optional)</Label>
+                    <Input
+                      id="singleDeadline"
+                      placeholder="e.g., January 1, 2025"
+                      value={newUserCollege.application_deadline_display || ""}
+                      onChange={(e) => setNewUserCollege({ ...newUserCollege, application_deadline_display: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <RequiredLabel htmlFor="single-college-category">College Category</RequiredLabel>
+                    <div className="grid grid-cols-3 gap-4" id="single-college-category">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="singleReach"
+                          checked={newUserCollege.is_reach}
+                          onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_reach: checked })}
+                        />
+                        <Label htmlFor="singleReach">Reach</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="singleTarget"
+                          checked={newUserCollege.is_target}
+                          onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_target: checked })}
+                        />
+                        <Label htmlFor="singleTarget">Target</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="singleSafety"
+                          checked={newUserCollege.is_safety}
+                          onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_safety: checked })}
+                        />
+                        <Label htmlFor="singleSafety">Safety</Label>
+                      </div>
+                    </div>
+                    {formErrors.category && <p className="text-xs text-destructive">{formErrors.category}</p>}
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="singleFavorite"
+                      checked={newUserCollege.is_favorite}
+                      onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_favorite: checked })}
+                    />
+                    <Label htmlFor="singleFavorite">Add to favorites</Label>
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="singleNotes">Notes (Optional)</Label>
+                    <Textarea
+                      id="singleNotes"
+                      placeholder="Add any notes about this college..."
+                      value={newUserCollege.notes || ""}
+                      onChange={(e) => setNewUserCollege({ ...newUserCollege, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button 
-              onClick={addSelectedColleges} 
+              onClick={selectedColleges.length === 1 
+                ? () => addCollegeToUserList(selectedColleges[0])
+                : addSelectedColleges} 
               disabled={selectedColleges.length === 0 || isLoading}
             >
               {isLoading ? (
@@ -737,14 +935,17 @@ export default function CollegeListTab() {
           <DialogHeader>
             <DialogTitle>Edit College Information</DialogTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="editStatus">Application Status</Label>
+              <RequiredLabel htmlFor="editStatus">Application Status</RequiredLabel>
               <Select
                 value={newUserCollege.application_status}
                 onValueChange={(value) => setNewUserCollege({ ...newUserCollege, application_status: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="editStatus">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -757,7 +958,7 @@ export default function CollegeListTab() {
                   <SelectItem value="Committed">Committed</SelectItem>
                 </SelectContent>
               </Select>
-              {formErrors.application_status && <p className="text-sm text-red-500">{formErrors.application_status}</p>}
+              {formErrors.application_status && <p className="text-xs text-destructive">{formErrors.application_status}</p>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="editDeadline">Application Deadline (Optional)</Label>
@@ -769,8 +970,8 @@ export default function CollegeListTab() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>College Category</Label>
-              <div className="grid grid-cols-3 gap-4">
+              <RequiredLabel htmlFor="college-category">College Category</RequiredLabel>
+              <div className="grid grid-cols-3 gap-4" id="college-category">
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="editReach"
@@ -796,7 +997,7 @@ export default function CollegeListTab() {
                   <Label htmlFor="editSafety">Safety</Label>
                 </div>
               </div>
-              {formErrors.category && <p className="text-sm text-red-500">{formErrors.category}</p>}
+              {formErrors.category && <p className="text-xs text-destructive">{formErrors.category}</p>}
             </div>
             <div className="flex items-center space-x-2">
               <Switch
