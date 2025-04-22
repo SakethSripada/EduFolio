@@ -20,6 +20,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { isValidGPA, isValidNumber, validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
+import { BulkCourseEntry } from "@/components/academics/BulkCourseEntry"
+import { UCGPACalculator } from "@/components/academics/UCGPACalculator"
 
 type Course = {
   id: string
@@ -75,6 +77,7 @@ export default function AcademicsTab() {
     notes: "",
   })
   const [isAddingCourse, setIsAddingCourse] = useState(false)
+  const [isBulkAddingCourses, setIsBulkAddingCourses] = useState(false)
   const [isEditingCourse, setIsEditingCourse] = useState(false)
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
   const [isCalculatingGPA, setIsCalculatingGPA] = useState(false)
@@ -827,7 +830,8 @@ export default function AcademicsTab() {
 
   // Calculate UC GPA (needed for format GPA for AI)
   const calculateUCGPA = (coursesToCalculate: Course[]) => {
-    return calculateGPA(true, false);
+    // This is now handled by the UCGPACalculator component
+    return 0 // Just to maintain compatibility with existing code
   }
 
   // Format GPA information for AI
@@ -960,9 +964,23 @@ export default function AcademicsTab() {
               </CardTitle>
               <CardDescription>Track your academic courses by grade level</CardDescription>
             </div>
-            <Button className="flex items-center gap-1" onClick={() => setIsAddingCourse(true)}>
-              <PlusCircle className="h-4 w-4" /> Add Course
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkAddingCourses(true)}
+                className="gap-1"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Bulk Add
+              </Button>
+              <Button
+                onClick={() => setIsAddingCourse(true)}
+                className="gap-1"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Add Course
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1681,6 +1699,46 @@ export default function AcademicsTab() {
         onConfirm={() => confirmDeleteTestScore && deleteTestScore(confirmDeleteTestScore)}
         variant="destructive"
       />
+
+      {/* Bulk Course Entry Dialog */}
+      <BulkCourseEntry
+        open={isBulkAddingCourses}
+        onOpenChange={setIsBulkAddingCourses}
+        onCoursesAdded={() => {
+          // Refresh courses after bulk adding
+          if (user) {
+            performDatabaseOperation(
+              async () => {
+                const { data, error } = await supabase
+                  .from("courses")
+                  .select("*")
+                  .eq("user_id", user.id)
+                  .order("created_at", { ascending: false })
+                
+                if (error) throw error
+                return data
+              },
+              setIsLoading,
+              (data) => {
+                if (data) setCourses(data)
+              },
+              (error) => {
+                toast({
+                  title: "Error refreshing courses",
+                  description: handleSupabaseError(error, "There was a problem loading your courses."),
+                  variant: "destructive",
+                })
+              }
+            )
+          }
+        }}
+        userId={user?.id || ""}
+      />
+
+      {/* UC GPA Calculator */}
+      <div className="mb-6">
+        <UCGPACalculator userId={user?.id || ""} />
+      </div>
     </div>
   )
 }
