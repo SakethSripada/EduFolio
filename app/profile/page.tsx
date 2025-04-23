@@ -159,6 +159,9 @@ export default function ProfilePage() {
       })
 
       if (authError) throw authError
+      
+      // Force refresh auth session to update UI elements that use user metadata
+      await supabase.auth.refreshSession();
 
       // Update profile in database
       const { error: profileError } = await supabase
