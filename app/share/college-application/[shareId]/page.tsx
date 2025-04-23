@@ -34,12 +34,11 @@ export default function SharedCollegeApplicationPage() {
       try {
         console.log("Fetching data for share ID:", shareId);
         // Verify the share link is valid.
-        const { data: shareData, error: shareError } = await supabase
+        const { data: shareRecords, error: shareError } = await supabase
           .from("shared_links")
           .select("*")
           .eq("share_id", shareId) // Use the shareId from useParams
           .eq("content_type", "college_application")
-          .maybeSingle()
 
         if (shareError) {
           console.error("Share link error:", shareError);
@@ -48,12 +47,15 @@ export default function SharedCollegeApplicationPage() {
           return
         }
 
-        if (!shareData) {
+        if (!shareRecords || shareRecords.length === 0) {
           console.error("No share data found");
           setError("This share link is invalid or has expired.")
           setLoading(false)
           return
         }
+
+        // Use the first record if multiple exist
+        const shareData = shareRecords[0]
 
         // Check if the link has expired.
         if (shareData.expires_at && new Date(shareData.expires_at) < new Date()) {

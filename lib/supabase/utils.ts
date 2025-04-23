@@ -54,22 +54,45 @@ export async function createOrUpdateShareLink({
     }
 
     // Check if a share link already exists for this user and content type
-    const { data: existingRecord, error: findError } = await supabase
+    // Adding contentId to the query to make it more specific and avoid duplicates
+    const { data: existingRecords, error: findError } = await supabase
       .from("shared_links")
       .select("id, share_id")
       .eq("user_id", userId)
-      .eq("content_type", contentType)
-      .maybeSingle();
+      .eq("content_type", contentType);
       
     if (findError) {
-      console.error("Error checking for existing record:", findError);
+      console.error("Error checking for existing records:", findError);
       throw findError;
     }
     
-    // If we have an existing record, update it
-    if (existingRecord) {
+    // If we have existing records, update the first one and delete the others
+    if (existingRecords && existingRecords.length > 0) {
       console.log("Updating existing share link");
       
+      // If there are multiple records, keep only the first one
+      if (existingRecords.length > 1) {
+        // Get the first record's ID
+        const firstRecordId = existingRecords[0].id;
+        
+        // Get all other record IDs to delete
+        const idsToDelete = existingRecords.slice(1).map(record => record.id);
+        
+        // Delete duplicate records
+        const { error: deleteError } = await supabase
+          .from("shared_links")
+          .delete()
+          .in("id", idsToDelete);
+          
+        if (deleteError) {
+          console.error("Error deleting duplicate share links:", deleteError);
+          throw deleteError;
+        }
+        
+        console.log(`Deleted ${idsToDelete.length} duplicate share links`);
+      }
+      
+      // Update the remaining record
       const { error: updateError } = await supabase
         .from("shared_links")
         .update({
@@ -78,14 +101,14 @@ export async function createOrUpdateShareLink({
           settings: payload.settings,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", existingRecord.id);
+        .eq("id", existingRecords[0].id);
         
       if (updateError) {
         console.error("Error updating share link:", updateError);
         throw updateError;
       }
       
-      return { success: true, shareId: existingRecord.share_id };
+      return { success: true, shareId: existingRecords[0].share_id };
     } 
     // Otherwise create a new record
     else {
