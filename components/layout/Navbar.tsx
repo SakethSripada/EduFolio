@@ -113,7 +113,7 @@ export default function Navbar() {
         </button>
 
         {/* Desktop navigation */}
-        <div className="hidden md:flex items-center space-x-6">
+        <div suppressHydrationWarning className="hidden md:flex items-center space-x-6">
           {user && (
             <>
               <Button
