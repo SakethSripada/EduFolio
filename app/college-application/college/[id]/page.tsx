@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, redirect } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,6 +18,9 @@ import CollegeAwards from "@/components/college-application/college-specific/Col
 import CollegeEssays from "@/components/college-application/college-specific/CollegeEssays"
 import CollegeTodos from "@/components/college-application/college-specific/CollegeTodos"
 import AIAssistant from "@/components/ai/AIAssistant"
+import { cookies } from "next/headers"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 
 type College = {
   id: string
@@ -46,7 +49,7 @@ type UserCollege = {
   notes?: string | null
 }
 
-export default function CollegeApplicationPage() {
+export default async function CollegeApplicationPage() {
   const params = useParams()
   const router = useRouter()
   const collegeId = params.id as string
@@ -58,8 +61,18 @@ export default function CollegeApplicationPage() {
   const { user } = useAuth()
   const { toast } = useToast()
 
+  // Create the server component client
+  const supabase = createServerComponentClient<Database>({ cookies })
+  
+  // Get the authenticated user
+  const { data: { user: serverUser } } = await supabase.auth.getUser()
+  
+  if (!serverUser) {
+    redirect("/login")
+  }
+
   useEffect(() => {
-    if (!user || !collegeId) return
+    if (!serverUser || !collegeId) return
 
     const fetchData = async () => {
       setIsLoading(true)
@@ -69,7 +82,7 @@ export default function CollegeApplicationPage() {
           .from("colleges")
           .select("*")
           .eq("id", collegeId)
-          .single()
+          .maybeSingle()
 
         if (collegeError) throw collegeError
 
@@ -77,9 +90,9 @@ export default function CollegeApplicationPage() {
         const { data: userCollegeData, error: userCollegeError } = await supabase
           .from("user_colleges")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", serverUser.id)
           .eq("college_id", collegeId)
-          .single()
+          .maybeSingle()
 
         if (userCollegeError && userCollegeError.code !== "PGRST116") throw userCollegeError
 
@@ -100,7 +113,7 @@ export default function CollegeApplicationPage() {
     }
 
     fetchData()
-  }, [user, collegeId, router, toast])
+  }, [serverUser, collegeId, router, toast])
 
   const getStatusBadge = () => {
     if (!userCollege) return null

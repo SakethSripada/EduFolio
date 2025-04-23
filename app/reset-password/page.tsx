@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { EyeIcon, EyeOffIcon, Loader2 } from "lucide-react"
-import { supabase } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
+import Image from "next/image"
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
@@ -19,6 +21,7 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const router = useRouter()
+  const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
     // Check if we have a hash fragment in the URL (from the reset password email)

@@ -91,7 +91,7 @@ export async function getShareLink(shareId: string): Promise<{ data: ShareLinkDa
   const supabase = createClientComponentClient()
 
   try {
-    const { data, error } = await supabase.from("shared_links").select("*").eq("share_id", shareId).single()
+    const { data, error } = await supabase.from("shared_links").select("*").eq("share_id", shareId).maybeSingle()
 
     if (error) throw error
 

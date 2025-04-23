@@ -22,7 +22,8 @@ import { MessageCircle, X, Send, Sparkles, Pencil, Plus, Maximize2, Minimize2, P
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import ReactMarkdown from "react-markdown"
 
 // For client-side usage of API key
@@ -35,7 +36,7 @@ const openaiConfig = {
 
 type Message = {
 id: string
-role: "user" | "assistant"
+role: "user" | "assistant" | "system"
 content: string
 timestamp: Date
 status?: "sending" | "sent" | "error"
@@ -100,6 +101,7 @@ const inputRef = useRef<HTMLInputElement>(null)
 const { toast } = useToast()
 const { user } = useAuth()
 const [profileData, setProfileData] = useState<any>(null)
+const supabase = createClientComponentClient<Database>()
 
 // Start with empty messages, no default welcome message
 const [messages, setMessages] = useState<Message[]>([])
@@ -126,7 +128,7 @@ useEffect(() => {
         .from("profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single()
+        .maybeSingle()
 
       if (profileError) {
         console.error("Error fetching profile:", profileError)
@@ -138,41 +140,112 @@ useEffect(() => {
         return
       }
 
-      // Fetch related data
-      const [academics, extracurriculars, awards, essays] = await Promise.all([
+      // Fetch all user data from relevant tables
+      const [
+        courses, 
+        academics, 
+        testScores, 
+        extracurricularActivities,
+        extracurriculars, 
+        awards, 
+        essays, 
+        manualGpa,
+        projects,
+        todos
+      ] = await Promise.all([
+        // Try both courses and academics tables
+        supabase.from("courses").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("academics").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-        supabase
-          .from("extracurricular_activities")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false }),
+        supabase.from("test_scores").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        // Try both extracurricular tables
+        supabase.from("extracurricular_activities").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("extracurriculars").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("awards").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("essays").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("manual_gpa").select("*").eq("user_id", user.id).maybeSingle(),
+        supabase.from("projects").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("todos").select("*").eq("user_id", user.id).order("due_date", { ascending: true }),
       ])
 
-      if (academics.error || extracurriculars.error || awards.error || essays.error) {
-        console.error(
-          "Error fetching related data:",
-          academics.error,
-          extracurriculars.error,
-          awards.error,
-          essays.error,
-        )
+      // Check for errors but continue with partial data if some tables fail
+      const fetchErrors = [
+        courses.error, academics.error, testScores.error, 
+        extracurricularActivities.error, extracurriculars.error, 
+        awards.error, essays.error, manualGpa.error,
+        projects.error, todos.error
+      ].filter(Boolean);
+
+      if (fetchErrors.length > 0) {
+        console.error("Error fetching user data:", fetchErrors)
         toast({
-          title: "Error fetching related data",
-          description: "Failed to load some of your profile information.",
+          title: "Partial data loaded",
+          description: "Some of your profile information couldn't be loaded.",
           variant: "destructive",
         })
-        return
       }
 
-      setProfileData({
-        ...profile,
-        academics: academics.data,
-        extracurriculars: extracurriculars.data,
-        awards: awards.data,
-        essays: essays.data,
-      })
+      // Fetch college-specific data
+      const userCollegesResult = await supabase.from("user_colleges")
+        .select(`
+          *,
+          college:colleges(*)
+        `)
+        .eq("user_id", user.id);
+      
+      // Prepare to collect college-specific data
+      const collegeData = [];
+      
+      // If user has colleges, fetch specific data for each
+      if (!userCollegesResult.error && userCollegesResult.data?.length > 0) {
+        for (const userCollege of userCollegesResult.data) {
+          try {
+            // For each college, fetch all college-specific data
+            const [collegeEssays, collegeAcademics, collegeExtracurriculars, collegeAwards, collegeTodos] = await Promise.all([
+              supabase.from("college_essays").select("*").eq("college_id", userCollege.college_id).eq("user_id", user.id),
+              supabase.from("college_academics").select("*").eq("college_id", userCollege.college_id).eq("user_id", user.id),
+              supabase.from("college_extracurriculars").select("*").eq("college_id", userCollege.college_id).eq("user_id", user.id),
+              supabase.from("college_awards").select("*").eq("college_id", userCollege.college_id).eq("user_id", user.id),
+              supabase.from("college_todos").select("*").eq("college_id", userCollege.college_id).eq("user_id", user.id),
+            ]);
+            
+            // Add college with its related data
+            collegeData.push({
+              user_college: userCollege,
+              college: userCollege.college,
+              essays: collegeEssays.data || [],
+              academics: collegeAcademics.data || [],
+              extracurriculars: collegeExtracurriculars.data || [],
+              awards: collegeAwards.data || [],
+              todos: collegeTodos.data || [],
+            });
+          } catch (collegeError) {
+            console.error("Error fetching college-specific data:", collegeError);
+            // Continue with next college
+          }
+        }
+      }
+
+      // Build a comprehensive profile data object
+      const comprehensiveProfileData = {
+        profile: profile,
+        // Use courses if available, fall back to academics
+        courses: courses.data?.length ? courses.data : academics.data || [],
+        academics: academics.data || [],
+        test_scores: testScores.data || [],
+        // Use extracurricularActivities if available, fall back to extracurriculars
+        extracurricular_activities: extracurricularActivities.data?.length 
+          ? extracurricularActivities.data 
+          : extracurriculars.data || [],
+        extracurriculars: extracurriculars.data || [],
+        awards: awards.data || [],
+        essays: essays.data || [],
+        manual_gpa: manualGpa.data || null,
+        projects: projects.data || [],
+        todos: todos.data || [],
+        colleges: collegeData,
+      }
+
+      setProfileData(comprehensiveProfileData)
     } catch (error) {
       console.error("Error fetching profile data:", error)
       toast({
@@ -239,6 +312,7 @@ const handleSendMessage = useCallback(async () => {
     status: "sending",
   }
 
+  // Add user message to the conversation
   setMessages((prev) => [...prev, userMessage])
   setInput("")
   setIsTyping(true)
@@ -251,25 +325,106 @@ const handleSendMessage = useCallback(async () => {
       input.includes("rephrase") ||
       input.includes("check this essay");
     
-    // Construct a prompt with instructions to keep the AI concise
-    let prompt = `${input}\n\n` +
-      `IMPORTANT: Provide a concise, direct response that addresses the query efficiently. ` +
-      `Avoid unnecessary explanations, lengthy introductions, or redundant content. ` +
-      `Focus on providing precise, valuable information in as few words as possible while still being helpful and complete.`;
-
-    // Append profile data to the prompt if applicable
+    // Format messages for the API
+    const formattedMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+    
+    // Add the current user message
+    formattedMessages.push({
+      role: "user",
+      content: input
+    });
+    
+    // Append profile data as structured system message if available
     if (profileData) {
-      prompt += `\n\nUser Profile Data:\n${JSON.stringify(profileData, null, 2)}`
+      // Create a more structured representation of the profile data
+      const structuredProfileData = {
+        user_info: profileData.profile || {},
+        academics: {
+          courses: profileData.courses || [],
+          gpa: profileData.manual_gpa || null,
+          test_scores: profileData.test_scores || []
+        },
+        activities: profileData.extracurricular_activities || profileData.extracurriculars || [],
+        awards: profileData.awards || [],
+        essays: profileData.essays || [],
+        colleges: profileData.colleges || [],
+        todos: profileData.todos || [],
+        projects: profileData.projects || []
+      };
+
+      // Create a formatted context message
+      let profileContext = "USER PROFILE INFORMATION\n\n";
+      
+      // Basic user info
+      if (profileData.profile) {
+        profileContext += `Name: ${profileData.profile.full_name || 'Not provided'}\n`;
+        profileContext += `School: ${profileData.profile.school || 'Not provided'}\n`;
+        profileContext += `Graduation Year: ${profileData.profile.grad_year || 'Not provided'}\n`;
+        profileContext += `Interests: ${profileData.profile.interests || 'Not provided'}\n\n`;
+      }
+      
+      // Add GPA information
+      if (profileData.manual_gpa) {
+        profileContext += `GPA: Unweighted ${profileData.manual_gpa.unweighted || 'N/A'}, Weighted ${profileData.manual_gpa.weighted || 'N/A'}\n\n`;
+      }
+      
+      // Add test score summary
+      if (profileData.test_scores?.length) {
+        profileContext += `Test Scores: ${profileData.test_scores.length} scores recorded\n`;
+        profileData.test_scores.forEach((score: any) => {
+          profileContext += `- ${score.test_name}: ${score.score}${score.max_score ? `/${score.max_score}` : ''} ${score.test_date_display ? `(${score.test_date_display})` : ''}\n`;
+        });
+        profileContext += "\n";
+      }
+      
+      // Add activity summary
+      const activities = profileData.extracurricular_activities?.length ? 
+        profileData.extracurricular_activities : profileData.extracurriculars || [];
+      
+      if (activities.length) {
+        profileContext += `Activities: ${activities.length} activities recorded\n`;
+        activities.slice(0, 5).forEach((activity: any, i: number) => { // Show top 5 activities
+          profileContext += `- ${activity.position || activity.role || 'Member'} at ${activity.organization}, ${activity.hours_per_week || '?'} hrs/week\n`;
+        });
+        if (activities.length > 5) {
+          profileContext += `- ... and ${activities.length - 5} more activities\n`;
+        }
+        profileContext += "\n";
+      }
+      
+      // Add essay summary
+      if (profileData.essays?.length) {
+        profileContext += `Essays: ${profileData.essays.length} essays in progress\n`;
+        profileContext += "\n";
+      }
+      
+      // Add college applications summary
+      if (profileData.colleges?.length) {
+        profileContext += `College Applications: ${profileData.colleges.length} colleges\n`;
+        profileData.colleges.forEach((college: any) => {
+          profileContext += `- ${college.college?.name || 'Unnamed College'}\n`;
+        });
+        profileContext += "\n";
+      }
+      
+      // Send both the structured data and the formatted summary
+      formattedMessages.push({
+        role: "system",
+        content: profileContext + "\nFull profile data in JSON format:\n" + JSON.stringify(structuredProfileData)
+      });
     }
 
-    // Call our secure API route instead of directly using OpenAI
+    // Call our secure API route with conversation history
     const response = await fetch('/api/ai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        prompt: prompt,
+        messages: formattedMessages,
         max_tokens: isSpecificTask ? 700 : 500, // Allow more tokens for specific tasks
         temperature: isSpecificTask ? 0.5 : 0.7 // Lower temperature for more focused responses on specific tasks
       }),
@@ -300,7 +455,7 @@ const handleSendMessage = useCallback(async () => {
   } finally {
     setIsTyping(false)
   }
-}, [input, toast, profileData, idCounter, generateUniqueId])
+}, [input, toast, profileData, messages, idCounter, generateUniqueId])
 
 // Update isOpen when showOnLoad or initialPrompt changes
 useEffect(() => {
@@ -322,7 +477,7 @@ useEffect(() => {
     
     return () => clearTimeout(timer);
   }
-}, [initialPrompt, input, handleSendMessage, isOpen]);
+}, [initialPrompt, input, handleSendMessage, isOpen, messages]);
 
 // Use useCallback for handleKeyDown to prevent unnecessary re-renders
 const handleKeyDown = useCallback(
@@ -427,12 +582,6 @@ return (
             >
               Suggestions
             </TabsTrigger>
-            <TabsTrigger
-              value="context"
-              className="rounded-t-md rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
-            >
-              Context
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 data-[state=inactive]:hidden overflow-hidden">
@@ -521,69 +670,6 @@ return (
                   </div>
                 </Button>
               ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="context" className="flex-1 p-4 m-0 data-[state=inactive]:hidden">
-            <h3 className="text-sm font-medium mb-3">AI can access:</h3>
-            <div className="space-y-3">
-              <Card>
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-primary/10 p-2 rounded">
-                      <Pencil className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium">Your Essays</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {profileData?.essays?.length || 0} essays in progress
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-7 gap-1">
-                      <Plus className="h-3 w-3" /> Add
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-primary/10 p-2 rounded">
-                      <MessageCircle className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium">Your Extracurriculars</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {profileData?.extracurriculars?.length || 0} activities added
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-7 gap-1">
-                      <Plus className="h-3 w-3" /> Add
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-primary/10 p-2 rounded">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium">Your Academics</h4>
-                      <p className="text-xs text-muted-foreground">
-                        GPA: {profileData?.academics?.unweighted || "N/A"} (Weighted:{" "}
-                        {profileData?.academics?.weighted || "N/A"})
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-7">
-                      View
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
         </Tabs>

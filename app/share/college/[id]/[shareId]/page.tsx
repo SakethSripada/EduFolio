@@ -25,7 +25,7 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
           .eq("share_id", params.shareId)
           .eq("content_type", "college_profile")
           .eq("content_id", params.id)
-          .single()
+          .maybeSingle()
 
         if (shareError || !shareData) {
           setError("This share link is invalid or has expired.")
@@ -38,7 +38,7 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
           .from("colleges")
           .select("*")
           .eq("id", params.id)
-          .single()
+          .maybeSingle()
 
         if (collegeError || !collegeData) {
           setError("College not found.")

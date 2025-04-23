@@ -10,7 +10,9 @@ import { Dialog } from "@/components/ui/dialog"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
@@ -24,6 +26,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { Loader2, Calendar, CheckCircle, Circle, PlusCircle, Edit, Trash2, Filter } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { RequiredLabel } from "@/components/ui/required-label"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
 
 type TodoItem = {
   id: string
@@ -45,6 +50,8 @@ export default function TodoList() {
   const [isEditingTodo, setIsEditingTodo] = useState(false)
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState<string>("all")
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
   const [categories, setCategories] = useState<string[]>([
     "Essays",
     "Applications",
@@ -53,9 +60,11 @@ export default function TodoList() {
     "Other",
   ])
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   const [newTodo, setNewTodo] = useState<Partial<TodoItem>>({
     title: "",
@@ -131,7 +140,13 @@ export default function TodoList() {
   }
 
   const addTodo = async () => {
-    if (!user || !validateTodoForm(false)) return
+    if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateTodoForm(false)) {
+      return
+    }
 
     await performDatabaseOperation(
       async () => {
@@ -160,6 +175,7 @@ export default function TodoList() {
           setTodos([data[0], ...todos])
           resetTodoForm()
           setIsAddingTodo(false)
+          setFormSubmitted(false)
 
           toast({
             title: "Task added",
@@ -193,7 +209,13 @@ export default function TodoList() {
   }
 
   const updateTodo = async () => {
-    if (!user || !editingTodoId || !validateTodoForm(true)) return
+    if (!user || !editingTodoId) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateTodoForm(true)) {
+      return
+    }
 
     await performDatabaseOperation(
       async () => {
@@ -232,6 +254,7 @@ export default function TodoList() {
         resetTodoForm()
         setIsEditingTodo(false)
         setEditingTodoId(null)
+        setFormSubmitted(false)
 
         toast({
           title: "Task updated",
@@ -323,12 +346,24 @@ export default function TodoList() {
 
   // Filter todos based on active filter
   const filteredTodos = todos.filter((todo) => {
-    if (activeFilter === "all") return true
-    if (activeFilter === "completed") return todo.completed
-    if (activeFilter === "pending") return !todo.completed
-    if (activeFilter === "category") return todo.category === activeFilter
+    // Apply tab filters (All, Completed, Pending)
+    if (activeFilter === "completed" && !todo.completed) return false
+    if (activeFilter === "pending" && todo.completed) return false
+    
+    // Apply category filter
+    if (categoryFilter && todo.category !== categoryFilter) return false
+    
+    // Apply priority filter
+    if (priorityFilter && todo.priority !== priorityFilter) return false
+    
     return true
   })
+
+  // Clear all filters
+  const clearFilters = () => {
+    setCategoryFilter(null);
+    setPriorityFilter(null);
+  }
 
   // Get priority badge
   const getPriorityBadge = (priority: string) => {
@@ -357,9 +392,58 @@ export default function TodoList() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-semibold">To-Do List</h2>
         <div className="flex gap-2">
-          <Button variant="outline" className="flex items-center gap-1">
-            <Filter className="h-4 w-4" /> Filter
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-1">
+                <Filter className="h-4 w-4" /> Filter
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72">
+              <div className="space-y-4">
+                <h3 className="font-medium">Filter Tasks</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="category-filter">Category</Label>
+                  <Select 
+                    value={categoryFilter || "all"} 
+                    onValueChange={(value) => setCategoryFilter(value === "all" ? null : value)}
+                  >
+                    <SelectTrigger id="category-filter">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="priority-filter">Priority</Label>
+                  <Select 
+                    value={priorityFilter || "all"} 
+                    onValueChange={(value) => setPriorityFilter(value === "all" ? null : value)}
+                  >
+                    <SelectTrigger id="priority-filter">
+                      <SelectValue placeholder="All Priorities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Priorities</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button variant="outline" className="w-full" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button className="flex items-center gap-1" onClick={() => setIsAddingTodo(true)}>
             <PlusCircle className="h-4 w-4" /> Add Task
           </Button>
@@ -445,16 +529,20 @@ export default function TodoList() {
           <DialogHeader>
             <CardTitle>Add New Task</CardTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Task Title</Label>
+              <RequiredLabel htmlFor="title">Title</RequiredLabel>
               <Input
                 id="title"
-                value={newTodo.title || ""}
+                value={newTodo.title}
                 onChange={(e) => setNewTodo({ ...newTodo, title: e.target.value })}
               />
-              {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+              {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
             </div>
+
             <div className="grid gap-2">
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea
@@ -463,14 +551,22 @@ export default function TodoList() {
                 onChange={(e) => setNewTodo({ ...newTodo, description: e.target.value })}
               />
             </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate">Due Date (Optional)</Label>
+              <Input
+                id="dueDate"
+                placeholder="e.g. Tomorrow, Next Friday, Dec 15"
+                value={newTodo.due_date_display || ""}
+                onChange={(e) => setNewTodo({ ...newTodo, due_date_display: e.target.value })}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={newTodo.priority || "medium"}
-                  onValueChange={(value) => setNewTodo({ ...newTodo, priority: value })}
-                >
-                  <SelectTrigger>
+                <RequiredLabel htmlFor="priority">Priority</RequiredLabel>
+                <Select value={newTodo.priority} onValueChange={(value) => setNewTodo({ ...newTodo, priority: value })}>
+                  <SelectTrigger id="priority">
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -479,15 +575,16 @@ export default function TodoList() {
                     <SelectItem value="low">Low</SelectItem>
                   </SelectContent>
                 </Select>
-                {formErrors.priority && <p className="text-sm text-red-500">{formErrors.priority}</p>}
+                {formErrors.priority && <p className="text-xs text-destructive">{formErrors.priority}</p>}
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
+                <RequiredLabel htmlFor="category">Category</RequiredLabel>
                 <Select
-                  value={newTodo.category || "Other"}
+                  value={newTodo.category}
                   onValueChange={(value) => setNewTodo({ ...newTodo, category: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -498,21 +595,14 @@ export default function TodoList() {
                     ))}
                   </SelectContent>
                 </Select>
-                {formErrors.category && <p className="text-sm text-red-500">{formErrors.category}</p>}
+                {formErrors.category && <p className="text-xs text-destructive">{formErrors.category}</p>}
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="dueDate">Due Date (Optional)</Label>
-              <Input
-                id="dueDate"
-                placeholder="e.g., May 15, 2025"
-                value={newTodo.due_date_display || ""}
-                onChange={(e) => setNewTodo({ ...newTodo, due_date_display: e.target.value })}
-              />
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={addTodo}>Add Task</Button>
+            <Button type="button" onClick={addTodo}>
+              Add Task
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -523,15 +613,18 @@ export default function TodoList() {
           <DialogHeader>
             <CardTitle>Edit Task</CardTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="editTitle">Task Title</Label>
+              <RequiredLabel htmlFor="editTitle">Title</RequiredLabel>
               <Input
                 id="editTitle"
                 value={newTodo.title || ""}
                 onChange={(e) => setNewTodo({ ...newTodo, title: e.target.value })}
               />
-              {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+              {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="editDescription">Description (Optional)</Label>
@@ -543,12 +636,12 @@ export default function TodoList() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="editPriority">Priority</Label>
+                <RequiredLabel htmlFor="editPriority">Priority</RequiredLabel>
                 <Select
                   value={newTodo.priority || "medium"}
                   onValueChange={(value) => setNewTodo({ ...newTodo, priority: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="editPriority">
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -557,15 +650,15 @@ export default function TodoList() {
                     <SelectItem value="low">Low</SelectItem>
                   </SelectContent>
                 </Select>
-                {formErrors.priority && <p className="text-sm text-red-500">{formErrors.priority}</p>}
+                {formErrors.priority && <p className="text-xs text-destructive">{formErrors.priority}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="editCategory">Category</Label>
+                <RequiredLabel htmlFor="editCategory">Category</RequiredLabel>
                 <Select
                   value={newTodo.category || "Other"}
                   onValueChange={(value) => setNewTodo({ ...newTodo, category: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="editCategory">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -576,7 +669,7 @@ export default function TodoList() {
                     ))}
                   </SelectContent>
                 </Select>
-                {formErrors.category && <p className="text-sm text-red-500">{formErrors.category}</p>}
+                {formErrors.category && <p className="text-xs text-destructive">{formErrors.category}</p>}
               </div>
             </div>
             <div className="grid gap-2">
@@ -590,7 +683,9 @@ export default function TodoList() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={updateTodo}>Save Changes</Button>
+            <Button type="button" onClick={updateTodo}>
+              Update Task
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

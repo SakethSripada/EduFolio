@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -18,16 +18,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, User } from "lucide-react"
+import { LogOut, User, Menu, X } from "lucide-react"
 
 export default function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { theme } = useTheme()
-  const { user, signOut, isLoading } = useAuth()
+  const { user, signOut, isLoading, refreshSession } = useAuth()
+
+  // Refresh session when the component mounts to ensure auth state is current
+  useEffect(() => {
+    if (!isLoading) {
+      refreshSession()
+    }
+  }, [refreshSession, isLoading])
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
+  }
+
+  const closeMenu = () => {
+    setIsMenuOpen(false)
   }
 
   // Get user initials for avatar
@@ -40,8 +52,18 @@ export default function Navbar() {
     return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase()
   }
 
+  // Handle navigation with refresh if needed
+  const handleNavigation = (path: string) => {
+    closeMenu()
+    if (pathname === path) {
+      // If we're already on this page, consider a refresh
+      refreshSession()
+    }
+    router.push(path)
+  }
+
   return (
-    <header className="bg-background border-b">
+    <header className="bg-background border-b sticky top-0 z-40">
       <div className="container flex items-center justify-between py-4">
         <Link href="/" className="flex items-center">
           <Image
@@ -54,39 +76,94 @@ export default function Navbar() {
           <span className="text-2xl font-bold">EduFolio</span>
         </Link>
 
+        {/* Mobile menu button */}
+        <button className="md:hidden" onClick={toggleMenu}>
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        {/* Desktop navigation */}
         <div className="hidden md:flex items-center space-x-6">
           {user && (
             <>
-              <Link
-                href="/college-application"
+              <Button
+                variant="ghost"
                 className={cn(
                   "text-muted-foreground hover:text-primary transition-colors",
-                  pathname === "/college-application" && "text-primary",
+                  pathname === "/college-application" && "text-primary font-medium",
                 )}
+                onClick={() => handleNavigation("/college-application")}
               >
                 College Applications
-              </Link>
-              <Link
-                href="/portfolio"
+              </Button>
+              <Button
+                variant="ghost"
                 className={cn(
                   "text-muted-foreground hover:text-primary transition-colors",
-                  pathname === "/portfolio" && "text-primary",
+                  pathname === "/portfolio" && "text-primary font-medium",
                 )}
+                onClick={() => handleNavigation("/portfolio")}
               >
                 Portfolio
-              </Link>
-              <Link
-                href="/profile"
+              </Button>
+              <Button
+                variant="ghost"
                 className={cn(
                   "text-muted-foreground hover:text-primary transition-colors",
-                  pathname === "/profile" && "text-primary",
+                  pathname === "/profile" && "text-primary font-medium",
                 )}
+                onClick={() => handleNavigation("/profile")}
               >
                 Profile
-              </Link>
+              </Button>
             </>
           )}
         </div>
+
+        {/* Mobile navigation */}
+        {isMenuOpen && (
+          <div className="absolute top-16 left-0 right-0 bg-background border-b shadow-lg p-4 md:hidden z-50">
+            {user ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start mb-2"
+                  onClick={() => handleNavigation("/college-application")}
+                >
+                  College Applications
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start mb-2"
+                  onClick={() => handleNavigation("/portfolio")}
+                >
+                  Portfolio
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start mb-2"
+                  onClick={() => handleNavigation("/profile")}
+                >
+                  Profile
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-red-500"
+                  onClick={signOut}
+                >
+                  Log Out
+                </Button>
+              </>
+            ) : (
+              <Button 
+                variant="default" 
+                className="w-full"
+                onClick={() => handleNavigation("/login")}
+              >
+                Log In
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center space-x-4">
           <ModeToggle />
@@ -98,12 +175,6 @@ export default function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
-                    {/* Temporarily disabled avatar image in favor of initials
-                    <AvatarImage
-                      src={user.user_metadata?.avatar_url || ""}
-                      alt={user.user_metadata?.full_name || "User"}
-                    />
-                    */}
                     <AvatarFallback>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -111,11 +182,9 @@ export default function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
-                  </Link>
+                <DropdownMenuItem onClick={() => handleNavigation("/profile")} className="cursor-pointer">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
@@ -124,8 +193,8 @@ export default function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild variant="outline">
-              <Link href="/login">Login</Link>
+            <Button onClick={() => handleNavigation("/login")} variant="outline">
+              Login
             </Button>
           )}
         </div>

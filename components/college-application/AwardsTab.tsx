@@ -10,11 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { validateRequired } from "@/lib/validation"
+import { RequiredLabel } from "@/components/ui/required-label"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
 
 type Award = {
   id: string
@@ -49,8 +53,10 @@ export default function AwardsTab() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Add state for confirmation dialog
   const [confirmDeleteAward, setConfirmDeleteAward] = useState<string | null>(null)
@@ -106,7 +112,13 @@ export default function AwardsTab() {
   }
 
   const addAward = async () => {
-    if (!user || !validateAwardForm(false)) return
+    if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateAwardForm(false)) {
+      return
+    }
 
     setIsLoading(true)
 
@@ -138,6 +150,7 @@ export default function AwardsTab() {
           description: "",
           issuing_organization: "",
         })
+        setFormSubmitted(false)
 
         toast({
           title: "Award added",
@@ -173,7 +186,13 @@ export default function AwardsTab() {
   }
 
   const updateAward = async () => {
-    if (!user || !editingAwardId || !validateAwardForm(true)) return
+    if (!user || !editingAwardId) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateAwardForm(true)) {
+      return
+    }
 
     setIsLoading(true)
 
@@ -219,6 +238,7 @@ export default function AwardsTab() {
         description: "",
         issuing_organization: "",
       })
+      setFormSubmitted(false)
 
       toast({
         title: "Award updated",
@@ -291,81 +311,88 @@ export default function AwardsTab() {
                 <DialogHeader>
                   <DialogTitle>Add New Award</DialogTitle>
                 </DialogHeader>
+                
+                <FormErrorSummary errors={formErrors} show={formSubmitted} />
+                
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="title">Honor Title</Label>
+                    <RequiredLabel htmlFor="title">Award Title</RequiredLabel>
                     <Input
                       id="title"
                       value={newAward.title}
                       onChange={(e) => setNewAward({ ...newAward, title: e.target.value })}
                     />
-                    {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+                    {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="issuing_organization">Issuing Organization (Optional)</Label>
-                    <Input
-                      id="issuing_organization"
-                      value={newAward.issuing_organization}
-                      onChange={(e) => setNewAward({ ...newAward, issuing_organization: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description (Optional)</Label>
-                    <Textarea
-                      id="description"
-                      value={newAward.description}
-                      onChange={(e) => setNewAward({ ...newAward, description: e.target.value })}
-                      placeholder="Briefly describe this award or honor"
-                    />
-                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="gradeLevel">Grade Level</Label>
+                      <RequiredLabel htmlFor="grade">Grade Level</RequiredLabel>
                       <Select
                         onValueChange={(value) => setNewAward({ ...newAward, grade_level: value })}
                         value={newAward.grade_level}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select grade" />
+                        <SelectTrigger id="grade">
+                          <SelectValue placeholder="Select grade level" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="9">9th Grade</SelectItem>
                           <SelectItem value="10">10th Grade</SelectItem>
                           <SelectItem value="11">11th Grade</SelectItem>
                           <SelectItem value="12">12th Grade</SelectItem>
+                          <SelectItem value="Multiple">Multiple Grades</SelectItem>
                         </SelectContent>
                       </Select>
-                      {formErrors.grade_level && <p className="text-sm text-red-500">{formErrors.grade_level}</p>}
+                      {formErrors.grade_level && <p className="text-xs text-destructive">{formErrors.grade_level}</p>}
                     </div>
+
                     <div className="grid gap-2">
-                      <Label htmlFor="level">Level of Recognition</Label>
+                      <RequiredLabel htmlFor="recognition">Recognition Level</RequiredLabel>
                       <Select
                         onValueChange={(value) => setNewAward({ ...newAward, recognition_level: value })}
                         value={newAward.recognition_level}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="recognition">
                           <SelectValue placeholder="Select level" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="School">School</SelectItem>
-                          <SelectItem value="Regional">Regional</SelectItem>
-                          <SelectItem value="State">State</SelectItem>
+                          <SelectItem value="Local">Local/Regional</SelectItem>
+                          <SelectItem value="State">State/Provincial</SelectItem>
                           <SelectItem value="National">National</SelectItem>
                           <SelectItem value="International">International</SelectItem>
                         </SelectContent>
                       </Select>
-                      {formErrors.recognition_level && (
-                        <p className="text-sm text-red-500">{formErrors.recognition_level}</p>
-                      )}
+                      {formErrors.recognition_level && <p className="text-xs text-destructive">{formErrors.recognition_level}</p>}
                     </div>
                   </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="organization">Issuing Organization (Optional)</Label>
+                    <Input
+                      id="organization"
+                      value={newAward.issuing_organization || ""}
+                      onChange={(e) => setNewAward({ ...newAward, issuing_organization: e.target.value })}
+                    />
+                  </div>
+
                   <div className="grid gap-2">
                     <Label htmlFor="date">Date Received (Optional)</Label>
                     <Input
                       id="date"
-                      placeholder="e.g., May 2025"
-                      value={newAward.date_display}
+                      placeholder="e.g., May 2024"
+                      value={newAward.date_display || ""}
                       onChange={(e) => setNewAward({ ...newAward, date_display: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="description">Description (Optional)</Label>
+                    <Textarea
+                      id="description"
+                      value={newAward.description || ""}
+                      onChange={(e) => setNewAward({ ...newAward, description: e.target.value })}
+                      placeholder="Briefly describe this award and its significance"
                     />
                   </div>
                 </div>
@@ -380,81 +407,88 @@ export default function AwardsTab() {
                 <DialogHeader>
                   <DialogTitle>Edit Award</DialogTitle>
                 </DialogHeader>
+                
+                <FormErrorSummary errors={formErrors} show={formSubmitted} />
+                
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="editTitle">Honor Title</Label>
+                    <RequiredLabel htmlFor="editTitle">Award Title</RequiredLabel>
                     <Input
                       id="editTitle"
                       value={editingAward.title}
                       onChange={(e) => setEditingAward({ ...editingAward, title: e.target.value })}
                     />
-                    {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
+                    {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="editIssuingOrganization">Issuing Organization (Optional)</Label>
-                    <Input
-                      id="editIssuingOrganization"
-                      value={editingAward.issuing_organization}
-                      onChange={(e) => setEditingAward({ ...editingAward, issuing_organization: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="editDescription">Description (Optional)</Label>
-                    <Textarea
-                      id="editDescription"
-                      value={editingAward.description}
-                      onChange={(e) => setEditingAward({ ...editingAward, description: e.target.value })}
-                      placeholder="Briefly describe this award or honor"
-                    />
-                  </div>
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="editGradeLevel">Grade Level</Label>
+                      <RequiredLabel htmlFor="editGradeLevel">Grade Level</RequiredLabel>
                       <Select
                         onValueChange={(value) => setEditingAward({ ...editingAward, grade_level: value })}
                         value={editingAward.grade_level}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select grade" />
+                        <SelectTrigger id="editGradeLevel">
+                          <SelectValue placeholder="Select grade level" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="9">9th Grade</SelectItem>
                           <SelectItem value="10">10th Grade</SelectItem>
                           <SelectItem value="11">11th Grade</SelectItem>
                           <SelectItem value="12">12th Grade</SelectItem>
+                          <SelectItem value="Multiple">Multiple Grades</SelectItem>
                         </SelectContent>
                       </Select>
-                      {formErrors.grade_level && <p className="text-sm text-red-500">{formErrors.grade_level}</p>}
+                      {formErrors.grade_level && <p className="text-xs text-destructive">{formErrors.grade_level}</p>}
                     </div>
+                    
                     <div className="grid gap-2">
-                      <Label htmlFor="editLevel">Level of Recognition</Label>
+                      <RequiredLabel htmlFor="editLevel">Recognition Level</RequiredLabel>
                       <Select
                         onValueChange={(value) => setEditingAward({ ...editingAward, recognition_level: value })}
                         value={editingAward.recognition_level}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="editLevel">
                           <SelectValue placeholder="Select level" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="School">School</SelectItem>
-                          <SelectItem value="Regional">Regional</SelectItem>
-                          <SelectItem value="State">State</SelectItem>
+                          <SelectItem value="Local">Local/Regional</SelectItem>
+                          <SelectItem value="State">State/Provincial</SelectItem>
                           <SelectItem value="National">National</SelectItem>
                           <SelectItem value="International">International</SelectItem>
                         </SelectContent>
                       </Select>
-                      {formErrors.recognition_level && (
-                        <p className="text-sm text-red-500">{formErrors.recognition_level}</p>
-                      )}
+                      {formErrors.recognition_level && <p className="text-xs text-destructive">{formErrors.recognition_level}</p>}
                     </div>
                   </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="editIssuingOrganization">Issuing Organization (Optional)</Label>
+                    <Input
+                      id="editIssuingOrganization"
+                      value={editingAward.issuing_organization || ""}
+                      onChange={(e) => setEditingAward({ ...editingAward, issuing_organization: e.target.value })}
+                    />
+                  </div>
+                  
                   <div className="grid gap-2">
                     <Label htmlFor="editDate">Date Received (Optional)</Label>
                     <Input
                       id="editDate"
-                      placeholder="e.g., May 2025"
-                      value={editingAward.date_display}
+                      placeholder="e.g., May 2024"
+                      value={editingAward.date_display || ""}
                       onChange={(e) => setEditingAward({ ...editingAward, date_display: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="editDescription">Description (Optional)</Label>
+                    <Textarea
+                      id="editDescription"
+                      value={editingAward.description || ""}
+                      onChange={(e) => setEditingAward({ ...editingAward, description: e.target.value })}
+                      placeholder="Briefly describe this award and its significance"
                     />
                   </div>
                 </div>
@@ -530,3 +564,6 @@ export default function AwardsTab() {
     </div>
   )
 }
+
+
+

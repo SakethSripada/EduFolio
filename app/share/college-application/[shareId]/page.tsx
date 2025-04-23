@@ -39,7 +39,7 @@ export default function SharedCollegeApplicationPage() {
           .select("*")
           .eq("share_id", shareId) // Use the shareId from useParams
           .eq("content_type", "college_application")
-          .single()
+          .maybeSingle()
 
         if (shareError) {
           console.error("Share link error:", shareError);
@@ -88,7 +88,7 @@ export default function SharedCollegeApplicationPage() {
           .from("profiles")
           .select("*")
           .eq("user_id", shareData.user_id)
-          .single()
+          .maybeSingle()
 
         if (profileError) {
           console.error("Profile error:", profileError);

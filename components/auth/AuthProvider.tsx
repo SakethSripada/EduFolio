@@ -1,19 +1,35 @@
 "use client"
 
-import type React from "react"
-
-import { createContext, useContext, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Session, User } from "@supabase/supabase-js"
-import { useRouter } from "next/navigation"
+import type {
+  Session,
+  User,
+  OAuthResponse,
+} from "@supabase/supabase-js"
+import { useRouter, usePathname } from "next/navigation"
 
 type AuthContextType = {
   user: User | null
   session: Session | null
   isLoading: boolean
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>
-  signIn: (email: string, password: string) => Promise<{ error: any }>
+  refreshSession: () => Promise<void>
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<{ error: any }>
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ error: any }>
+  signInWithGoogle: () => Promise<OAuthResponse>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: any }>
 }
@@ -25,150 +41,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  
-  // Use the nextjs client for consistent auth
+  const pathname = usePathname()
   const client = createClientComponentClient()
 
-  useEffect(() => {
-    const setData = async () => {
-      try {
-        const {
-          data: { session },
-        } = await client.auth.getSession()
-        
-        console.log("Auth Provider: Initial session check", { 
-          hasSession: !!session,
-          sessionUser: session?.user?.id
-        })
-        
-        setSession(session)
-        setUser(session?.user ?? null)
-        setIsLoading(false)
-      } catch (error) {
-        console.error("Error getting session:", error)
-        setIsLoading(false)
-      }
+  // Function to refresh the session data
+  const refreshSession = useCallback(async () => {
+    try {
+      const { data: { session } } = await client.auth.getSession()
+      setSession(session)
+      setUser(session?.user ?? null)
+    } catch (error) {
+      console.error("Error refreshing session:", error)
+    } finally {
+      setIsLoading(false)
     }
+  }, [client])
 
-    // Update the auth state change listener to use setTimeout
-    const { data: authListener } = client.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, { hasSession: !!session })
-      
+  useEffect(() => {
+    // Initial session check
+    refreshSession()
+
+    // Listen to auth events
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+    })
 
-      if (event === "SIGNED_IN") {
-        // Create or update user profile using setTimeout to prevent deadlocks
-        if (session?.user) {
-          setTimeout(async () => {
-            try {
-              // First check if profile exists
-              const { data: existingProfile, error: fetchError } = await client
-                .from("profiles")
-                .select("*")
-                .eq("user_id", session.user.id)
-                .single()
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [client, refreshSession])
 
-              if (fetchError && fetchError.code !== "PGRST116") {
-                console.error("Error checking profile:", fetchError)
-                return
-              }
+  // Ensure session is still valid when navigating between routes
+  useEffect(() => {
+    if (!isLoading && pathname !== '/login' && pathname !== '/signup') {
+      refreshSession()
+    }
+  }, [pathname, refreshSession, isLoading])
 
-              if (!existingProfile) {
-                // Insert new profile
-                const { error: insertError } = await client.from("profiles").insert({
-                  user_id: session.user.id,
-                  full_name: session.user.user_metadata.full_name || "",
-                  email: session.user.email || "",
-                  avatar_url: session.user.user_metadata.avatar_url || null,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                })
+  const signUp = (email: string, password: string, fullName: string) =>
+    client.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    })
 
-                if (insertError) {
-                  console.error("Error creating profile:", insertError)
-                }
-              } else {
-                // Update existing profile
-                const { error: updateError } = await client
-                  .from("profiles")
-                  .update({
-                    full_name: session.user.user_metadata.full_name || existingProfile.full_name,
-                    avatar_url: session.user.user_metadata.avatar_url || existingProfile.avatar_url,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq("user_id", session.user.id)
+  const signIn = (email: string, password: string) =>
+    client.auth.signInWithPassword({ email, password })
 
-                if (updateError) {
-                  console.error("Error updating profile:", updateError)
-                }
-              }
-            } catch (error) {
-              console.error("Error managing profile:", error)
-            }
-          }, 0)
-        }
+  const signInWithGoogle = (): Promise<OAuthResponse> =>
+    client.auth.signInWithOAuth({ 
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/college-application`
       }
     })
 
-    setData()
-
-    return () => {
-      authListener.subscription.unsubscribe()
-    }
-  }, [router, client])
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    })
-    return { error }
-  }
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await client.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { error }
-  }
-
   const signOut = async () => {
     await client.auth.signOut()
+    setUser(null)
+    setSession(null)
     router.push("/login")
   }
 
-  const resetPassword = async (email: string) => {
-    const { error } = await client.auth.resetPasswordForEmail(email, {
+  const resetPassword = (email: string) =>
+    client.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
-    return { error }
-  }
 
-  const value = {
-    user,
-    session,
-    isLoading,
-    signUp,
-    signIn,
-    signOut,
-    resetPassword,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        isLoading,
+        refreshSession,
+        signUp,
+        signIn,
+        signInWithGoogle,
+        signOut,
+        resetPassword,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error("useAuth must be inside AuthProvider")
+  return ctx
 }

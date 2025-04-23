@@ -15,11 +15,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import AIAssistant from "@/components/ai/AIAssistant"
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { isValidGPA, isValidNumber, validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
+import { BulkCourseEntry } from "@/components/academics/BulkCourseEntry"
+import { UCGPACalculator } from "@/components/academics/UCGPACalculator"
+import { RequiredLabel } from "@/components/ui/required-label"
+import { FormErrorSummary } from "@/components/ui/form-error-summary"
 
 type Course = {
   id: string
@@ -75,6 +81,7 @@ export default function AcademicsTab() {
     notes: "",
   })
   const [isAddingCourse, setIsAddingCourse] = useState(false)
+  const [isBulkAddingCourses, setIsBulkAddingCourses] = useState(false)
   const [isEditingCourse, setIsEditingCourse] = useState(false)
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
   const [isCalculatingGPA, setIsCalculatingGPA] = useState(false)
@@ -98,8 +105,10 @@ export default function AcademicsTab() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Add state for confirmation dialog
   const [confirmDeleteCourse, setConfirmDeleteCourse] = useState<string | null>(null)
@@ -299,7 +308,13 @@ export default function AcademicsTab() {
   }
 
   const addCourse = async () => {
-    if (!user || !validateCourseForm()) return
+    if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateCourseForm()) {
+      return
+    }
 
     performDatabaseOperation(
       async () => {
@@ -343,6 +358,7 @@ export default function AcademicsTab() {
             notes: "",
           })
           setIsAddingCourse(false)
+          setFormSubmitted(false)
 
           toast({
             title: "Course added",
@@ -370,7 +386,13 @@ export default function AcademicsTab() {
   }
 
   const updateCourse = async () => {
-    if (!user || !editingCourseId || !validateCourseForm()) return
+    if (!user || !editingCourseId) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateCourseForm()) {
+      return
+    }
 
     performDatabaseOperation(
       async () => {
@@ -432,6 +454,7 @@ export default function AcademicsTab() {
         })
         setIsEditingCourse(false)
         setEditingCourseId(null)
+        setFormSubmitted(false)
 
         toast({
           title: "Course updated",
@@ -477,7 +500,13 @@ export default function AcademicsTab() {
   }
 
   const addTestScore = async () => {
-    if (!user || !validateTestScoreForm(false)) return
+    if (!user) return
+    
+    setFormSubmitted(true)
+    
+    if (!validateTestScoreForm(false)) {
+      return
+    }
 
     performDatabaseOperation(
       async () => {
@@ -510,6 +539,7 @@ export default function AcademicsTab() {
             test_date_display: "",
             notes: "",
           })
+          setFormSubmitted(false)
 
           toast({
             title: "Test score added",
@@ -827,7 +857,8 @@ export default function AcademicsTab() {
 
   // Calculate UC GPA (needed for format GPA for AI)
   const calculateUCGPA = (coursesToCalculate: Course[]) => {
-    return calculateGPA(true, false);
+    // This is now handled by the UCGPACalculator component
+    return 0 // Just to maintain compatibility with existing code
   }
 
   // Format GPA information for AI
@@ -960,9 +991,23 @@ export default function AcademicsTab() {
               </CardTitle>
               <CardDescription>Track your academic courses by grade level</CardDescription>
             </div>
-            <Button className="flex items-center gap-1" onClick={() => setIsAddingCourse(true)}>
-              <PlusCircle className="h-4 w-4" /> Add Course
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkAddingCourses(true)}
+                className="gap-1"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Bulk Add
+              </Button>
+              <Button
+                onClick={() => setIsAddingCourse(true)}
+                className="gap-1"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Add Course
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1046,14 +1091,17 @@ export default function AcademicsTab() {
                 <DialogHeader>
                   <DialogTitle>Add New Test Score</DialogTitle>
                 </DialogHeader>
+                
+                <FormErrorSummary errors={formErrors} show={formSubmitted} />
+                
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="test">Test</Label>
+                    <RequiredLabel htmlFor="test">Test</RequiredLabel>
                     <Select
                       onValueChange={(value) => setNewTestScore({ ...newTestScore, test_name: value })}
                       value={newTestScore.test_name}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="test">
                         <SelectValue placeholder="Select a test" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1073,18 +1121,18 @@ export default function AcademicsTab() {
                         <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
-                    {formErrors.test_name && <p className="text-sm text-red-500">{formErrors.test_name}</p>}
+                    {formErrors.test_name && <p className="text-xs text-destructive">{formErrors.test_name}</p>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="score">Score</Label>
+                      <RequiredLabel htmlFor="score">Score</RequiredLabel>
                       <Input
                         id="score"
                         type="number"
                         value={newTestScore.score}
                         onChange={(e) => setNewTestScore({ ...newTestScore, score: e.target.value })}
                       />
-                      {formErrors.score && <p className="text-sm text-red-500">{formErrors.score}</p>}
+                      {formErrors.score && <p className="text-xs text-destructive">{formErrors.score}</p>}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="maxScore">Max Possible Score (Optional)</Label>
@@ -1094,16 +1142,16 @@ export default function AcademicsTab() {
                         value={newTestScore.max_score}
                         onChange={(e) => setNewTestScore({ ...newTestScore, max_score: e.target.value })}
                       />
-                      {formErrors.max_score && <p className="text-sm text-red-500">{formErrors.max_score}</p>}
+                      {formErrors.max_score && <p className="text-xs text-destructive">{formErrors.max_score}</p>}
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="date">Test Date</Label>
+                    <Label htmlFor="date">Test Date (Optional)</Label>
                     <Input
                       id="date"
                       type="text"
                       placeholder="e.g., May 2025"
-                      value={newTestScore.test_date_display}
+                      value={newTestScore.test_date_display || ""}
                       onChange={(e) => setNewTestScore({ ...newTestScore, test_date_display: e.target.value })}
                     />
                   </div>
@@ -1111,7 +1159,7 @@ export default function AcademicsTab() {
                     <Label htmlFor="notes">Notes (Optional)</Label>
                     <Input
                       id="notes"
-                      value={newTestScore.notes}
+                      value={newTestScore.notes || ""}
                       onChange={(e) => setNewTestScore({ ...newTestScore, notes: e.target.value })}
                     />
                   </div>
@@ -1183,9 +1231,12 @@ export default function AcademicsTab() {
           <DialogHeader>
             <DialogTitle>Edit Test Score</DialogTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="editTest">Test</Label>
+              <RequiredLabel htmlFor="editTest">Test</RequiredLabel>
               <Select
                 value={editingTestScore.test_name}
                 onValueChange={(value) => setEditingTestScore({ ...editingTestScore, test_name: value })}
@@ -1214,7 +1265,7 @@ export default function AcademicsTab() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="editScore">Score</Label>
+                <RequiredLabel htmlFor="editScore">Score</RequiredLabel>
                 <Input
                   id="editScore"
                   type="number"
@@ -1285,25 +1336,28 @@ export default function AcademicsTab() {
           <DialogHeader>
             <DialogTitle>{isEditingCourse ? "Edit Course" : "Add New Course"}</DialogTitle>
           </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Course Name</Label>
+              <RequiredLabel htmlFor="courseName">Course Name</RequiredLabel>
               <Input
-                id="name"
+                id="courseName"
                 value={newCourse.name || ""}
                 onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
               />
-              {formErrors.name && <p className="text-sm text-red-500">{formErrors.name}</p>}
+              {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="grade">Grade Received</Label>
+                <RequiredLabel htmlFor="grade">Grade</RequiredLabel>
                 <Select
-                  value={newCourse.grade || ""}
                   onValueChange={(value) => setNewCourse({ ...newCourse, grade: value })}
+                  value={newCourse.grade || ""}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select grade" />
+                  <SelectTrigger id="grade">
+                    <SelectValue placeholder="Select a grade" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="A+">A+</SelectItem>
@@ -1321,48 +1375,40 @@ export default function AcademicsTab() {
                     <SelectItem value="F">F</SelectItem>
                     <SelectItem value="P">Pass</SelectItem>
                     <SelectItem value="NP">No Pass</SelectItem>
+                    <SelectItem value="I">Incomplete</SelectItem>
+                    <SelectItem value="W">Withdrawn</SelectItem>
                     <SelectItem value="IP">In Progress</SelectItem>
                   </SelectContent>
                 </Select>
-                {formErrors.grade && <p className="text-sm text-red-500">{formErrors.grade}</p>}
+                {formErrors.grade && <p className="text-xs text-destructive">{formErrors.grade}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="level">Course Level</Label>
+                <RequiredLabel htmlFor="level">Course Level</RequiredLabel>
                 <Select
+                  onValueChange={(value) => setNewCourse({ ...newCourse, level: value })}
                   value={newCourse.level || "Regular"}
-                  onValueChange={(value) =>
-                    setNewCourse({
-                      ...newCourse,
-                      level: value,
-                    })
-                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="level">
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Regular">Regular</SelectItem>
                     <SelectItem value="Honors">Honors</SelectItem>
                     <SelectItem value="AP/IB">AP/IB</SelectItem>
-                    <SelectItem value="College">College/Dual Enrollment</SelectItem>
+                    <SelectItem value="College">College</SelectItem>
                   </SelectContent>
                 </Select>
-                {formErrors.level && <p className="text-sm text-red-500">{formErrors.level}</p>}
+                {formErrors.level && <p className="text-xs text-destructive">{formErrors.level}</p>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="gradeLevel">Grade Level</Label>
+                <RequiredLabel htmlFor="gradeLevel">Grade Level</RequiredLabel>
                 <Select
+                  onValueChange={(value) => setNewCourse({ ...newCourse, grade_level: value })}
                   value={newCourse.grade_level || "11"}
-                  onValueChange={(value) =>
-                    setNewCourse({
-                      ...newCourse,
-                      grade_level: value,
-                    })
-                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="gradeLevel">
                     <SelectValue placeholder="Select grade level" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1372,53 +1418,49 @@ export default function AcademicsTab() {
                     <SelectItem value="12">12th Grade</SelectItem>
                   </SelectContent>
                 </Select>
-                {formErrors.grade_level && <p className="text-sm text-red-500">{formErrors.grade_level}</p>}
+                {formErrors.grade_level && <p className="text-xs text-destructive">{formErrors.grade_level}</p>}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="term">Term</Label>
+                <RequiredLabel htmlFor="term">Term</RequiredLabel>
                 <Select
+                  onValueChange={(value) => setNewCourse({ ...newCourse, term: value })}
                   value={newCourse.term || "Year"}
-                  onValueChange={(value) =>
-                    setNewCourse({
-                      ...newCourse,
-                      term: value,
-                    })
-                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="term">
                     <SelectValue placeholder="Select term" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Fall">Fall</SelectItem>
-                    <SelectItem value="Spring">Spring</SelectItem>
                     <SelectItem value="Year">Full Year</SelectItem>
+                    <SelectItem value="Semester">Semester</SelectItem>
+                    <SelectItem value="Quarter">Quarter</SelectItem>
                     <SelectItem value="Summer">Summer</SelectItem>
                   </SelectContent>
                 </Select>
-                {formErrors.term && <p className="text-sm text-red-500">{formErrors.term}</p>}
+                {formErrors.term && <p className="text-xs text-destructive">{formErrors.term}</p>}
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="credits">Credits</Label>
-              <Input
-                id="credits"
-                type="number"
-                min="0.5"
-                max="2"
-                step="0.5"
-                value={newCourse.credits || 1}
-                onChange={(e) => setNewCourse({ ...newCourse, credits: Number.parseFloat(e.target.value) })}
-              />
-              {formErrors.credits && <p className="text-sm text-red-500">{formErrors.credits}</p>}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="schoolYear">School Year (Optional)</Label>
-              <Input
-                id="schoolYear"
-                placeholder="e.g., 2024-2025"
-                value={newCourse.school_year || ""}
-                onChange={(e) => setNewCourse({ ...newCourse, school_year: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <RequiredLabel htmlFor="credits">Credits</RequiredLabel>
+                <Input
+                  id="credits"
+                  type="number"
+                  value={newCourse.credits || 1}
+                  onChange={(e) =>
+                    setNewCourse({ ...newCourse, credits: Number(e.target.value) || 0 })
+                  }
+                />
+                {formErrors.credits && <p className="text-xs text-destructive">{formErrors.credits}</p>}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="schoolYear">School Year (Optional)</Label>
+                <Input
+                  id="schoolYear"
+                  placeholder="e.g., 2023-2024"
+                  value={newCourse.school_year || ""}
+                  onChange={(e) => setNewCourse({ ...newCourse, school_year: e.target.value })}
+                />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
@@ -1681,6 +1723,46 @@ export default function AcademicsTab() {
         onConfirm={() => confirmDeleteTestScore && deleteTestScore(confirmDeleteTestScore)}
         variant="destructive"
       />
+
+      {/* Bulk Course Entry Dialog */}
+      <BulkCourseEntry
+        open={isBulkAddingCourses}
+        onOpenChange={setIsBulkAddingCourses}
+        onCoursesAdded={() => {
+          // Refresh courses after bulk adding
+          if (user) {
+            performDatabaseOperation(
+              async () => {
+                const { data, error } = await supabase
+                  .from("courses")
+                  .select("*")
+                  .eq("user_id", user.id)
+                  .order("created_at", { ascending: false })
+                
+                if (error) throw error
+                return data
+              },
+              setIsLoading,
+              (data) => {
+                if (data) setCourses(data)
+              },
+              (error) => {
+                toast({
+                  title: "Error refreshing courses",
+                  description: handleSupabaseError(error, "There was a problem loading your courses."),
+                  variant: "destructive",
+                })
+              }
+            )
+          }
+        }}
+        userId={user?.id || ""}
+      />
+
+      {/* UC GPA Calculator */}
+      <div className="mb-6">
+        <UCGPACalculator userId={user?.id || ""} />
+      </div>
     </div>
   )
 }
