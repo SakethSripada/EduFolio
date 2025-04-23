@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogOut, User, Menu, X } from "lucide-react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -26,6 +27,8 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { theme } = useTheme()
   const { user, signOut, isLoading, refreshSession } = useAuth()
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const supabase = createClientComponentClient()
 
   // Refresh session when the component mounts to ensure auth state is current
   useEffect(() => {
@@ -33,6 +36,25 @@ export default function Navbar() {
       refreshSession()
     }
   }, [refreshSession, isLoading])
+
+  // Fetch user profile from database to get the most up-to-date name
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", user.id)
+          .single()
+          
+        if (!error && data) {
+          setUserProfile(data)
+        }
+      }
+      
+      fetchProfile()
+    }
+  }, [user, supabase, pathname])
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -44,6 +66,15 @@ export default function Navbar() {
 
   // Get user initials for avatar
   const getUserInitials = () => {
+    // First try to get the name from the database profile (most up-to-date)
+    if (userProfile?.full_name) {
+      const fullName = userProfile.full_name
+      const names = fullName.split(" ")
+      if (names.length === 1) return names[0].charAt(0).toUpperCase()
+      return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase()
+    }
+    
+    // Fall back to user metadata if no profile was found
     if (!user || !user.user_metadata?.full_name) return "U"
 
     const fullName = user.user_metadata.full_name
