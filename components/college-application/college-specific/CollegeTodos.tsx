@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { PlusCircle, Edit, Trash2, Copy, Loader2, Calendar, CheckCircle2, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
@@ -52,6 +53,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Initialize with empty values to avoid undefined errors
   const [newTodo, setNewTodo] = useState<Partial<Todo>>({
@@ -128,7 +130,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
           },
         ])
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
       return data

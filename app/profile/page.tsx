@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Loader2, User, Mail, Key, Shield, LogOut, Camera, Trash2, GraduationCap } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { toast } from "@/components/ui/use-toast"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -49,6 +50,7 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClientComponentClient<Database>()
 
   const [profile, setProfile] = useState({
     fullName: "",

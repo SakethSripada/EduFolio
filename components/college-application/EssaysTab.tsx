@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { calculateWordCount, calculateCharacterCount, validateRequired } from "@/lib/validation"
@@ -73,6 +75,7 @@ export default function EssaysTab() {
   const [collapsedEssays, setCollapsedEssays] = useState<Record<string, boolean>>({})
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Add state for confirmation dialog
   const [confirmDeleteEssay, setConfirmDeleteEssay] = useState<string | null>(null)

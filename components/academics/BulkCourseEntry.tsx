@@ -32,8 +32,10 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ArrowRight, Plus, Trash, Search } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/AuthProvider"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
+import { useToast } from "@/components/ui/use-toast"
 import { 
   GRADE_LEVELS, 
   TERMS, 
@@ -81,7 +83,9 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
   })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
   
   // Filter courses based on search query
   const filteredCourses = useMemo(() => {

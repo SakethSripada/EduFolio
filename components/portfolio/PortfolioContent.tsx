@@ -52,7 +52,10 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError, performDatabaseOperation } from "@/lib/supabase"
+import { handleSupabaseError, performDatabaseOperation } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
+import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -65,7 +68,13 @@ import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
 import { validateRequired } from "@/lib/validation"
 
-export default function PortfolioContent() {
+type PortfolioContentProps = {
+  // ... existing code ...
+}
+
+export const PortfolioContent = ({ 
+  // ... existing code ...
+}: PortfolioContentProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [activeTab, setActiveTab] = useState("all")
@@ -84,6 +93,8 @@ export default function PortfolioContent() {
   const [expiryOption, setExpiryOption] = useState("never")
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
   const { user } = useAuth()
+  const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   const [newProject, setNewProject] = useState({
     title: "",
@@ -165,7 +176,7 @@ export default function PortfolioContent() {
               expires_at: null,
             })
             .select("*")
-            .single();
+            .maybeSingle();
 
           if (insertError) {
             console.error("Error creating share link:", insertError);

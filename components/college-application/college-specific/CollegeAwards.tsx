@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { PlusCircle, Edit, Trash2, Copy, Loader2, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
@@ -48,6 +49,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Initialize with empty values to avoid undefined errors
   const [newAward, setNewAward] = useState<Partial<Award>>({
@@ -124,7 +126,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
           },
         ])
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
       return data

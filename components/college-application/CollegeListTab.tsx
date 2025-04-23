@@ -13,7 +13,9 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PlusCircle, Edit, Trash2, Star, StarOff, Loader2, FileText } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
@@ -62,6 +64,7 @@ export default function CollegeListTab() {
   const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
   const [collegeSearchQuery, setCollegeSearchQuery] = useState("")
   const [selectedColleges, setSelectedColleges] = useState<string[]>([])
 
@@ -400,7 +403,7 @@ export default function CollegeListTab() {
             college:colleges(*)
           `)
           .eq("id", editingCollegeId)
-          .single()
+          .maybeSingle()
 
         if (fetchError) throw fetchError
 

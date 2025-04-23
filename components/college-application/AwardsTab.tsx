@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -54,6 +56,7 @@ export default function AwardsTab() {
   const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Add state for confirmation dialog
   const [confirmDeleteAward, setConfirmDeleteAward] = useState<string | null>(null)

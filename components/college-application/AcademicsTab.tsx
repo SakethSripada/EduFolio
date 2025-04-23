@@ -15,7 +15,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import AIAssistant from "@/components/ai/AIAssistant"
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { isValidGPA, isValidNumber, validateRequired } from "@/lib/validation"
@@ -106,6 +108,7 @@ export default function AcademicsTab() {
   const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Add state for confirmation dialog
   const [confirmDeleteCourse, setConfirmDeleteCourse] = useState<string | null>(null)

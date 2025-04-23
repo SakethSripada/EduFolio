@@ -33,7 +33,7 @@ export default function SharedProfilePage() {
           .select("*")
           .eq("share_id", params.shareId)
           .eq("content_type", "user_profile")
-          .single();
+          .maybeSingle();
           
         if (linkError) {
           console.error("Error fetching shared link:", linkError);
@@ -70,7 +70,7 @@ export default function SharedProfilePage() {
           .from("profiles")
           .select("*")
           .eq("user_id", linkData.user_id)
-          .single();
+          .maybeSingle();
           
         if (profileError) {
           console.error("Error fetching profile:", profileError);

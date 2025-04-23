@@ -7,7 +7,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/components/auth/AuthProvider"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
+import { useToast } from "@/components/ui/use-toast"
 import { Info } from "lucide-react"
 
 type Course = {
@@ -35,6 +38,9 @@ export function UCGPACalculator({ userId }: UCGPACalculatorProps) {
   const [honorPoints, setHonorPoints] = useState(0)
   const [totalGradePoints, setTotalGradePoints] = useState(0)
   const [totalCourses, setTotalCourses] = useState(0)
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Load courses
   useEffect(() => {

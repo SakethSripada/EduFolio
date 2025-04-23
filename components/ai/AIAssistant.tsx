@@ -22,7 +22,8 @@ import { MessageCircle, X, Send, Sparkles, Pencil, Plus, Maximize2, Minimize2, P
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import ReactMarkdown from "react-markdown"
 
 // For client-side usage of API key
@@ -100,6 +101,7 @@ const inputRef = useRef<HTMLInputElement>(null)
 const { toast } = useToast()
 const { user } = useAuth()
 const [profileData, setProfileData] = useState<any>(null)
+const supabase = createClientComponentClient<Database>()
 
 // Start with empty messages, no default welcome message
 const [messages, setMessages] = useState<Message[]>([])
@@ -126,7 +128,7 @@ useEffect(() => {
         .from("profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single()
+        .maybeSingle()
 
       if (profileError) {
         console.error("Error fetching profile:", profileError)

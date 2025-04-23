@@ -18,7 +18,9 @@ import {
   Sparkles 
 } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired, isValidNumber } from "@/lib/validation"
@@ -67,6 +69,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Update the useEffect to use setTimeout for Supabase calls
   useEffect(() => {

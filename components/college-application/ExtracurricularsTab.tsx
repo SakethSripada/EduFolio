@@ -13,7 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PlusCircle, Edit, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2 } from "lucide-react"
 import AIAssistant from "@/components/ai/AIAssistant"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
@@ -77,6 +79,7 @@ export default function ExtracurricularsTab() {
   const [formSubmitted, setFormSubmitted] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   // Add state for confirmation dialog
   const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null)

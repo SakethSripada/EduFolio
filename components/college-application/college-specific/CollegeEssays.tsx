@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
@@ -95,6 +96,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   })
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
   const [aiAssistantType, setAiAssistantType] = useState<AiAssistantType>("brainstorm")
   const [aiPrompt, setAiPrompt] = useState("")
   const [aiEssayContent, setAiEssayContent] = useState("")

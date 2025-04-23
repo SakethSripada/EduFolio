@@ -136,7 +136,7 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
           .from("profiles")
           .select("*")
           .eq("user_id", shareData.user_id)
-          .single()
+          .maybeSingle()
           
         if (profileError || !profileData) {
           setError("User profile not found.")

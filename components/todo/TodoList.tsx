@@ -10,7 +10,9 @@ import { Dialog } from "@/components/ui/dialog"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
@@ -62,6 +64,7 @@ export default function TodoList() {
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
   const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
   const [newTodo, setNewTodo] = useState<Partial<TodoItem>>({
     title: "",

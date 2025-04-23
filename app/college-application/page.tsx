@@ -125,7 +125,7 @@ export default function CollegeApplication() {
             settings: defaultSettings,
           })
           .select("*")
-          .single()
+          .maybeSingle()
 
         if (insertError) {
           console.error("Error creating share link:", insertError)
