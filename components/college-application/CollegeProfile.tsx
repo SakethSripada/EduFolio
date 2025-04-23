@@ -107,17 +107,42 @@ export default function CollegeProfile({
       if (!user) return
 
       try {
-        const { data, error } = await supabase
+        const { data: existingRecords, error } = await supabase
           .from("shared_links")
           .select("*")
           .eq("user_id", user.id)
           .eq("content_type", "college_profile")
           .eq("content_id", collegeId)
-          .maybeSingle()
 
         if (error) throw error
 
-        if (data) {
+        if (existingRecords && existingRecords.length > 0) {
+          // Handle potential duplicates
+          if (existingRecords.length > 1) {
+            console.log(`Found ${existingRecords.length} share links for college profile, cleaning up duplicates...`)
+            
+            // Get the first record's ID to keep
+            const firstRecordId = existingRecords[0].id
+            
+            // Get all other record IDs to delete
+            const idsToDelete = existingRecords.slice(1).map(record => record.id)
+            
+            // Delete duplicate records
+            const { error: deleteError } = await supabase
+              .from("shared_links")
+              .delete()
+              .in("id", idsToDelete)
+              
+            if (deleteError) {
+              console.error("Error deleting duplicate share links:", deleteError)
+            } else {
+              console.log(`Deleted ${idsToDelete.length} duplicate share links`)
+            }
+          }
+          
+          // Use the first record
+          const data = existingRecords[0]
+          
           setExistingShareLink(data)
           setShareLink(generateShareUrl("college_profile", data.share_id, collegeId))
           setIsPublic(data.is_public)

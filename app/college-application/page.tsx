@@ -66,21 +66,48 @@ export default function CollegeApplication() {
       const baseUrl =
         typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : ""
 
-      // Simply check for existing share link without refreshing session
-      const { data, error } = await supabase
+      // Query for existing share links without using maybeSingle to handle multiple records
+      const { data: existingRecords, error } = await supabase
         .from("shared_links")
         .select("*")
         .eq("user_id", user.id)
         .eq("content_type", "college_application")
-        .maybeSingle()
 
       if (error) {
         console.error("Error checking share link:", error)
         return
       }
 
-      if (data) {
-        // Share link record exists – load its data.
+      if (existingRecords && existingRecords.length > 0) {
+        // Share link record exists – handle potential duplicates
+        
+        // If there are multiple records, keep only the first one
+        if (existingRecords.length > 1) {
+          console.log(`Found ${existingRecords.length} share links, cleaning up duplicates...`)
+          
+          // Get the first record's ID to keep
+          const firstRecordId = existingRecords[0].id
+          
+          // Get all other record IDs to delete
+          const idsToDelete = existingRecords.slice(1).map(record => record.id)
+          
+          // Delete duplicate records
+          const { error: deleteError } = await supabase
+            .from("shared_links")
+            .delete()
+            .in("id", idsToDelete)
+            
+          if (deleteError) {
+            console.error("Error deleting duplicate share links:", deleteError)
+          } else {
+            console.log(`Deleted ${idsToDelete.length} duplicate share links`)
+          }
+        }
+        
+        // Use the first record
+        const data = existingRecords[0]
+        
+        // Load its data
         setExistingShareLink(data)
         setShareId(data.share_id)
         setShareLink(`${baseUrl}/share/college-application/${data.share_id}`)
@@ -125,7 +152,7 @@ export default function CollegeApplication() {
             settings: defaultSettings,
           })
           .select("*")
-          .maybeSingle()
+          .single()
 
         if (insertError) {
           console.error("Error creating share link:", insertError)
