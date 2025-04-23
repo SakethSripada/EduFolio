@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter, redirect } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { supabase, handleSupabaseError } from "@/lib/supabase"
+import { handleSupabaseError } from "@/lib/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
@@ -18,8 +18,7 @@ import CollegeAwards from "@/components/college-application/college-specific/Col
 import CollegeEssays from "@/components/college-application/college-specific/CollegeEssays"
 import CollegeTodos from "@/components/college-application/college-specific/CollegeTodos"
 import AIAssistant from "@/components/ai/AIAssistant"
-import { cookies } from "next/headers"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
 
 type College = {
@@ -49,7 +48,7 @@ type UserCollege = {
   notes?: string | null
 }
 
-export default async function CollegeApplicationPage() {
+export default function CollegeApplicationPage() {
   const params = useParams()
   const router = useRouter()
   const collegeId = params.id as string
@@ -60,19 +59,10 @@ export default async function CollegeApplicationPage() {
   const [showAIAssistant, setShowAIAssistant] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
-
-  // Create the server component client
-  const supabase = createServerComponentClient<Database>({ cookies })
-  
-  // Get the authenticated user
-  const { data: { user: serverUser } } = await supabase.auth.getUser()
-  
-  if (!serverUser) {
-    redirect("/login")
-  }
+  const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
-    if (!serverUser || !collegeId) return
+    if (!user || !collegeId) return
 
     const fetchData = async () => {
       setIsLoading(true)
@@ -85,19 +75,27 @@ export default async function CollegeApplicationPage() {
           .maybeSingle()
 
         if (collegeError) throw collegeError
+        
+        console.log('College data:', collegeData, 'College ID:', collegeId)
+
+        if (!collegeData) {
+          throw new Error("College not found")
+        }
 
         // Fetch user's college relationship
         const { data: userCollegeData, error: userCollegeError } = await supabase
           .from("user_colleges")
           .select("*")
-          .eq("user_id", serverUser.id)
+          .eq("user_id", user.id)
           .eq("college_id", collegeId)
           .maybeSingle()
 
+        console.log('User college data:', userCollegeData, 'User ID:', user.id)
+        
         if (userCollegeError && userCollegeError.code !== "PGRST116") throw userCollegeError
 
         setCollege(collegeData)
-        setUserCollege(userCollegeData || null)
+        setUserCollege(userCollegeData)
       } catch (error) {
         console.error("Error fetching college data:", error)
         toast({
@@ -113,7 +111,7 @@ export default async function CollegeApplicationPage() {
     }
 
     fetchData()
-  }, [serverUser, collegeId, router, toast])
+  }, [user, collegeId, router, toast, supabase])
 
   const getStatusBadge = () => {
     if (!userCollege) return null
@@ -166,7 +164,8 @@ export default async function CollegeApplicationPage() {
     )
   }
 
-  if (!college || !userCollege) {
+  if ((!college || !userCollege) && user) {
+    console.log('Not found condition triggered - College:', college, 'UserCollege:', userCollege, 'User:', user)
     return (
       <ProtectedRoute>
         <div className="py-8 px-4 sm:px-6 lg:px-8">
@@ -210,15 +209,15 @@ export default async function CollegeApplicationPage() {
             <CardHeader>
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <CardTitle className="text-2xl">{college.name}</CardTitle>
-                  <CardDescription>{college.location}</CardDescription>
+                  <CardTitle className="text-2xl">{college!.name}</CardTitle>
+                  <CardDescription>{college!.location}</CardDescription>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2">
                     {getStatusBadge()}
-                    {userCollege.application_deadline_display && (
+                    {userCollege!.application_deadline_display && (
                       <span className="text-sm text-muted-foreground">
-                        Deadline: {userCollege.application_deadline_display}
+                        Deadline: {userCollege!.application_deadline_display}
                       </span>
                     )}
                   </div>
@@ -230,30 +229,30 @@ export default async function CollegeApplicationPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">College Type</h3>
-                  <p>{college.type}</p>
+                  <p>{college!.type}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">Size</h3>
-                  <p>{college.size}</p>
+                  <p>{college!.size}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">Acceptance Rate</h3>
-                  <p>{(college.acceptance_rate * 100).toFixed(1)}%</p>
+                  <p>{(college!.acceptance_rate * 100).toFixed(1)}%</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">Ranking</h3>
-                  <p>#{college.ranking}</p>
+                  <p>#{college!.ranking}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">Tuition</h3>
-                  <p>${college.tuition.toLocaleString()}/year</p>
+                  <p>${college!.tuition.toLocaleString()}/year</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">Website</h3>
                   <p>
-                    {college.website_url ? (
+                    {college!.website_url ? (
                       <a
-                        href={college.website_url}
+                        href={college!.website_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline"
@@ -267,12 +266,12 @@ export default async function CollegeApplicationPage() {
                 </div>
               </div>
 
-              {userCollege.notes && (
+              {userCollege!.notes && (
                 <>
                   <Separator className="my-4" />
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">Notes</h3>
-                    <p className="text-sm">{userCollege.notes}</p>
+                    <p className="text-sm">{userCollege!.notes}</p>
                   </div>
                 </>
               )}
@@ -315,10 +314,10 @@ export default async function CollegeApplicationPage() {
                   <CollegeAwards collegeId={collegeId} />
                 </TabsContent>
                 <TabsContent value="essays">
-                  <CollegeEssays collegeId={collegeId} collegeName={college.name} />
+                  <CollegeEssays collegeId={collegeId} collegeName={college!.name} />
                 </TabsContent>
                 <TabsContent value="todos">
-                  <CollegeTodos collegeId={collegeId} collegeName={college.name} />
+                  <CollegeTodos collegeId={collegeId} collegeName={college!.name} />
                 </TabsContent>
               </div>
             </Tabs>
@@ -339,7 +338,7 @@ export default async function CollegeApplicationPage() {
             initialContext={{
               type: "college",
               id: collegeId,
-              title: `${college.name} Application`,
+              title: `${college!.name} Application`,
             }}
             showOnLoad={true}
             onClose={() => setShowAIAssistant(false)}

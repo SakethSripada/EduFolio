@@ -752,7 +752,7 @@ export default function CollegeListTab() {
 
       {/* Add College Dialog */}
       <Dialog open={isAddingCollege} onOpenChange={setIsAddingCollege}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Colleges to Your List</DialogTitle>
           </DialogHeader>
@@ -822,101 +822,11 @@ export default function CollegeListTab() {
                   </div>
                 </div>
               )}
-              
-              {selectedColleges.length === 1 && (
-                <div className="grid gap-4 mt-4 border-t pt-4">
-                  <p className="font-medium">Additional details for {colleges.find(c => c.id === selectedColleges[0])?.name}</p>
-                  
-                  <div className="grid gap-2">
-                    <RequiredLabel htmlFor="singleStatus">Application Status</RequiredLabel>
-                    <Select
-                      value={newUserCollege.application_status}
-                      onValueChange={(value) => setNewUserCollege({ ...newUserCollege, application_status: value })}
-                    >
-                      <SelectTrigger id="singleStatus">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Researching">Researching</SelectItem>
-                        <SelectItem value="Applying">Applying</SelectItem>
-                        <SelectItem value="Applied">Applied</SelectItem>
-                        <SelectItem value="Waitlisted">Waitlisted</SelectItem>
-                        <SelectItem value="Accepted">Accepted</SelectItem>
-                        <SelectItem value="Rejected">Rejected</SelectItem>
-                        <SelectItem value="Committed">Committed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.application_status && <p className="text-xs text-destructive">{formErrors.application_status}</p>}
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="singleDeadline">Application Deadline (Optional)</Label>
-                    <Input
-                      id="singleDeadline"
-                      placeholder="e.g., January 1, 2025"
-                      value={newUserCollege.application_deadline_display || ""}
-                      onChange={(e) => setNewUserCollege({ ...newUserCollege, application_deadline_display: e.target.value })}
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <RequiredLabel htmlFor="single-college-category">College Category</RequiredLabel>
-                    <div className="grid grid-cols-3 gap-4" id="single-college-category">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="singleReach"
-                          checked={newUserCollege.is_reach}
-                          onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_reach: checked })}
-                        />
-                        <Label htmlFor="singleReach">Reach</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="singleTarget"
-                          checked={newUserCollege.is_target}
-                          onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_target: checked })}
-                        />
-                        <Label htmlFor="singleTarget">Target</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="singleSafety"
-                          checked={newUserCollege.is_safety}
-                          onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_safety: checked })}
-                        />
-                        <Label htmlFor="singleSafety">Safety</Label>
-                      </div>
-                    </div>
-                    {formErrors.category && <p className="text-xs text-destructive">{formErrors.category}</p>}
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="singleFavorite"
-                      checked={newUserCollege.is_favorite}
-                      onCheckedChange={(checked) => setNewUserCollege({ ...newUserCollege, is_favorite: checked })}
-                    />
-                    <Label htmlFor="singleFavorite">Add to favorites</Label>
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="singleNotes">Notes (Optional)</Label>
-                    <Textarea
-                      id="singleNotes"
-                      placeholder="Add any notes about this college..."
-                      value={newUserCollege.notes || ""}
-                      onChange={(e) => setNewUserCollege({ ...newUserCollege, notes: e.target.value })}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           <DialogFooter>
             <Button 
-              onClick={selectedColleges.length === 1 
-                ? () => addCollegeToUserList(selectedColleges[0])
-                : addSelectedColleges} 
+              onClick={addSelectedColleges} 
               disabled={selectedColleges.length === 0 || isLoading}
             >
               {isLoading ? (
@@ -934,7 +844,7 @@ export default function CollegeListTab() {
 
       {/* Edit College Dialog */}
       <Dialog open={isEditingCollege} onOpenChange={setIsEditingCollege}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit College Information</DialogTitle>
           </DialogHeader>
