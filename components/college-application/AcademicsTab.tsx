@@ -23,7 +23,6 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { isValidGPA, isValidNumber, validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
 import { BulkCourseEntry } from "@/components/academics/BulkCourseEntry"
-import { UCGPACalculator } from "@/components/academics/UCGPACalculator"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
 import { NumericInput } from "@/components/ui/numeric-input"
@@ -265,7 +264,69 @@ export default function AcademicsTab() {
     let filteredCourses = courses
 
     if (!includeNinthGrade) {
-      filteredCourses = courses.filter((course) => course.grade_level !== "9")
+      // For UC GPA, only include courses from summer after 9th through summer after 11th grade
+      filteredCourses = courses.filter((course) => {
+        // Include 10th and 11th grade courses
+        if (course.grade_level === "10" || course.grade_level === "11") return true;
+        
+        // Include summer courses after 9th grade
+        if (course.grade_level === "9" && course.term.toLowerCase().includes("summer")) return true;
+        
+        // Include summer courses after 11th grade
+        if (course.grade_level === "11" && course.term.toLowerCase().includes("summer")) return true;
+        
+        return false;
+      });
+      
+      // Calculate UC GPA according to the UC guidelines
+      if (weighted) {
+        // Convert grades to points: A=4, B=3, C=2, D=1, F=0 (no +/-)
+        let totalPoints = 0;
+        let totalCourses = 0;
+        let honorPointsTotal = 0;
+        let tenthGradeHonorPoints = 0;
+        
+        filteredCourses.forEach(course => {
+          // Base grade points
+          let gradePoints = 0;
+          switch(course.grade.charAt(0)) {
+            case 'A': gradePoints = 4; break;
+            case 'B': gradePoints = 3; break;
+            case 'C': gradePoints = 2; break;
+            case 'D': gradePoints = 1; break;
+            case 'F': gradePoints = 0; break;
+            default: return; // Skip if grade is not valid
+          }
+          
+          totalPoints += gradePoints;
+          totalCourses++;
+          
+          // Calculate honor points
+          const isHonorsCourse = ["Honors", "AP", "IB", "College"].includes(course.level);
+          const isEligibleForHonorPoint = ['A', 'B', 'C'].includes(course.grade.charAt(0)) && isHonorsCourse;
+          
+          if (isEligibleForHonorPoint) {
+            // Track honor points by grade level
+            if (course.grade_level === "10" || 
+                (course.grade_level === "9" && course.term.toLowerCase().includes("summer"))) {
+              tenthGradeHonorPoints++;
+            }
+            honorPointsTotal++;
+          }
+        });
+        
+        // Apply the 4 honors point maximum for 10th grade
+        const tenthGradeHonorPointsCapped = Math.min(tenthGradeHonorPoints, 4);
+        
+        // Apply the 8 honors point maximum overall
+        const totalHonorPointsCapped = Math.min(honorPointsTotal, 8);
+        
+        // Add capped honor points to total
+        totalPoints += totalHonorPointsCapped;
+        
+        // Calculate final UC GPA
+        return totalCourses > 0 ? totalPoints / totalCourses : 0;
+      }
     }
 
     if (filteredCourses.length === 0) return 0
@@ -856,12 +917,6 @@ export default function AcademicsTab() {
     return formattedText;
   };
 
-  // Calculate UC GPA (needed for format GPA for AI)
-  const calculateUCGPA = (coursesToCalculate: Course[]) => {
-    // This is now handled by the UCGPACalculator component
-    return 0 // Just to maintain compatibility with existing code
-  }
-
   // Format GPA information for AI
   const formatGPAForAI = () => {
     let formattedText = "GPA Information:\n";
@@ -941,7 +996,21 @@ export default function AcademicsTab() {
               <div className="text-xs text-muted-foreground mt-1">Including honors/AP bonus</div>
             </div>
             <div className="bg-card rounded-lg p-4 border shadow-sm">
-              <div className="text-sm text-muted-foreground mb-1">UC GPA</div>
+              <div className="text-sm text-muted-foreground mb-1 flex items-center">
+                UC GPA
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex ml-1">
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Calculated per UC guidelines: A-G courses from 10-11th grade and summer after 9th/11th. Honors points capped at 8 semester courses.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               {isLoading ? (
                 <div className="flex justify-center items-center h-[36px]">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -1589,7 +1658,7 @@ export default function AcademicsTab() {
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Excludes 9th grade, caps at 8 semesters of weighted courses</p>
+                          <p>Calculated per UC guidelines: A-G courses from 10-11th grade and summer after 9th/11th. Honors points capped at 8 semester courses.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1603,7 +1672,7 @@ export default function AcademicsTab() {
                   ) : (
                     <div className="text-3xl font-bold">{calculateGPA(true, false).toFixed(2)}</div>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">10-12th grade only</p>
+                  <p className="text-xs text-muted-foreground mt-1">10-12th grade, weighted</p>
                 </CardContent>
               </Card>
             </div>
@@ -1729,11 +1798,6 @@ export default function AcademicsTab() {
         }}
         userId={user?.id || ""}
       />
-
-      {/* UC GPA Calculator */}
-      <div className="mb-6">
-        <UCGPACalculator userId={user?.id || ""} />
-      </div>
     </div>
   )
 }
