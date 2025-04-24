@@ -94,17 +94,17 @@ export default function SharedCollegeApplicationPage() {
 
         if (profileError) {
           console.error("Profile error:", profileError);
-          setError("User profile not found.")
-          setLoading(false)
-          return
+          // Don't fail completely, just use fallback values
+          console.warn("Using fallback profile data due to error");
         }
 
-        if (!profileData) {
-          console.error("No profile data found");
-          setError("User profile not found.")
-          setLoading(false)
-          return
-        }
+        // Create fallback profile data if not found or error occurred
+        const userProfile = profileData || {
+          full_name: "Student",
+          avatar_url: null,
+          school: "Not specified",
+          grad_year: "Not specified"
+        };
 
         // Fetch the application data.
         const [
@@ -122,6 +122,14 @@ export default function SharedCollegeApplicationPage() {
           supabase.from("essays").select("*").eq("user_id", shareData.user_id),
           supabase.from("user_colleges").select("*").eq("user_id", shareData.user_id),
         ])
+
+        // Check for errors in responses and log them, but continue with empty arrays
+        if (academicsResponse.error) console.error("Error fetching academics:", academicsResponse.error);
+        if (testScoresResponse.error) console.error("Error fetching test scores:", testScoresResponse.error);
+        if (extracurricularActivitiesResponse.error) console.error("Error fetching extracurriculars:", extracurricularActivitiesResponse.error);
+        if (awardsResponse.error) console.error("Error fetching awards:", awardsResponse.error);
+        if (essaysResponse.error) console.error("Error fetching essays:", essaysResponse.error);
+        if (userCollegesResponse.error) console.error("Error fetching user colleges:", userCollegesResponse.error);
 
         // Log responses to debug what's coming back
         console.log("User colleges data:", userCollegesResponse);
@@ -201,23 +209,28 @@ export default function SharedCollegeApplicationPage() {
 
         console.log("Processed colleges data:", collegesData);
 
+        // Prepare the college data.
+        const userColleges = userCollegesResponse.data || [];
+        const collegeList = userColleges.map((userCollege) => {
+          return {
+            id: userCollege.id,
+            collegeName: userCollege.college_name,
+            status: userCollege.status,
+            decision: userCollege.decision,
+          };
+        });
+
+        // Prepare the student data.
         setStudentData({
-          name: profileData.full_name,
-          avatar: profileData.avatar_url,
-          school: profileData.school || "Not specified",
-          gradYear: profileData.grad_year || "Not specified",
-          academics: {
-            courses: academicsResponse.data || [],
-            gpa: {
-              unweighted: unweightedGPA.toFixed(2),
-              weighted: weightedGPA.toFixed(2),
-            },
-            testScores: testScoresResponse.data || [],
-          },
-          extracurriculars: extracurriculars,
+          userProfile,
+          academics: academicsResponse.data || [],
+          testScores: testScoresResponse.data || [],
+          extracurricularActivities: extracurricularActivitiesResponse.data || [],
           awards: awardsResponse.data || [],
           essays: essaysResponse.data || [],
-          colleges: collegesData,
+          colleges: collegesData.length > 0 ? collegesData : (collegeList || []),
+          unweightedGPA: totalCredits > 0 ? unweightedGPA.toFixed(2) : "N/A",
+          weightedGPA: totalCredits > 0 ? weightedGPA.toFixed(2) : "N/A",
         })
       } catch (error) {
         console.error("Error fetching shared college application:", error)
@@ -287,12 +300,12 @@ export default function SharedCollegeApplicationPage() {
         <div className="flex items-center gap-4 mb-6">
           {/* Temporarily disabled avatar in favor of initials */}
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
-            {getUserInitials(studentData.name)}
+            {getUserInitials(studentData.userProfile.full_name)}
           </div>
           <div>
-            <h1 className="text-3xl font-bold">{studentData.name}'s College Application</h1>
+            <h1 className="text-3xl font-bold">{studentData.userProfile.full_name}'s College Application</h1>
             <p className="text-muted-foreground">
-              {studentData.school} • Class of {studentData.gradYear}
+              {studentData.userProfile.school || "School not specified"} • Class of {studentData.userProfile.grad_year || "Year not specified"}
             </p>
           </div>
         </div>
@@ -410,12 +423,12 @@ export default function SharedCollegeApplicationPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg">
                           <span className="text-sm text-muted-foreground mb-1">Unweighted GPA</span>
-                          <span className="text-4xl font-bold">{studentData.academics.gpa.unweighted}</span>
+                          <span className="text-4xl font-bold">{studentData.unweightedGPA}</span>
                           <span className="text-xs text-muted-foreground mt-1">4.0 Scale</span>
                         </div>
                         <div className="flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg">
                           <span className="text-sm text-muted-foreground mb-1">Weighted GPA</span>
-                          <span className="text-4xl font-bold">{studentData.academics.gpa.weighted}</span>
+                          <span className="text-4xl font-bold">{studentData.weightedGPA}</span>
                           <span className="text-xs text-muted-foreground mt-1">5.0 Scale</span>
                         </div>
                       </div>
@@ -440,14 +453,14 @@ export default function SharedCollegeApplicationPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {studentData.academics.courses.length === 0 ? (
+                            {studentData.academics.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                                   No courses added yet
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              studentData.academics.courses.map((course: any) => (
+                              studentData.academics.map((course: any) => (
                                 <TableRow key={course.id}>
                                   <TableCell>{course.name}</TableCell>
                                   <TableCell>{course.grade}</TableCell>
@@ -489,14 +502,14 @@ export default function SharedCollegeApplicationPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {studentData.academics.testScores.length === 0 ? (
+                            {studentData.testScores.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
                                   No test scores added yet
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              studentData.academics.testScores.map((score: any) => (
+                              studentData.testScores.map((score: any) => (
                                 <TableRow key={score.id}>
                                   <TableCell>{score.test_name}</TableCell>
                                   <TableCell>{score.score}</TableCell>
@@ -518,12 +531,12 @@ export default function SharedCollegeApplicationPage() {
                 <div>
                   <h2 className="text-2xl font-semibold mb-4">Extracurricular Activities</h2>
                   <div className="space-y-4">
-                    {studentData.extracurriculars.length === 0 ? (
+                    {studentData.extracurricularActivities.length === 0 ? (
                       <div className="text-center p-8 border rounded-md">
                         <p className="text-muted-foreground">No extracurricular activities added yet</p>
                       </div>
                     ) : (
-                      studentData.extracurriculars.map((activity: any, index: number) => (
+                      studentData.extracurricularActivities.map((activity: any, index: number) => (
                         <Card key={activity.id || index}>
                           <CardHeader>
                             <div className="flex justify-between items-start">
@@ -542,17 +555,17 @@ export default function SharedCollegeApplicationPage() {
                               </div>
                               <div>
                                 <dt className="text-sm font-medium text-muted-foreground">Grade Levels</dt>
-                                <dd>{activity.grade_levels || activity.grades}</dd>
+                                <dd>{activity.grade_levels || activity.grades || "Not specified"}</dd>
                               </div>
                               <div>
                                 <dt className="text-sm font-medium text-muted-foreground">Time Commitment</dt>
                                 <dd>
-                                  {activity.hours_per_week} hrs/week, {activity.weeks_per_year} weeks/year
+                                  {activity.hours_per_week || 0} hrs/week, {activity.weeks_per_year || 0} weeks/year
                                 </dd>
                               </div>
                               <div>
                                 <dt className="text-sm font-medium text-muted-foreground">Timing</dt>
-                                <dd>{activity.participation_timing || activity.timing}</dd>
+                                <dd>{activity.participation_timing || activity.timing || "Not specified"}</dd>
                               </div>
                             </dl>
                           </CardContent>

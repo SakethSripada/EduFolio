@@ -50,3 +50,16 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS grad_year TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS school TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS interests TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS privacy_settings JSONB DEFAULT '{"publicProfile": false, "showEmail": false}'::jsonb;
+
+-- Add policy for public access to profiles referenced by public shared links
+CREATE POLICY IF NOT EXISTS "Anyone can view profiles referenced by public shared links"
+ ON public.profiles
+ FOR SELECT
+ USING (
+   EXISTS (
+     SELECT 1 FROM public.shared_links
+     WHERE shared_links.user_id = profiles.user_id
+     AND shared_links.is_public = true
+     AND (shared_links.expires_at IS NULL OR shared_links.expires_at > NOW())
+   )
+ );
