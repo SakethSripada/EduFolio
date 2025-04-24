@@ -22,6 +22,7 @@ import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type College = {
   id: string
@@ -69,11 +70,11 @@ export default function CollegeListTab() {
   const [selectedColleges, setSelectedColleges] = useState<string[]>([])
   
   // New filter state variables
-  const [acceptanceRateFilter, setAcceptanceRateFilter] = useState<[number, number]>([0, 100])
+  const [acceptanceRateFilter, setAcceptanceRateFilter] = useState<[number | null, number | null]>([0, 100])
   const [typeFilter, setTypeFilter] = useState<string>("All")
-  const [rankingFilter, setRankingFilter] = useState<[number, number]>([1, 300])
+  const [rankingFilter, setRankingFilter] = useState<[number | null, number | null]>([1, 300])
   const [sizeFilter, setSizeFilter] = useState<string>("All")
-  const [tuitionFilter, setTuitionFilter] = useState<[number, number]>([0, 70000])
+  const [tuitionFilter, setTuitionFilter] = useState<[number | null, number | null]>([0, 70000])
   const [regionFilter, setRegionFilter] = useState<string>("All")
   const [showFilters, setShowFilters] = useState(false)
 
@@ -179,8 +180,8 @@ export default function CollegeListTab() {
     // Acceptance rate filter (convert decimal to percentage for comparison)
     const acceptanceRatePercent = college.acceptance_rate * 100;
     const matchesAcceptanceRate = 
-      acceptanceRatePercent >= acceptanceRateFilter[0] && 
-      acceptanceRatePercent <= acceptanceRateFilter[1];
+      (acceptanceRateFilter[0] === null || acceptanceRatePercent >= acceptanceRateFilter[0]) && 
+      (acceptanceRateFilter[1] === null || acceptanceRatePercent <= acceptanceRateFilter[1]);
     
     // Type filter
     const matchesType = typeFilter === "All" || college.type === typeFilter;
@@ -190,13 +191,13 @@ export default function CollegeListTab() {
     
     // Ranking filter
     const matchesRanking = 
-      college.ranking >= rankingFilter[0] && 
-      college.ranking <= rankingFilter[1];
+      (rankingFilter[0] === null || college.ranking >= rankingFilter[0]) && 
+      (rankingFilter[1] === null || college.ranking <= rankingFilter[1]);
       
     // Tuition filter
     const matchesTuition = 
-      college.tuition >= tuitionFilter[0] && 
-      college.tuition <= tuitionFilter[1];
+      (tuitionFilter[0] === null || college.tuition >= tuitionFilter[0]) && 
+      (tuitionFilter[1] === null || college.tuition <= tuitionFilter[1]);
       
     // Region filter
     const matchesRegion = regionFilter === "All" || 
@@ -904,38 +905,30 @@ export default function CollegeListTab() {
                     
                     <div>
                       <Label className="text-sm font-medium mb-1 block">
-                        Acceptance Rate: {acceptanceRateFilter[0]}% - {acceptanceRateFilter[1]}%
+                        Acceptance Rate: {acceptanceRateFilter[0] !== null ? acceptanceRateFilter[0] : 'Any'}% - {acceptanceRateFilter[1] !== null ? acceptanceRateFilter[1] : 'Any'}%
                       </Label>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="min-rate" className="text-xs">Min (%)</Label>
-                          <Input
+                          <NumericInput
                             id="min-rate"
-                            type="number"
                             min={0}
                             max={100}
                             value={acceptanceRateFilter[0]}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (!isNaN(value) && value >= 0 && value <= acceptanceRateFilter[1]) {
-                                setAcceptanceRateFilter([value, acceptanceRateFilter[1]]);
-                              }
+                            onChange={(value) => {
+                              setAcceptanceRateFilter([value, acceptanceRateFilter[1]]);
                             }}
                           />
                         </div>
                         <div>
                           <Label htmlFor="max-rate" className="text-xs">Max (%)</Label>
-                          <Input
+                          <NumericInput
                             id="max-rate"
-                            type="number"
                             min={0}
                             max={100}
                             value={acceptanceRateFilter[1]}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (!isNaN(value) && value >= acceptanceRateFilter[0] && value <= 100) {
-                                setAcceptanceRateFilter([acceptanceRateFilter[0], value]);
-                              }
+                            onChange={(value) => {
+                              setAcceptanceRateFilter([acceptanceRateFilter[0], value]);
                             }}
                           />
                         </div>
@@ -944,38 +937,28 @@ export default function CollegeListTab() {
                     
                     <div>
                       <Label className="text-sm font-medium mb-1 block">
-                        Ranking: {rankingFilter[0]} - {rankingFilter[1]}
+                        Ranking: {rankingFilter[0] !== null ? rankingFilter[0] : 'Any'} - {rankingFilter[1] !== null ? rankingFilter[1] : 'Any'}
                       </Label>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="min-rank" className="text-xs">Min Rank</Label>
-                          <Input
+                          <NumericInput
                             id="min-rank"
-                            type="number"
                             min={1}
-                            max={300}
                             value={rankingFilter[0]}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (!isNaN(value) && value >= 1 && value <= rankingFilter[1]) {
-                                setRankingFilter([value, rankingFilter[1]]);
-                              }
+                            onChange={(value) => {
+                              setRankingFilter([value, rankingFilter[1]]);
                             }}
                           />
                         </div>
                         <div>
                           <Label htmlFor="max-rank" className="text-xs">Max Rank</Label>
-                          <Input
+                          <NumericInput
                             id="max-rank"
-                            type="number"
                             min={1}
-                            max={300}
                             value={rankingFilter[1]}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (!isNaN(value) && value >= rankingFilter[0]) {
-                                setRankingFilter([rankingFilter[0], value]);
-                              }
+                            onChange={(value) => {
+                              setRankingFilter([rankingFilter[0], value]);
                             }}
                           />
                         </div>
@@ -984,38 +967,28 @@ export default function CollegeListTab() {
                     
                     <div>
                       <Label className="text-sm font-medium mb-1 block">
-                        Tuition: ${tuitionFilter[0].toLocaleString()} - ${tuitionFilter[1].toLocaleString()}
+                        Tuition: ${tuitionFilter[0] !== null ? tuitionFilter[0]?.toLocaleString() : 'Any'} - ${tuitionFilter[1] !== null ? tuitionFilter[1]?.toLocaleString() : 'Any'}
                       </Label>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="min-tuition" className="text-xs">Min Tuition ($)</Label>
-                          <Input
+                          <NumericInput
                             id="min-tuition"
-                            type="number"
                             min={0}
-                            max={70000}
                             value={tuitionFilter[0]}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (!isNaN(value) && value >= 0 && value <= tuitionFilter[1]) {
-                                setTuitionFilter([value, tuitionFilter[1]]);
-                              }
+                            onChange={(value) => {
+                              setTuitionFilter([value, tuitionFilter[1]]);
                             }}
                           />
                         </div>
                         <div>
                           <Label htmlFor="max-tuition" className="text-xs">Max Tuition ($)</Label>
-                          <Input
+                          <NumericInput
                             id="max-tuition"
-                            type="number"
                             min={0}
-                            max={70000}
                             value={tuitionFilter[1]}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (!isNaN(value) && value >= tuitionFilter[0]) {
-                                setTuitionFilter([tuitionFilter[0], value]);
-                              }
+                            onChange={(value) => {
+                              setTuitionFilter([tuitionFilter[0], value]);
                             }}
                           />
                         </div>

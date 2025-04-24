@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import AIAssistant from "@/components/ai/AIAssistant"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type Essay = {
   id: string
@@ -921,11 +922,11 @@ export default function EssaysTab() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
-                  <Input
+                  <NumericInput
                     id="targetWordCount"
-                    type="number"
-                    value={newEssay.target_word_count}
-                    onChange={(e) => setNewEssay({ ...newEssay, target_word_count: e.target.value })}
+                    min={0}
+                    value={newEssay.target_word_count === "" ? null : parseFloat(newEssay.target_word_count)}
+                    onChange={(value) => setNewEssay({ ...newEssay, target_word_count: value === null ? "" : value.toString() })}
                     placeholder="e.g., 650"
                   />
                   {formErrors.target_word_count && <p className="text-xs text-destructive">{formErrors.target_word_count}</p>}

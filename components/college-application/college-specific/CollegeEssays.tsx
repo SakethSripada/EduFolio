@@ -20,6 +20,7 @@ import AIAssistant from "@/components/ai/AIAssistant"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { debounce } from "@/lib/utils"
 import { useRef } from "react"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type AiAssistantType = "brainstorm" | "outline" | "feedback" | "grammar" | "improve"
 
@@ -966,13 +967,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
             </div>
             <div className="grid gap-2">
               <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
-              <Input
+              <NumericInput
                 id="targetWordCount"
-                type="number"
-                value={newEssay.target_word_count || ""}
-                onChange={(e) =>
-                  setNewEssay({ ...newEssay, target_word_count: e.target.value ? Number(e.target.value) : null })
-                }
+                min={0}
+                value={typeof newEssay.target_word_count === 'number' ? newEssay.target_word_count : null}
+                onChange={(value) => setNewEssay({ ...newEssay, target_word_count: value })}
               />
             </div>
             <div className="grid gap-2">
@@ -1074,11 +1073,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
             </div>
             <div className="grid gap-2">
               <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
-              <Input
+              <NumericInput
                 id="targetWordCount"
-                type="number"
-                value={newEssay.target_word_count || ""}
-                onChange={(e) => setNewEssay({ ...newEssay, target_word_count: Number(e.target.value) || null })}
+                min={0}
+                value={typeof newEssay.target_word_count === 'number' ? newEssay.target_word_count : null}
+                onChange={(value) => setNewEssay({ ...newEssay, target_word_count: value })}
               />
             </div>
             <div className="grid gap-2">
