@@ -2,6 +2,16 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export type ShareLinkType = "college_application" | "college_profile" | "portfolio"
 
+export interface ShareSettings {
+  showExtracurriculars?: boolean
+  showAcademics?: boolean
+  showAwards?: boolean
+  showEssays?: boolean
+  showCourses?: boolean
+  showTestScores?: boolean
+  showColleges?: boolean
+}
+
 export interface ShareLinkData {
   id?: string
   user_id: string
@@ -9,6 +19,7 @@ export interface ShareLinkData {
   content_type: ShareLinkType
   content_id?: string
   is_public: boolean
+  settings?: ShareSettings | null
   expires_at?: string | null
   created_at?: string
   updated_at?: string
@@ -24,14 +35,16 @@ export async function createOrUpdateShareLink({
   isPublic,
   expiresAt,
   existingShareId,
+  settings,
 }: {
   userId: string
   contentType: ShareLinkType
-  contentId?: string
+  contentId?: string | null
   isPublic: boolean
   expiresAt?: Date | null
   existingShareId?: string
-}): Promise<{ success: boolean; shareId: string; error?: any }> {
+  settings?: ShareSettings
+}): Promise<{ success: boolean; shareId: string; shareLink?: string; error?: any }> {
   const supabase = createClientComponentClient()
 
   try {
@@ -57,12 +70,14 @@ export async function createOrUpdateShareLink({
           is_public: isPublic,
           expires_at: expiresAt ? expiresAt.toISOString() : null,
           updated_at: new Date().toISOString(),
+          settings: settings || {},
         })
         .eq("id", existingLink.id)
 
       if (updateError) throw updateError
 
-      return { success: true, shareId }
+      const shareLink = generateShareUrl(contentType, shareId, contentId as string | undefined)
+      return { success: true, shareId, shareLink }
     } else {
       // Create new share link
       const { error: insertError } = await supabase.from("shared_links").insert({
@@ -71,12 +86,14 @@ export async function createOrUpdateShareLink({
         content_type: contentType,
         content_id: contentId,
         is_public: isPublic,
+        settings: settings || {},
         expires_at: expiresAt ? expiresAt.toISOString() : null,
       })
 
       if (insertError) throw insertError
 
-      return { success: true, shareId }
+      const shareLink = generateShareUrl(contentType, shareId, contentId as string | undefined)
+      return { success: true, shareId, shareLink }
     }
   } catch (error) {
     console.error("Error creating/updating share link:", error)

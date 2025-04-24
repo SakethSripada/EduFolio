@@ -26,6 +26,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired, isValidNumber } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
 import AIAssistant from "@/components/ai/AIAssistant"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type CollegeAcademicsProps = {
   collegeId: string
@@ -686,14 +687,12 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="credits">Credits</Label>
-              <Input
+              <NumericInput
                 id="credits"
-                type="number"
-                min="0.5"
-                max="2"
-                step="0.5"
-                value={newCourse.credits || 1}
-                onChange={(e) => setNewCourse({ ...newCourse, credits: Number.parseFloat(e.target.value) })}
+                min={0.5}
+                max={10}
+                value={typeof newCourse.credits === 'number' ? newCourse.credits : null}
+                onChange={(value) => setNewCourse({ ...newCourse, credits: value === null ? 1 : value })}
               />
               {formErrors.credits && <p className="text-sm text-red-500">{formErrors.credits}</p>}
             </div>
@@ -861,14 +860,12 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="credits">Credits</Label>
-              <Input
+              <NumericInput
                 id="credits"
-                type="number"
-                min="0.5"
-                max="2"
-                step="0.5"
-                value={newCourse.credits || 1}
-                onChange={(e) => setNewCourse({ ...newCourse, credits: Number.parseFloat(e.target.value) })}
+                min={0.5}
+                max={10}
+                value={typeof newCourse.credits === 'number' ? newCourse.credits : null}
+                onChange={(value) => setNewCourse({ ...newCourse, credits: value === null ? 1 : value })}
               />
               {formErrors.credits && <p className="text-sm text-red-500">{formErrors.credits}</p>}
             </div>

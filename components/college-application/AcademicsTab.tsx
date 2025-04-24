@@ -26,6 +26,7 @@ import { BulkCourseEntry } from "@/components/academics/BulkCourseEntry"
 import { UCGPACalculator } from "@/components/academics/UCGPACalculator"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type Course = {
   id: string
@@ -1126,21 +1127,19 @@ export default function AcademicsTab() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <RequiredLabel htmlFor="score">Score</RequiredLabel>
-                      <Input
+                      <NumericInput
                         id="score"
-                        type="number"
-                        value={newTestScore.score}
-                        onChange={(e) => setNewTestScore({ ...newTestScore, score: e.target.value })}
+                        value={newTestScore.score === "" ? null : parseFloat(newTestScore.score)}
+                        onChange={(value) => setNewTestScore({ ...newTestScore, score: value === null ? "" : value.toString() })}
                       />
                       {formErrors.score && <p className="text-xs text-destructive">{formErrors.score}</p>}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="maxScore">Max Possible Score (Optional)</Label>
-                      <Input
+                      <NumericInput
                         id="maxScore"
-                        type="number"
-                        value={newTestScore.max_score}
-                        onChange={(e) => setNewTestScore({ ...newTestScore, max_score: e.target.value })}
+                        value={newTestScore.max_score === "" ? null : parseFloat(newTestScore.max_score)}
+                        onChange={(value) => setNewTestScore({ ...newTestScore, max_score: value === null ? "" : value.toString() })}
                       />
                       {formErrors.max_score && <p className="text-xs text-destructive">{formErrors.max_score}</p>}
                     </div>
@@ -1266,21 +1265,19 @@ export default function AcademicsTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <RequiredLabel htmlFor="editScore">Score</RequiredLabel>
-                <Input
+                <NumericInput
                   id="editScore"
-                  type="number"
-                  value={editingTestScore.score}
-                  onChange={(e) => setEditingTestScore({ ...editingTestScore, score: e.target.value })}
+                  value={editingTestScore.score === "" ? null : parseFloat(editingTestScore.score)}
+                  onChange={(value) => setEditingTestScore({ ...editingTestScore, score: value === null ? "" : value.toString() })}
                 />
                 {formErrors.score && <p className="text-sm text-red-500">{formErrors.score}</p>}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="editMaxScore">Max Possible Score (Optional)</Label>
-                <Input
+                <NumericInput
                   id="editMaxScore"
-                  type="number"
-                  value={editingTestScore.max_score}
-                  onChange={(e) => setEditingTestScore({ ...editingTestScore, max_score: e.target.value })}
+                  value={editingTestScore.max_score === "" ? null : parseFloat(editingTestScore.max_score)}
+                  onChange={(value) => setEditingTestScore({ ...editingTestScore, max_score: value === null ? "" : value.toString() })}
                 />
                 {formErrors.max_score && <p className="text-sm text-red-500">{formErrors.max_score}</p>}
               </div>
@@ -1442,13 +1439,11 @@ export default function AcademicsTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <RequiredLabel htmlFor="credits">Credits</RequiredLabel>
-                <Input
+                <NumericInput
                   id="credits"
-                  type="number"
-                  value={newCourse.credits || 1}
-                  onChange={(e) =>
-                    setNewCourse({ ...newCourse, credits: Number(e.target.value) || 0 })
-                  }
+                  min={0}
+                  value={typeof newCourse.credits === 'number' ? newCourse.credits : null}
+                  onChange={(value) => setNewCourse({ ...newCourse, credits: value === null ? undefined : value })}
                 />
                 {formErrors.credits && <p className="text-xs text-destructive">{formErrors.credits}</p>}
               </div>
@@ -1500,63 +1495,39 @@ export default function AcademicsTab() {
 
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="unweighted">Unweighted GPA</Label>
-                <Input
-                  id="unweighted"
-                  type="number"
-                  min="0"
-                  max="4.0"
-                  step="0.01"
-                  value={manualGPA.unweighted.toString()}
-                  onChange={(e) => {
-                    const value = e.target.value === "" ? 0 : Number.parseFloat(e.target.value)
-                    setManualGPA({
-                      ...manualGPA,
-                      unweighted: isNaN(value) ? 0 : Math.min(4.0, Math.max(0, value)),
-                    })
-                  }}
+                <RequiredLabel htmlFor="unweightedGPA">Unweighted GPA</RequiredLabel>
+                <NumericInput
+                  id="unweightedGPA"
+                  min={0}
+                  max={4.0}
+                  value={manualGPA.unweighted}
+                  onChange={(value) => setManualGPA({ ...manualGPA, unweighted: value === null ? 0 : value })}
                 />
-                {formErrors.unweighted && <p className="text-sm text-red-500">{formErrors.unweighted}</p>}
+                {formErrors.unweighted && <p className="text-xs text-destructive">{formErrors.unweighted}</p>}
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="weighted">Weighted GPA</Label>
-                <Input
-                  id="weighted"
-                  type="number"
-                  min="0"
-                  max="5.0"
-                  step="0.01"
-                  value={manualGPA.weighted.toString()}
-                  onChange={(e) => {
-                    const value = e.target.value === "" ? 0 : Number.parseFloat(e.target.value)
-                    setManualGPA({
-                      ...manualGPA,
-                      weighted: isNaN(value) ? 0 : Math.min(5.0, Math.max(0, value)),
-                    })
-                  }}
+                <RequiredLabel htmlFor="weightedGPA">Weighted GPA</RequiredLabel>
+                <NumericInput
+                  id="weightedGPA"
+                  min={0}
+                  max={5.0}
+                  value={manualGPA.weighted}
+                  onChange={(value) => setManualGPA({ ...manualGPA, weighted: value === null ? 0 : value })}
                 />
-                {formErrors.weighted && <p className="text-sm text-red-500">{formErrors.weighted}</p>}
+                {formErrors.weighted && <p className="text-xs text-destructive">{formErrors.weighted}</p>}
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="ucGPA">UC GPA (10-12th grade)</Label>
-                <Input
+                <RequiredLabel htmlFor="ucGPA">UC GPA</RequiredLabel>
+                <NumericInput
                   id="ucGPA"
-                  type="number"
-                  min="0"
-                  max="5.0"
-                  step="0.01"
-                  value={manualGPA.uc_gpa.toString()}
-                  onChange={(e) => {
-                    const value = e.target.value === "" ? 0 : Number.parseFloat(e.target.value)
-                    setManualGPA({
-                      ...manualGPA,
-                      uc_gpa: isNaN(value) ? 0 : Math.min(5.0, Math.max(0, value)),
-                    })
-                  }}
+                  min={0}
+                  max={5.0}
+                  value={manualGPA.uc_gpa}
+                  onChange={(value) => setManualGPA({ ...manualGPA, uc_gpa: value === null ? 0 : value })}
                 />
-                {formErrors.uc_gpa && <p className="text-sm text-red-500">{formErrors.uc_gpa}</p>}
+                {formErrors.uc_gpa && <p className="text-xs text-destructive">{formErrors.uc_gpa}</p>}
               </div>
             </div>
           </div>

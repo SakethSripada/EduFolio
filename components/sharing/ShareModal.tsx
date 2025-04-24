@@ -55,34 +55,14 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
     if (open && user) {
       setIsLoading(true)
       
-      const initializeSharing = async () => {
-        // First, ensure the shared_links table exists
-        const { success, error } = await ensureSharedLinksTable();
-        
-        if (!success) {
-          console.error("Failed to ensure shared_links table:", error);
-          toast({
-            title: "Database setup required",
-            description: "The sharing feature requires database setup. Please contact an administrator.",
-            variant: "destructive",
-          });
-          setIsLoading(false);
-          return;
-        }
-        
-        // Now fetch the share link data
-        fetchShareLink();
-      };
-      
-      const fetchShareLink = async () => {
+      const fetchShareLinkData = async () => {
         try {        
-          const { data, error } = await supabase
+          const { data: existingRecords, error } = await supabase
             .from("shared_links")
             .select("*")
             .eq("user_id", user.id)
             .eq("content_type", contentType)
-            .eq("content_id", contentId || null)
-            .maybeSingle()
+            .eq("content_id", contentId || null);
 
           if (error) {
             console.error("Error fetching share link data:", error.message || error);
@@ -95,29 +75,55 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
             return;
           }
 
-          if (data) {
+          if (existingRecords && existingRecords.length > 0) {
+            // Handle potential duplicates
+            if (existingRecords.length > 1) {
+              console.log(`Found ${existingRecords.length} share links in modal, cleaning up duplicates...`);
+              
+              // Get the first record's ID to keep
+              const firstRecordId = existingRecords[0].id;
+              
+              // Get all other record IDs to delete
+              const idsToDelete = existingRecords.slice(1).map(record => record.id);
+              
+              // Delete duplicate records
+              const { error: deleteError } = await supabase
+                .from("shared_links")
+                .delete()
+                .in("id", idsToDelete);
+                
+              if (deleteError) {
+                console.error("Error deleting duplicate share links:", deleteError);
+              } else {
+                console.log(`Deleted ${idsToDelete.length} duplicate share links from modal`);
+              }
+            }
+            
+            // Use the first record
+            const data = existingRecords[0];
+            
             // Existing share link found
-            setIsPublic(data.is_public)
+            setIsPublic(data.is_public);
             
             // Set settings
             if (data.settings) {
-              setSettings(data.settings as ShareSettings)
+              setSettings(data.settings as ShareSettings);
             }
             
             // Set expiry
             if (data.expires_at) {
-              setExpiryOption("date")
-              setExpiryDate(new Date(data.expires_at))
+              setExpiryOption("date");
+              setExpiryDate(new Date(data.expires_at));
             } else {
-              setExpiryOption("never")
-              setExpiryDate(undefined)
+              setExpiryOption("never");
+              setExpiryDate(undefined);
             }
             
             // Generate share URL
             setShareLink(generateShareUrl(contentType, data.share_id, contentId));
           } else {
             // No existing share link, use defaults
-            setIsPublic(true)
+            setIsPublic(true);
             setSettings({
               showExtracurriculars: true,
               showAcademics: true,
@@ -125,26 +131,21 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
               showEssays: true,
               showCourses: true,
               showTestScores: true,
-            })
-            setExpiryOption("never")
-            setExpiryDate(undefined)
-            setShareLink("")
+            });
+            setExpiryOption("never");
+            setExpiryDate(undefined);
+            setShareLink("");
           }
           setIsLoading(false);
-        } catch (error: any) {
-          console.error("Error fetching share link:", error.message || error);
-          toast({
-            title: "Error",
-            description: `Failed to fetch share link: ${error.message || 'Unknown error'}`,
-            variant: "destructive",
-          });
+        } catch (error) {
+          console.error("Error in fetchShareLinkData:", error);
           setIsLoading(false);
         }
-      }
-      
-      initializeSharing();
+      };
+
+      fetchShareLinkData();
     }
-  }, [open, user, contentType, contentId, supabase, toast])
+  }, [open, user, contentType, contentId, toast, supabase])
 
   // Create or update share link
   const handleCreateShareLink = async () => {
@@ -159,18 +160,12 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
 
     setIsLoading(true);
     try {
-      // First, ensure the shared_links table exists
-      const { success, error: migrationError } = await ensureSharedLinksTable();
-      
-      if (!success) {
-        console.error("Failed to ensure shared_links table:", migrationError);
-        toast({
-          title: "Database setup required",
-          description: "The sharing feature requires database setup. Please contact an administrator.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
+      // Check if we need to ensure the shared_links table exists
+      try {
+        await ensureSharedLinksTable();
+      } catch (err) {
+        console.error("Table setup error:", err);
+        // Continue anyway, as table might already exist
       }
       
       // Calculate expiry date if needed
@@ -200,8 +195,12 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
         return;
       }
 
-      // Update the share link
-      setShareLink(response.shareLink);
+      // Update the share link if it was returned, or generate it if not
+      if (response.shareLink) {
+        setShareLink(response.shareLink);
+      } else {
+        setShareLink(generateShareUrl(contentType, response.shareId, contentId));
+      }
 
       toast({
         title: "Share link updated",
@@ -209,7 +208,8 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
       });
       
       // Copy to clipboard automatically
-      navigator.clipboard.writeText(response.shareLink)
+      const linkToCopy = response.shareLink || shareLink;
+      navigator.clipboard.writeText(linkToCopy)
         .then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);

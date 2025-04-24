@@ -22,6 +22,7 @@ import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type College = {
   id: string
@@ -67,6 +68,15 @@ export default function CollegeListTab() {
   const supabase = createClientComponentClient<Database>()
   const [collegeSearchQuery, setCollegeSearchQuery] = useState("")
   const [selectedColleges, setSelectedColleges] = useState<string[]>([])
+  
+  // New filter state variables
+  const [acceptanceRateFilter, setAcceptanceRateFilter] = useState<[number | null, number | null]>([0, 100])
+  const [typeFilter, setTypeFilter] = useState<string>("All")
+  const [rankingFilter, setRankingFilter] = useState<[number | null, number | null]>([1, 300])
+  const [sizeFilter, setSizeFilter] = useState<string>("All")
+  const [tuitionFilter, setTuitionFilter] = useState<[number | null, number | null]>([0, 70000])
+  const [regionFilter, setRegionFilter] = useState<string>("All")
+  const [showFilters, setShowFilters] = useState(false)
 
   const [newUserCollege, setNewUserCollege] = useState({
     college_id: "",
@@ -81,6 +91,15 @@ export default function CollegeListTab() {
 
   // Add state for confirmation dialog
   const [confirmDeleteCollege, setConfirmDeleteCollege] = useState<string | null>(null)
+
+  // Define regions with their states
+  const regions = {
+    "All": [],
+    "Northeast": ["ME", "NH", "VT", "MA", "RI", "CT", "NY", "NJ", "PA"],
+    "Midwest": ["OH", "MI", "IN", "IL", "WI", "MN", "IA", "MO", "ND", "SD", "NE", "KS"],
+    "South": ["DE", "MD", "DC", "VA", "WV", "NC", "SC", "GA", "FL", "KY", "TN", "AL", "MS", "AR", "LA", "OK", "TX"],
+    "West": ["MT", "ID", "WY", "CO", "NM", "AZ", "UT", "NV", "WA", "OR", "CA", "AK", "HI"]
+  };
 
   useEffect(() => {
     if (!user) return
@@ -151,13 +170,42 @@ export default function CollegeListTab() {
     return Object.keys(errors).length === 0
   }
 
-  // Filter colleges based on search query for the add college dialog
+  // Filter colleges based on all criteria
   const filteredCollegesForSelection = colleges.filter((college) => {
-    if (!collegeSearchQuery) return true;
-    return (
+    // Text search filter
+    const matchesText = !collegeSearchQuery || 
       college.name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
-      college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase())
-    );
+      college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase());
+      
+    // Acceptance rate filter (convert decimal to percentage for comparison)
+    const acceptanceRatePercent = college.acceptance_rate * 100;
+    const matchesAcceptanceRate = 
+      (acceptanceRateFilter[0] === null || acceptanceRatePercent >= acceptanceRateFilter[0]) && 
+      (acceptanceRateFilter[1] === null || acceptanceRatePercent <= acceptanceRateFilter[1]);
+    
+    // Type filter
+    const matchesType = typeFilter === "All" || college.type === typeFilter;
+    
+    // Size filter
+    const matchesSize = sizeFilter === "All" || college.size === sizeFilter;
+    
+    // Ranking filter
+    const matchesRanking = 
+      (rankingFilter[0] === null || college.ranking >= rankingFilter[0]) && 
+      (rankingFilter[1] === null || college.ranking <= rankingFilter[1]);
+      
+    // Tuition filter
+    const matchesTuition = 
+      (tuitionFilter[0] === null || college.tuition >= tuitionFilter[0]) && 
+      (tuitionFilter[1] === null || college.tuition <= tuitionFilter[1]);
+      
+    // Region filter
+    const matchesRegion = regionFilter === "All" || 
+      (regions[regionFilter as keyof typeof regions] as string[]).some(state => 
+        college.location.endsWith(`, ${state}`)
+      );
+    
+    return matchesText && matchesAcceptanceRate && matchesType && matchesSize && matchesRanking && matchesTuition && matchesRegion;
   });
 
   // Toggle selection of a college
@@ -606,6 +654,17 @@ export default function CollegeListTab() {
     }
   }
 
+  // Reset all filters to default values
+  const resetAllFilters = () => {
+    setCollegeSearchQuery("");
+    setAcceptanceRateFilter([0, 100]);
+    setTypeFilter("All");
+    setRankingFilter([1, 300]);
+    setSizeFilter("All");
+    setTuitionFilter([0, 70000]);
+    setRegionFilter("All");
+  };
+
   if (isLoading && userColleges.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -770,6 +829,186 @@ export default function CollegeListTab() {
                 className="mb-2"
               />
               
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(prev => !prev)}
+                  className="mb-2"
+                >
+                  {showFilters ? "Hide Filters" : "Show Filters"}
+                </Button>
+                
+                {showFilters && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetAllFilters}
+                    className="mb-2"
+                  >
+                    Reset Filters
+                  </Button>
+                )}
+              </div>
+              
+              {showFilters && (
+                <div className="border rounded-md p-4 mb-4 bg-muted/30">
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="type-filter" className="text-sm font-medium mb-1 block">Institution Type</Label>
+                        <Select value={typeFilter} onValueChange={setTypeFilter}>
+                          <SelectTrigger id="type-filter">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="All">All Types</SelectItem>
+                            <SelectItem value="Public">Public</SelectItem>
+                            <SelectItem value="Private">Private</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="size-filter" className="text-sm font-medium mb-1 block">Institution Size</Label>
+                        <Select value={sizeFilter} onValueChange={setSizeFilter}>
+                          <SelectTrigger id="size-filter">
+                            <SelectValue placeholder="Select size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="All">All Sizes</SelectItem>
+                            <SelectItem value="Small">Small</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="Large">Large</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="region-filter" className="text-sm font-medium mb-1 block">Region</Label>
+                      <Select value={regionFilter} onValueChange={setRegionFilter}>
+                        <SelectTrigger id="region-filter">
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">All Regions</SelectItem>
+                          <SelectItem value="Northeast">Northeast</SelectItem>
+                          <SelectItem value="Midwest">Midwest</SelectItem>
+                          <SelectItem value="South">South</SelectItem>
+                          <SelectItem value="West">West</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium mb-1 block">
+                        Acceptance Rate: {acceptanceRateFilter[0] !== null ? acceptanceRateFilter[0] : 'Any'}% - {acceptanceRateFilter[1] !== null ? acceptanceRateFilter[1] : 'Any'}%
+                      </Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="min-rate" className="text-xs">Min (%)</Label>
+                          <NumericInput
+                            id="min-rate"
+                            min={0}
+                            max={100}
+                            value={acceptanceRateFilter[0]}
+                            onChange={(value) => {
+                              setAcceptanceRateFilter([value, acceptanceRateFilter[1]]);
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="max-rate" className="text-xs">Max (%)</Label>
+                          <NumericInput
+                            id="max-rate"
+                            min={0}
+                            max={100}
+                            value={acceptanceRateFilter[1]}
+                            onChange={(value) => {
+                              setAcceptanceRateFilter([acceptanceRateFilter[0], value]);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium mb-1 block">
+                        Ranking: {rankingFilter[0] !== null ? rankingFilter[0] : 'Any'} - {rankingFilter[1] !== null ? rankingFilter[1] : 'Any'}
+                      </Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="min-rank" className="text-xs">Min Rank</Label>
+                          <NumericInput
+                            id="min-rank"
+                            min={1}
+                            value={rankingFilter[0]}
+                            onChange={(value) => {
+                              setRankingFilter([value, rankingFilter[1]]);
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="max-rank" className="text-xs">Max Rank</Label>
+                          <NumericInput
+                            id="max-rank"
+                            min={1}
+                            value={rankingFilter[1]}
+                            onChange={(value) => {
+                              setRankingFilter([rankingFilter[0], value]);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium mb-1 block">
+                        Tuition: ${tuitionFilter[0] !== null ? tuitionFilter[0]?.toLocaleString() : 'Any'} - ${tuitionFilter[1] !== null ? tuitionFilter[1]?.toLocaleString() : 'Any'}
+                      </Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="min-tuition" className="text-xs">Min Tuition ($)</Label>
+                          <NumericInput
+                            id="min-tuition"
+                            min={0}
+                            value={tuitionFilter[0]}
+                            onChange={(value) => {
+                              setTuitionFilter([value, tuitionFilter[1]]);
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="max-tuition" className="text-xs">Max Tuition ($)</Label>
+                          <NumericInput
+                            id="max-tuition"
+                            min={0}
+                            value={tuitionFilter[1]}
+                            onChange={(value) => {
+                              setTuitionFilter([tuitionFilter[0], value]);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm text-muted-foreground">
+                  Showing {filteredCollegesForSelection.length} of {colleges.length} colleges
+                </p>
+                {filteredCollegesForSelection.length > 0 && selectedColleges.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedColleges.length} college{selectedColleges.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
+              </div>
+              
               <div className="border rounded-md max-h-[300px] overflow-y-auto">
                 <Table>
                   <TableHeader>
@@ -777,7 +1016,11 @@ export default function CollegeListTab() {
                       <TableHead className="w-[50px]"></TableHead>
                       <TableHead>College</TableHead>
                       <TableHead>Location</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Size</TableHead>
                       <TableHead>Acceptance Rate</TableHead>
+                      <TableHead>Rank</TableHead>
+                      <TableHead>Tuition ($)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -799,9 +1042,20 @@ export default function CollegeListTab() {
                         </TableCell>
                         <TableCell>{college.name}</TableCell>
                         <TableCell>{college.location}</TableCell>
+                        <TableCell>{college.type}</TableCell>
+                        <TableCell>{college.size}</TableCell>
                         <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
+                        <TableCell>{college.ranking}</TableCell>
+                        <TableCell>${college.tuition.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
+                    {filteredCollegesForSelection.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-4">
+                          No colleges match your filters. Try adjusting your search criteria.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>

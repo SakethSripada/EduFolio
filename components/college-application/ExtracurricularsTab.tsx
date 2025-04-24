@@ -22,6 +22,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type Activity = {
   id: string
@@ -556,21 +557,23 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                     </div>
                     <div className="grid gap-2">
                       <RequiredLabel htmlFor="hoursPerWeek">Hours Spent Per Week</RequiredLabel>
-                      <Input
+                      <NumericInput
                         id="hoursPerWeek"
-                        type="number"
-                        value={newActivity.hours_per_week}
-                        onChange={(e) => setNewActivity({ ...newActivity, hours_per_week: e.target.value })}
+                        min={0}
+                        max={168}
+                        value={newActivity.hours_per_week === "" ? null : parseFloat(newActivity.hours_per_week)}
+                        onChange={(value) => setNewActivity({ ...newActivity, hours_per_week: value === null ? "" : value.toString() })}
                       />
                       {formErrors.hours_per_week && <p className="text-sm text-red-500">{formErrors.hours_per_week}</p>}
                     </div>
                     <div className="grid gap-2">
                       <RequiredLabel htmlFor="weeksPerYear">Weeks Spent Per Year</RequiredLabel>
-                      <Input
+                      <NumericInput
                         id="weeksPerYear"
-                        type="number"
-                        value={newActivity.weeks_per_year}
-                        onChange={(e) => setNewActivity({ ...newActivity, weeks_per_year: e.target.value })}
+                        min={0}
+                        max={52}
+                        value={newActivity.weeks_per_year === "" ? null : parseFloat(newActivity.weeks_per_year)}
+                        onChange={(value) => setNewActivity({ ...newActivity, weeks_per_year: value === null ? "" : value.toString() })}
                       />
                       {formErrors.weeks_per_year && <p className="text-sm text-red-500">{formErrors.weeks_per_year}</p>}
                     </div>
@@ -727,21 +730,23 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="editHoursPerWeek">Hours Spent Per Week</Label>
-                      <Input
+                      <NumericInput
                         id="editHoursPerWeek"
-                        type="number"
-                        value={editingActivity.hours_per_week}
-                        onChange={(e) => setEditingActivity({ ...editingActivity, hours_per_week: e.target.value })}
+                        min={0}
+                        max={168}
+                        value={editingActivity.hours_per_week === "" ? null : parseFloat(editingActivity.hours_per_week)}
+                        onChange={(value) => setEditingActivity({ ...editingActivity, hours_per_week: value === null ? "" : value.toString() })}
                       />
                       {formErrors.hours_per_week && <p className="text-sm text-red-500">{formErrors.hours_per_week}</p>}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="editWeeksPerYear">Weeks Spent Per Year</Label>
-                      <Input
+                      <NumericInput
                         id="editWeeksPerYear"
-                        type="number"
-                        value={editingActivity.weeks_per_year}
-                        onChange={(e) => setEditingActivity({ ...editingActivity, weeks_per_year: e.target.value })}
+                        min={0}
+                        max={52}
+                        value={editingActivity.weeks_per_year === "" ? null : parseFloat(editingActivity.weeks_per_year)}
+                        onChange={(value) => setEditingActivity({ ...editingActivity, weeks_per_year: value === null ? "" : value.toString() })}
                       />
                       {formErrors.weeks_per_year && <p className="text-sm text-red-500">{formErrors.weeks_per_year}</p>}
                     </div>

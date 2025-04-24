@@ -32,6 +32,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
 import { performDatabaseOperation } from "@/lib/utils"
 import AIAssistant from "@/components/ai/AIAssistant"
+import { NumericInput } from "@/components/ui/numeric-input"
 
 type CollegeExtracurricularsProps = {
   collegeId: string
@@ -690,21 +691,23 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="hours">Hours Spent Per Week</Label>
-                <Input
+                <NumericInput
                   id="hours"
-                  type="number"
-                  value={newActivity.hours_per_week}
-                  onChange={(e) => setNewActivity({ ...newActivity, hours_per_week: Number(e.target.value) })}
+                  min={0}
+                  max={168}
+                  value={typeof newActivity.hours_per_week === 'number' ? newActivity.hours_per_week : null}
+                  onChange={(value) => setNewActivity({ ...newActivity, hours_per_week: value === null ? 0 : value })}
                 />
                 {formErrors.hours_per_week && <p className="text-sm text-red-500">{formErrors.hours_per_week}</p>}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="weeks">Weeks Spent Per Year</Label>
-                <Input
+                <NumericInput
                   id="weeks"
-                  type="number"
-                  value={newActivity.weeks_per_year}
-                  onChange={(e) => setNewActivity({ ...newActivity, weeks_per_year: Number(e.target.value) })}
+                  min={0}
+                  max={52}
+                  value={typeof newActivity.weeks_per_year === 'number' ? newActivity.weeks_per_year : null}
+                  onChange={(value) => setNewActivity({ ...newActivity, weeks_per_year: value === null ? 0 : value })}
                 />
                 {formErrors.weeks_per_year && <p className="text-sm text-red-500">{formErrors.weeks_per_year}</p>}
               </div>
