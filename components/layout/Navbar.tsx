@@ -196,17 +196,17 @@ export default function Navbar() {
           </div>
         )}
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4" suppressHydrationWarning>
           <ModeToggle />
 
           {isLoading ? (
-            <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" suppressHydrationWarning></div>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
-                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                    <AvatarFallback suppressHydrationWarning>{getUserInitials()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>

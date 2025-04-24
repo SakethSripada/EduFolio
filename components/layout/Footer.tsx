@@ -3,13 +3,13 @@ import Link from "next/link"
 export default function Footer() {
   return (
     <footer className="bg-background border-t py-8">
-      <div className="container mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
+      <div className="container mx-auto" suppressHydrationWarning>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8" suppressHydrationWarning>
+          <div suppressHydrationWarning>
             <h3 className="text-lg font-semibold mb-4">EduFolio</h3>
             <p className="text-muted-foreground">Your educational journey, beautifully organized.</p>
           </div>
-          <div>
+          <div suppressHydrationWarning>
             <h3 className="text-lg font-semibold mb-4">Features</h3>
             <ul className="space-y-2">
               <li>
@@ -29,7 +29,7 @@ export default function Footer() {
               </li>
             </ul>
           </div>
-          <div>
+          <div suppressHydrationWarning>
             <h3 className="text-lg font-semibold mb-4">Resources</h3>
             <ul className="space-y-2">
               <li>
@@ -49,7 +49,7 @@ export default function Footer() {
               </li>
             </ul>
           </div>
-          <div>
+          <div suppressHydrationWarning>
             <h3 className="text-lg font-semibold mb-4">Legal</h3>
             <ul className="space-y-2">
               <li>
@@ -65,7 +65,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="border-t mt-8 pt-6 text-center text-sm text-muted-foreground">
+        <div className="border-t mt-8 pt-6 text-center text-sm text-muted-foreground" suppressHydrationWarning>
           © 2025 EduFolio. All rights reserved.
         </div>
       </div>

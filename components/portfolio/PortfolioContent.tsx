@@ -62,7 +62,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
-import { createOrUpdateShareLink, generateShareUrl } from "@/lib/supabase/utils"
+import { createOrUpdateShareLink, generateShareUrl, ShareSettings } from "@/lib/share-utils"
 import { Separator } from "@/components/ui/separator"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
@@ -134,20 +134,45 @@ export const PortfolioContent = ({
         const baseUrl = 
           typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : "";
 
-        // Check if a share link already exists
-        const { data, error } = await supabase
+        // Check if a share link already exists - without using maybeSingle to handle multiple records
+        const { data: existingRecords, error } = await supabase
           .from("shared_links")
           .select("*")
           .eq("user_id", user.id)
-          .eq("content_type", "portfolio")
-          .maybeSingle();
+          .eq("content_type", "portfolio");
 
         if (error) {
           console.error("Error checking share link:", error);
           return;
         }
 
-        if (data) {
+        if (existingRecords && existingRecords.length > 0) {
+          // Handle potential duplicates
+          if (existingRecords.length > 1) {
+            console.log(`Found ${existingRecords.length} portfolio share links, cleaning up duplicates...`);
+            
+            // Get the first record's ID to keep
+            const firstRecordId = existingRecords[0].id;
+            
+            // Get all other record IDs to delete
+            const idsToDelete = existingRecords.slice(1).map(record => record.id);
+            
+            // Delete duplicate records
+            const { error: deleteError } = await supabase
+              .from("shared_links")
+              .delete()
+              .in("id", idsToDelete);
+              
+            if (deleteError) {
+              console.error("Error deleting duplicate share links:", deleteError);
+            } else {
+              console.log(`Deleted ${idsToDelete.length} duplicate portfolio share links`);
+            }
+          }
+          
+          // Use the first record
+          const data = existingRecords[0];
+          
           // Share link exists - load its data
           setExistingShareLink(data);
           setShareId(data.share_id);
@@ -176,7 +201,7 @@ export const PortfolioContent = ({
               expires_at: null,
             })
             .select("*")
-            .maybeSingle();
+            .single();  // Use single() instead of maybeSingle()
 
           if (insertError) {
             console.error("Error creating share link:", insertError);
@@ -285,7 +310,7 @@ export const PortfolioContent = ({
       // Use existing share ID if available
       const currentShareId = existingShareLink?.share_id || shareId;
       
-      const { success, error } = await createOrUpdateShareLink({
+      const result = await createOrUpdateShareLink({
         userId: user.id,
         contentType: "portfolio",
         contentId: null,
@@ -294,7 +319,18 @@ export const PortfolioContent = ({
         existingShareId: currentShareId,
       });
       
-      if (error) throw error;
+      if (!result.success) {
+        throw result.error;
+      }
+      
+      // Update the share link if one was returned
+      if ('shareLink' in result && result.shareLink) {
+        setShareLink(result.shareLink);
+      } else {
+        // Otherwise generate one from the share ID
+        const baseUrl = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : "";
+        setShareLink(`${baseUrl}/share/portfolio/${result.shareId}`);
+      }
 
       toast({
         title: "Share link saved",
