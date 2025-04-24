@@ -487,10 +487,18 @@ export const PortfolioContent = ({
       setIsLoading,
       (data) => {
         if (data) {
+          // First update the data
           setProjects([data[0], ...projects])
+          
+          // Then reset form and close the modal with a small delay to prevent reopening
           resetProjectForm()
-          setIsAddingProject(false)
-          setFormSubmitted(false)
+          
+          // Use a timeout to ensure state updates don't conflict
+          setTimeout(() => {
+            setIsAddingProject(false)
+            setFormSubmitted(false)
+          }, 0)
+          
           toast({
             title: "Project added",
             description: "Your project has been added successfully.",
@@ -592,7 +600,7 @@ export const PortfolioContent = ({
       },
       setIsLoading,
       (data) => {
-        // Update local state
+        // First update the projects data
         setProjects(
           projects.map((project) => {
             if (project.id === editingProjectId) {
@@ -602,9 +610,15 @@ export const PortfolioContent = ({
           }),
         )
 
+        // Reset form first
         resetProjectForm()
-        setIsEditingProject(false)
-        setEditingProjectId(null)
+        
+        // Use a timeout to ensure state updates don't conflict
+        setTimeout(() => {
+          setIsEditingProject(false)
+          setEditingProjectId(null)
+        }, 0)
+        
         toast({
           title: "Project updated",
           description: "Your project has been updated successfully.",
@@ -1002,10 +1016,12 @@ export const PortfolioContent = ({
           open={isAddingProject || isEditingProject}
           onOpenChange={(open) => {
             if (!open) {
+              // Only handle close events here - don't set to true
               resetProjectForm()
               setIsAddingProject(false)
               setIsEditingProject(false)
               setEditingProjectId(null)
+              setFormSubmitted(false)
             }
           }}
         >

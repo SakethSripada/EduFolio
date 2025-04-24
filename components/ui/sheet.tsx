@@ -13,7 +13,8 @@ const modalState = {
   hasAppliedFix: false,
   scrollbarWidth: 0,
   scrollY: 0,
-  bodyPaddingRight: ''
+  bodyPaddingRight: '',
+  preventReopenMap: new Map<string, boolean>() // Track components that should avoid reopening
 };
 
 // Reuse the same hook pattern as in dialog.tsx
@@ -103,11 +104,37 @@ const useSheetContentShiftFix = (open: boolean) => {
   }, [open]);
 };
 
+// Enhanced Sheet with reopening prevention
 const Sheet = ({ open, onOpenChange, ...props }: SheetPrimitive.DialogProps) => {
+  // Generate a stable component ID for this sheet instance
+  const [sheetId] = React.useState(() => Math.random().toString(36).slice(2, 10));
+  
   // Use our custom hook to prevent content shift
   useSheetContentShiftFix(open || false);
   
-  return <SheetPrimitive.Root open={open} onOpenChange={onOpenChange} {...props} />;
+  // Handle open state changes with reopening prevention
+  const handleOpenChange = React.useCallback((newOpenState: boolean) => {
+    if (onOpenChange) {
+      // If closing, set a flag to prevent immediate reopening
+      if (!newOpenState) {
+        modalState.preventReopenMap.set(sheetId, true);
+        
+        // Clear the prevention flag after a short delay
+        window.setTimeout(() => {
+          modalState.preventReopenMap.delete(sheetId);
+        }, 100);
+      }
+      
+      // If attempting to open but prevention is active, ignore it
+      if (newOpenState && modalState.preventReopenMap.get(sheetId)) {
+        return;
+      }
+      
+      onOpenChange(newOpenState);
+    }
+  }, [onOpenChange, sheetId]);
+  
+  return <SheetPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props} />;
 }
 
 const SheetTrigger = SheetPrimitive.Trigger
