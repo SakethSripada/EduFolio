@@ -485,6 +485,53 @@ export interface Database {
           updated_at?: string
         }
       }
+      user_colleges: {
+        Row: {
+          id: string
+          user_id: string
+          college_id: string
+          application_status: string
+          application_deadline: string | null
+          application_deadline_display: string | null
+          is_reach: boolean
+          is_target: boolean
+          is_safety: boolean
+          is_favorite: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          college_id: string
+          application_status?: string
+          application_deadline?: string | null
+          application_deadline_display?: string | null
+          is_reach?: boolean
+          is_target?: boolean
+          is_safety?: boolean
+          is_favorite?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          college_id?: string
+          application_status?: string
+          application_deadline?: string | null
+          application_deadline_display?: string | null
+          is_reach?: boolean
+          is_target?: boolean
+          is_safety?: boolean
+          is_favorite?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       college_profiles: {
         Row: {
           id: string
