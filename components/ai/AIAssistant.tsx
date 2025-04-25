@@ -18,7 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { MessageCircle, X, Send, Sparkles, Pencil, Plus, Maximize2, Minimize2, Paperclip, Mic, Bot, User } from 'lucide-react'
+import { MessageCircle, X, Send, Sparkles, Pencil, Plus, Maximize2, Minimize2, Paperclip, Mic, Bot, User, RefreshCw } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -405,7 +405,23 @@ const handleSendMessage = useCallback(async () => {
       if (profileData.colleges?.length) {
         profileContext += `College Applications: ${profileData.colleges.length} colleges\n`;
         profileData.colleges.forEach((college: any) => {
-          profileContext += `- ${college.college?.name || 'Unnamed College'}\n`;
+          const userCollege = college.user_college || {};
+          const applicationStatus = userCollege.application_status || 'Not started';
+          const deadline = userCollege.application_deadline_display || 'No deadline set';
+          
+          let schoolType = [];
+          if (userCollege.is_reach) schoolType.push('Reach');
+          if (userCollege.is_target) schoolType.push('Target');
+          if (userCollege.is_safety) schoolType.push('Safety');
+          const schoolTypeStr = schoolType.length > 0 ? `(${schoolType.join('/')})` : '';
+          
+          const favorite = userCollege.is_favorite ? '⭐ ' : '';
+          
+          profileContext += `- ${favorite}${college.college?.name || 'Unnamed College'} ${schoolTypeStr}\n`;
+          profileContext += `  Status: ${applicationStatus}, Deadline: ${deadline}\n`;
+          if (userCollege.notes) {
+            profileContext += `  Notes: ${userCollege.notes}\n`;
+          }
         });
         profileContext += "\n";
       }
@@ -503,6 +519,46 @@ const closeChat = useCallback(() => {
   }
 }, [onClose])
 
+// Clear chat and reset to initial context if available
+const clearChat = useCallback(() => {
+  setMessages([])
+  
+  // If there's an initial context, add the contextual message back
+  if (initialContext) {
+    let contextMessage = ""
+
+    switch (initialContext.type) {
+      case "essay":
+        contextMessage = `How can I help with your essay "${initialContext.title}"?`
+        break
+      case "extracurricular":
+        contextMessage = `How can I help with your "${initialContext.title}" activity?`
+        break
+      case "award":
+        contextMessage = `How can I help with your "${initialContext.title}" award?`
+        break
+      case "academics":
+        contextMessage = `How can I help with your academics?`
+        break
+      case "college":
+        contextMessage = `How can I help with your application to ${initialContext.title || "college"}?`
+        break
+      default:
+        contextMessage = "How can I help with your college application today?"
+    }
+
+    setMessages([
+      {
+        id: generateUniqueId(),
+        role: "assistant",
+        content: contextMessage,
+        timestamp: new Date(),
+        context: initialContext,
+      },
+    ])
+  }
+}, [initialContext, generateUniqueId])
+
 useEffect(() => {
   // Scroll to bottom when messages change
   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -560,6 +616,9 @@ return (
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={toggleExpand} className="h-8 w-8">
               {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={clearChat} className="h-8 w-8" title="Clear chat">
+              <RefreshCw className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={closeChat} className="h-8 w-8">
               <X className="h-4 w-4" />
