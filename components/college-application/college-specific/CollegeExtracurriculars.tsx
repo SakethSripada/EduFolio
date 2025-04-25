@@ -212,6 +212,11 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
             impact_statement: "",
             is_current: false,
           })
+          
+          // Use a timeout to ensure state updates don't conflict
+          setTimeout(() => {
+            setIsEditingActivity(false)
+          }, 0)
 
           toast({
             title: "Activity added",
@@ -304,8 +309,8 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         });
         
         setActivities(updatedActivities);
-        setIsEditingActivity(false)
-        setEditingActivityId(null)
+        
+        // Reset form first
         setNewActivity({
           activity_type: "",
           position: "",
@@ -319,6 +324,12 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
           impact_statement: "",
           is_current: false,
         })
+        
+        // Use a timeout to ensure state updates don't conflict
+        setTimeout(() => {
+          setIsEditingActivity(false)
+          setEditingActivityId(null)
+        }, 0)
 
         toast({
           title: "Activity updated",
@@ -417,7 +428,11 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         if (data) {
           setActivities([...data, ...activities])
           setSelectedActivities({})
-          setIsImportingActivities(false)
+          
+          // Use a timeout to ensure state updates don't conflict
+          setTimeout(() => {
+            setIsImportingActivities(false)
+          }, 0)
 
           toast({
             title: "Activities imported",
@@ -573,8 +588,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
         open={isEditingActivity}
         onOpenChange={(open) => {
           if (!open) {
-            setIsEditingActivity(false)
-            setEditingActivityId(null)
+            // Only handle close events here - don't set to true
             setNewActivity({
               activity_type: "",
               position: "",
@@ -589,6 +603,8 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
               is_current: false,
             })
             setFormErrors({})
+            setIsEditingActivity(false)
+            setEditingActivityId(null)
           }
         }}
       >
@@ -740,7 +756,13 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
       </Dialog>
 
       {/* Import Activities Dialog */}
-      <Dialog open={isImportingActivities} onOpenChange={setIsImportingActivities}>
+      <Dialog open={isImportingActivities} onOpenChange={(open) => {
+        if (!open) {
+          // Only handle close events here
+          setIsImportingActivities(false)
+          setSelectedActivities({})
+        }
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Activities</DialogTitle>
