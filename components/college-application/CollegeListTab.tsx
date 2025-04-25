@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -92,6 +92,10 @@ export default function CollegeListTab() {
   // Add state for confirmation dialog
   const [confirmDeleteCollege, setConfirmDeleteCollege] = useState<string | null>(null)
 
+  // Add state for pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20 // Number of colleges to show per page
+
   // Define regions with their states
   const regions = {
     "All": [],
@@ -170,46 +174,73 @@ export default function CollegeListTab() {
     return Object.keys(errors).length === 0
   }
 
-  // Filter colleges based on all criteria
-  const filteredCollegesForSelection = colleges.filter((college) => {
-    // Text search filter
-    const matchesText = !collegeSearchQuery || 
-      college.name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
-      college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase());
+  // Memoize filtered colleges to avoid recalculating on every render
+  const filteredCollegesForSelection = useMemo(() => {
+    return colleges.filter((college) => {
+      // Text search filter
+      const matchesText = !collegeSearchQuery || 
+        college.name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
+        college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase());
+        
+      // Acceptance rate filter (convert decimal to percentage for comparison)
+      const acceptanceRatePercent = college.acceptance_rate * 100;
+      const matchesAcceptanceRate = 
+        (acceptanceRateFilter[0] === null || acceptanceRatePercent >= acceptanceRateFilter[0]) && 
+        (acceptanceRateFilter[1] === null || acceptanceRatePercent <= acceptanceRateFilter[1]);
       
-    // Acceptance rate filter (convert decimal to percentage for comparison)
-    const acceptanceRatePercent = college.acceptance_rate * 100;
-    const matchesAcceptanceRate = 
-      (acceptanceRateFilter[0] === null || acceptanceRatePercent >= acceptanceRateFilter[0]) && 
-      (acceptanceRateFilter[1] === null || acceptanceRatePercent <= acceptanceRateFilter[1]);
-    
-    // Type filter
-    const matchesType = typeFilter === "All" || college.type === typeFilter;
-    
-    // Size filter
-    const matchesSize = sizeFilter === "All" || college.size === sizeFilter;
-    
-    // Ranking filter
-    const matchesRanking = 
-      (rankingFilter[0] === null || college.ranking >= rankingFilter[0]) && 
-      (rankingFilter[1] === null || college.ranking <= rankingFilter[1]);
+      // Type filter
+      const matchesType = typeFilter === "All" || college.type === typeFilter;
       
-    // Tuition filter
-    const matchesTuition = 
-      (tuitionFilter[0] === null || college.tuition >= tuitionFilter[0]) && 
-      (tuitionFilter[1] === null || college.tuition <= tuitionFilter[1]);
+      // Size filter
+      const matchesSize = sizeFilter === "All" || college.size === sizeFilter;
       
-    // Region filter
-    const matchesRegion = regionFilter === "All" || 
-      (regions[regionFilter as keyof typeof regions] as string[]).some(state => 
-        college.location.endsWith(`, ${state}`)
-      );
-    
-    return matchesText && matchesAcceptanceRate && matchesType && matchesSize && matchesRanking && matchesTuition && matchesRegion;
-  });
+      // Ranking filter
+      const matchesRanking = 
+        (rankingFilter[0] === null || college.ranking >= rankingFilter[0]) && 
+        (rankingFilter[1] === null || college.ranking <= rankingFilter[1]);
+        
+      // Tuition filter
+      const matchesTuition = 
+        (tuitionFilter[0] === null || college.tuition >= tuitionFilter[0]) && 
+        (tuitionFilter[1] === null || college.tuition <= tuitionFilter[1]);
+        
+      // Region filter
+      const matchesRegion = regionFilter === "All" || 
+        (regions[regionFilter as keyof typeof regions] as string[]).some(state => 
+          college.location.endsWith(`, ${state}`)
+        );
+      
+      return matchesText && matchesAcceptanceRate && matchesType && matchesSize && matchesRanking && matchesTuition && matchesRegion;
+    });
+  }, [colleges, collegeSearchQuery, acceptanceRateFilter, typeFilter, sizeFilter, rankingFilter, tuitionFilter, regionFilter, regions]);
 
-  // Toggle selection of a college
-  const toggleCollegeSelection = (collegeId: string) => {
+  // Function to check if a college is already in the user's list
+  const isCollegeInUserList = useCallback((collegeId: string): boolean => {
+    return userColleges.some(userCollege => userCollege.college_id === collegeId);
+  }, [userColleges]);
+
+  // Clear all selected colleges
+  const clearSelectedColleges = useCallback((): void => {
+    setSelectedColleges([]);
+    toast({
+      title: "Selection cleared",
+      description: "All selected colleges have been cleared."
+    });
+  }, [toast]);
+
+  // Get paginated college data
+  const paginatedColleges = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredCollegesForSelection.slice(startIndex, startIndex + pageSize);
+  }, [filteredCollegesForSelection, currentPage, pageSize]);
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredCollegesForSelection.length / pageSize);
+  }, [filteredCollegesForSelection.length, pageSize]);
+
+  // Toggle selection of a college - memoized for performance
+  const toggleCollegeSelection = useCallback((collegeId: string) => {
     setSelectedColleges((prev) => {
       if (prev.includes(collegeId)) {
         return prev.filter((id) => id !== collegeId);
@@ -217,7 +248,12 @@ export default function CollegeListTab() {
         return [...prev, collegeId];
       }
     });
-  };
+  }, []);
+
+  // Handle page change
+  const changePage = useCallback((newPage: number) => {
+    setCurrentPage(newPage);
+  }, []);
 
   // Add multiple selected colleges
   const addSelectedColleges = async () => {
@@ -665,6 +701,146 @@ export default function CollegeListTab() {
     setRegionFilter("All");
   };
 
+  // Replace the existing colleges table in the add college dialog with this optimized version
+  const renderCollegeTable = () => {
+    return (
+      <div className="border rounded-md max-h-[300px] overflow-y-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]"></TableHead>
+              <TableHead>College</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Size</TableHead>
+              <TableHead>Acceptance Rate</TableHead>
+              <TableHead>Rank</TableHead>
+              <TableHead>Tuition ($)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedColleges.length > 0 ? (
+              paginatedColleges.map((college) => {
+                const alreadyAdded = isCollegeInUserList(college.id);
+                return (
+                  <TableRow 
+                    key={college.id}
+                    className={`
+                      ${selectedColleges.includes(college.id) ? "bg-muted" : ""}
+                      ${alreadyAdded ? "opacity-50" : ""}
+                    `}
+                    onClick={() => !alreadyAdded && toggleCollegeSelection(college.id)}
+                    style={{ cursor: alreadyAdded ? "not-allowed" : "pointer" }}
+                  >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedColleges.includes(college.id)}
+                        disabled={alreadyAdded}
+                        onChange={() => {}}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {college.name}
+                      {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">(Already added)</span>}
+                    </TableCell>
+                    <TableCell>{college.location}</TableCell>
+                    <TableCell>{college.type}</TableCell>
+                    <TableCell>{college.size}</TableCell>
+                    <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
+                    <TableCell>{college.ranking}</TableCell>
+                    <TableCell>${college.tuition.toLocaleString()}</TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-4">
+                  No colleges match your filters. Try adjusting your search criteria.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
+  // Add pagination controls for the college list
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <div className="flex items-center justify-center gap-1 mt-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => changePage(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </Button>
+        
+        <div className="flex items-center gap-1 mx-2">
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            // Show at most 5 page buttons
+            let pageNum = currentPage;
+            if (currentPage <= 3) {
+              // If we're near the start, show pages 1-5
+              pageNum = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              // If we're near the end, show the last 5 pages
+              pageNum = totalPages - 4 + i;
+            } else {
+              // Otherwise show currentPage-2 to currentPage+2
+              pageNum = currentPage - 2 + i;
+            }
+            
+            // Make sure pageNum is within bounds
+            if (pageNum <= 0 || pageNum > totalPages) return null;
+            
+            return (
+              <Button 
+                key={pageNum}
+                variant={currentPage === pageNum ? "default" : "outline"} 
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => changePage(pageNum)}
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+          
+          {totalPages > 5 && currentPage < totalPages - 2 && (
+            <>
+              <span className="mx-1">...</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => changePage(totalPages)}
+              >
+                {totalPages}
+              </Button>
+            </>
+          )}
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => changePage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </Button>
+      </div>
+    );
+  };
+
   if (isLoading && userColleges.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -711,106 +887,144 @@ export default function CollegeListTab() {
               No colleges found. Add a college to get started.
             </div>
           ) : (
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>College</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Deadline</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredColleges.map((userCollege) => (
-                    <TableRow key={userCollege.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {userCollege.is_favorite ? (
-                            <Star className="h-4 w-4 text-yellow-500" />
-                          ) : (
-                            <StarOff className="h-4 w-4 text-muted-foreground opacity-0" />
-                          )}
-                          <span>{userCollege.college.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{userCollege.college.location}</TableCell>
-                      <TableCell>{getStatusBadge(userCollege.application_status)}</TableCell>
-                      <TableCell>{userCollege.application_deadline_display || "Not set"}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {userCollege.is_reach && (
-                            <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-200">
-                              Reach
-                            </Badge>
-                          )}
-                          {userCollege.is_target && (
-                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
-                              Target
-                            </Badge>
-                          )}
-                          {userCollege.is_safety && (
-                            <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">
-                              Safety
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleFavorite(userCollege.id)}
-                            title={userCollege.is_favorite ? "Remove from favorites" : "Add to favorites"}
-                          >
-                            {userCollege.is_favorite ? (
-                              <Star className="h-4 w-4 text-yellow-500" />
-                            ) : (
-                              <StarOff className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => startEditCollege(userCollege.id)}
-                            title="Edit college"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setConfirmDeleteCollege(userCollege.id)}
-                            title="Remove college"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              navigateToCollegeApplication(userCollege.college_id, userCollege.college.name)
-                            }
-                            title="View college application"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-4">
+              {filteredColleges.map((userCollege) => (
+                <div 
+                  key={userCollege.id} 
+                  className="flex flex-col bg-card border rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden h-full relative"
+                >
+                  {/* Card Header with Logo and Favorite Button */}
+                  <div className="relative h-32 bg-muted/50 flex items-center justify-center p-4 border-b">
+                    {userCollege.college.logo_url ? (
+                      <img 
+                        src={userCollege.college.logo_url} 
+                        alt={`${userCollege.college.name} logo`} 
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-2xl font-bold text-center text-muted-foreground">
+                        {userCollege.college.name.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 bg-background/70 backdrop-blur-sm hover:bg-background rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(userCollege.id);
+                      }}
+                      title={userCollege.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      {userCollege.is_favorite ? (
+                        <Star className="h-4 w-4 text-yellow-500" />
+                      ) : (
+                        <StarOff className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Card Content */}
+                  <div className="flex flex-col flex-grow p-4 space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-lg line-clamp-1">{userCollege.college.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-1">{userCollege.college.location}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <div className="mt-1">{getStatusBadge(userCollege.application_status)}</div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Deadline</p>
+                        <p className="text-sm truncate">{userCollege.application_deadline_display || "Not set"}</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Category</p>
+                      <div className="flex flex-wrap gap-1">
+                        {userCollege.is_reach && (
+                          <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-200">
+                            Reach
+                          </Badge>
+                        )}
+                        {userCollege.is_target && (
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                            Target
+                          </Badge>
+                        )}
+                        {userCollege.is_safety && (
+                          <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">
+                            Safety
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Notes Preview - optional */}
+                    {userCollege.notes && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Notes</p>
+                        <p className="text-sm line-clamp-2">{userCollege.notes}</p>
+                      </div>
+                    )}
+                    
+                    <div className="mt-auto pt-3 border-t flex justify-between items-center">
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditCollege(userCollege.id);
+                          }}
+                          title="Edit college"
+                          className="h-8 w-8"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteCollege(userCollege.id);
+                          }}
+                          title="Remove college"
+                          className="h-8 w-8"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigateToCollegeApplication(userCollege.college_id, userCollege.college.name)}
+                        title="View college application"
+                        className="ml-auto"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Application
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </TabsContent>
       </Tabs>
 
       {/* Add College Dialog */}
-      <Dialog open={isAddingCollege} onOpenChange={setIsAddingCollege}>
+      <Dialog open={isAddingCollege} onOpenChange={(isOpen) => {
+        // Reset pagination when opening/closing dialog
+        if (!isOpen) {
+          setCurrentPage(1);
+        }
+        setIsAddingCollege(isOpen);
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Colleges to Your List</DialogTitle>
@@ -825,7 +1039,10 @@ export default function CollegeListTab() {
                 id="college-search"
                 placeholder="Search by name or location..."
                 value={collegeSearchQuery}
-                onChange={(e) => setCollegeSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setCollegeSearchQuery(e.target.value);
+                  setCurrentPage(1); // Reset to first page when search changes
+                }}
                 className="mb-2"
               />
               
@@ -845,7 +1062,10 @@ export default function CollegeListTab() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={resetAllFilters}
+                    onClick={() => {
+                      resetAllFilters();
+                      setCurrentPage(1); // Reset to first page when filters reset
+                    }}
                     className="mb-2"
                   >
                     Reset Filters
@@ -1003,66 +1223,38 @@ export default function CollegeListTab() {
                   Showing {filteredCollegesForSelection.length} of {colleges.length} colleges
                 </p>
                 {filteredCollegesForSelection.length > 0 && selectedColleges.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedColleges.length} college{selectedColleges.length !== 1 ? 's' : ''} selected
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedColleges.length} college{selectedColleges.length !== 1 ? 's' : ''} selected
+                    </p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearSelectedColleges}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 )}
               </div>
               
-              <div className="border rounded-md max-h-[300px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>College</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Acceptance Rate</TableHead>
-                      <TableHead>Rank</TableHead>
-                      <TableHead>Tuition ($)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCollegesForSelection.map((college) => (
-                      <TableRow 
-                        key={college.id}
-                        className={selectedColleges.includes(college.id) ? "bg-muted" : ""}
-                        onClick={() => toggleCollegeSelection(college.id)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedColleges.includes(college.id)}
-                            onChange={() => {}}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                        <TableCell>{college.name}</TableCell>
-                        <TableCell>{college.location}</TableCell>
-                        <TableCell>{college.type}</TableCell>
-                        <TableCell>{college.size}</TableCell>
-                        <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
-                        <TableCell>{college.ranking}</TableCell>
-                        <TableCell>${college.tuition.toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredCollegesForSelection.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-4">
-                          No colleges match your filters. Try adjusting your search criteria.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              {renderCollegeTable()}
+              {renderPagination()}
               
               {selectedColleges.length > 0 && (
                 <div className="mt-2 p-2 bg-muted rounded-md">
-                  <p className="text-sm font-medium">Selected Colleges:</p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium">Selected Colleges:</p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearSelectedColleges}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {selectedColleges.map((collegeId) => {
                       const college = colleges.find((c) => c.id === collegeId);
