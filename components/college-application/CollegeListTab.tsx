@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -92,6 +92,10 @@ export default function CollegeListTab() {
   // Add state for confirmation dialog
   const [confirmDeleteCollege, setConfirmDeleteCollege] = useState<string | null>(null)
 
+  // Add state for pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20 // Number of colleges to show per page
+
   // Define regions with their states
   const regions = {
     "All": [],
@@ -170,46 +174,73 @@ export default function CollegeListTab() {
     return Object.keys(errors).length === 0
   }
 
-  // Filter colleges based on all criteria
-  const filteredCollegesForSelection = colleges.filter((college) => {
-    // Text search filter
-    const matchesText = !collegeSearchQuery || 
-      college.name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
-      college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase());
+  // Memoize filtered colleges to avoid recalculating on every render
+  const filteredCollegesForSelection = useMemo(() => {
+    return colleges.filter((college) => {
+      // Text search filter
+      const matchesText = !collegeSearchQuery || 
+        college.name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
+        college.location.toLowerCase().includes(collegeSearchQuery.toLowerCase());
+        
+      // Acceptance rate filter (convert decimal to percentage for comparison)
+      const acceptanceRatePercent = college.acceptance_rate * 100;
+      const matchesAcceptanceRate = 
+        (acceptanceRateFilter[0] === null || acceptanceRatePercent >= acceptanceRateFilter[0]) && 
+        (acceptanceRateFilter[1] === null || acceptanceRatePercent <= acceptanceRateFilter[1]);
       
-    // Acceptance rate filter (convert decimal to percentage for comparison)
-    const acceptanceRatePercent = college.acceptance_rate * 100;
-    const matchesAcceptanceRate = 
-      (acceptanceRateFilter[0] === null || acceptanceRatePercent >= acceptanceRateFilter[0]) && 
-      (acceptanceRateFilter[1] === null || acceptanceRatePercent <= acceptanceRateFilter[1]);
-    
-    // Type filter
-    const matchesType = typeFilter === "All" || college.type === typeFilter;
-    
-    // Size filter
-    const matchesSize = sizeFilter === "All" || college.size === sizeFilter;
-    
-    // Ranking filter
-    const matchesRanking = 
-      (rankingFilter[0] === null || college.ranking >= rankingFilter[0]) && 
-      (rankingFilter[1] === null || college.ranking <= rankingFilter[1]);
+      // Type filter
+      const matchesType = typeFilter === "All" || college.type === typeFilter;
       
-    // Tuition filter
-    const matchesTuition = 
-      (tuitionFilter[0] === null || college.tuition >= tuitionFilter[0]) && 
-      (tuitionFilter[1] === null || college.tuition <= tuitionFilter[1]);
+      // Size filter
+      const matchesSize = sizeFilter === "All" || college.size === sizeFilter;
       
-    // Region filter
-    const matchesRegion = regionFilter === "All" || 
-      (regions[regionFilter as keyof typeof regions] as string[]).some(state => 
-        college.location.endsWith(`, ${state}`)
-      );
-    
-    return matchesText && matchesAcceptanceRate && matchesType && matchesSize && matchesRanking && matchesTuition && matchesRegion;
-  });
+      // Ranking filter
+      const matchesRanking = 
+        (rankingFilter[0] === null || college.ranking >= rankingFilter[0]) && 
+        (rankingFilter[1] === null || college.ranking <= rankingFilter[1]);
+        
+      // Tuition filter
+      const matchesTuition = 
+        (tuitionFilter[0] === null || college.tuition >= tuitionFilter[0]) && 
+        (tuitionFilter[1] === null || college.tuition <= tuitionFilter[1]);
+        
+      // Region filter
+      const matchesRegion = regionFilter === "All" || 
+        (regions[regionFilter as keyof typeof regions] as string[]).some(state => 
+          college.location.endsWith(`, ${state}`)
+        );
+      
+      return matchesText && matchesAcceptanceRate && matchesType && matchesSize && matchesRanking && matchesTuition && matchesRegion;
+    });
+  }, [colleges, collegeSearchQuery, acceptanceRateFilter, typeFilter, sizeFilter, rankingFilter, tuitionFilter, regionFilter, regions]);
 
-  // Toggle selection of a college
-  const toggleCollegeSelection = (collegeId: string) => {
+  // Function to check if a college is already in the user's list
+  const isCollegeInUserList = useCallback((collegeId: string): boolean => {
+    return userColleges.some(userCollege => userCollege.college_id === collegeId);
+  }, [userColleges]);
+
+  // Clear all selected colleges
+  const clearSelectedColleges = useCallback((): void => {
+    setSelectedColleges([]);
+    toast({
+      title: "Selection cleared",
+      description: "All selected colleges have been cleared."
+    });
+  }, [toast]);
+
+  // Get paginated college data
+  const paginatedColleges = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredCollegesForSelection.slice(startIndex, startIndex + pageSize);
+  }, [filteredCollegesForSelection, currentPage, pageSize]);
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredCollegesForSelection.length / pageSize);
+  }, [filteredCollegesForSelection.length, pageSize]);
+
+  // Toggle selection of a college - memoized for performance
+  const toggleCollegeSelection = useCallback((collegeId: string) => {
     setSelectedColleges((prev) => {
       if (prev.includes(collegeId)) {
         return prev.filter((id) => id !== collegeId);
@@ -217,7 +248,12 @@ export default function CollegeListTab() {
         return [...prev, collegeId];
       }
     });
-  };
+  }, []);
+
+  // Handle page change
+  const changePage = useCallback((newPage: number) => {
+    setCurrentPage(newPage);
+  }, []);
 
   // Add multiple selected colleges
   const addSelectedColleges = async () => {
@@ -665,18 +701,144 @@ export default function CollegeListTab() {
     setRegionFilter("All");
   };
 
-  // Function to check if a college is already in the user's list
-  const isCollegeInUserList = (collegeId: string): boolean => {
-    return userColleges.some(userCollege => userCollege.college_id === collegeId);
+  // Replace the existing colleges table in the add college dialog with this optimized version
+  const renderCollegeTable = () => {
+    return (
+      <div className="border rounded-md max-h-[300px] overflow-y-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]"></TableHead>
+              <TableHead>College</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Size</TableHead>
+              <TableHead>Acceptance Rate</TableHead>
+              <TableHead>Rank</TableHead>
+              <TableHead>Tuition ($)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedColleges.length > 0 ? (
+              paginatedColleges.map((college) => {
+                const alreadyAdded = isCollegeInUserList(college.id);
+                return (
+                  <TableRow 
+                    key={college.id}
+                    className={`
+                      ${selectedColleges.includes(college.id) ? "bg-muted" : ""}
+                      ${alreadyAdded ? "opacity-50" : ""}
+                    `}
+                    onClick={() => !alreadyAdded && toggleCollegeSelection(college.id)}
+                    style={{ cursor: alreadyAdded ? "not-allowed" : "pointer" }}
+                  >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedColleges.includes(college.id)}
+                        disabled={alreadyAdded}
+                        onChange={() => {}}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {college.name}
+                      {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">(Already added)</span>}
+                    </TableCell>
+                    <TableCell>{college.location}</TableCell>
+                    <TableCell>{college.type}</TableCell>
+                    <TableCell>{college.size}</TableCell>
+                    <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
+                    <TableCell>{college.ranking}</TableCell>
+                    <TableCell>${college.tuition.toLocaleString()}</TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-4">
+                  No colleges match your filters. Try adjusting your search criteria.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    );
   };
 
-  // Clear all selected colleges
-  const clearSelectedColleges = (): void => {
-    setSelectedColleges([]);
-    toast({
-      title: "Selection cleared",
-      description: "All selected colleges have been cleared."
-    });
+  // Add pagination controls for the college list
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <div className="flex items-center justify-center gap-1 mt-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => changePage(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </Button>
+        
+        <div className="flex items-center gap-1 mx-2">
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            // Show at most 5 page buttons
+            let pageNum = currentPage;
+            if (currentPage <= 3) {
+              // If we're near the start, show pages 1-5
+              pageNum = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              // If we're near the end, show the last 5 pages
+              pageNum = totalPages - 4 + i;
+            } else {
+              // Otherwise show currentPage-2 to currentPage+2
+              pageNum = currentPage - 2 + i;
+            }
+            
+            // Make sure pageNum is within bounds
+            if (pageNum <= 0 || pageNum > totalPages) return null;
+            
+            return (
+              <Button 
+                key={pageNum}
+                variant={currentPage === pageNum ? "default" : "outline"} 
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => changePage(pageNum)}
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+          
+          {totalPages > 5 && currentPage < totalPages - 2 && (
+            <>
+              <span className="mx-1">...</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => changePage(totalPages)}
+              >
+                {totalPages}
+              </Button>
+            </>
+          )}
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => changePage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </Button>
+      </div>
+    );
   };
 
   if (isLoading && userColleges.length === 0) {
@@ -856,7 +1018,13 @@ export default function CollegeListTab() {
       </Tabs>
 
       {/* Add College Dialog */}
-      <Dialog open={isAddingCollege} onOpenChange={setIsAddingCollege}>
+      <Dialog open={isAddingCollege} onOpenChange={(isOpen) => {
+        // Reset pagination when opening/closing dialog
+        if (!isOpen) {
+          setCurrentPage(1);
+        }
+        setIsAddingCollege(isOpen);
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Colleges to Your List</DialogTitle>
@@ -871,7 +1039,10 @@ export default function CollegeListTab() {
                 id="college-search"
                 placeholder="Search by name or location..."
                 value={collegeSearchQuery}
-                onChange={(e) => setCollegeSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setCollegeSearchQuery(e.target.value);
+                  setCurrentPage(1); // Reset to first page when search changes
+                }}
                 className="mb-2"
               />
               
@@ -891,7 +1062,10 @@ export default function CollegeListTab() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={resetAllFilters}
+                    onClick={() => {
+                      resetAllFilters();
+                      setCurrentPage(1); // Reset to first page when filters reset
+                    }}
                     className="mb-2"
                   >
                     Reset Filters
@@ -1065,66 +1239,8 @@ export default function CollegeListTab() {
                 )}
               </div>
               
-              <div className="border rounded-md max-h-[300px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>College</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Acceptance Rate</TableHead>
-                      <TableHead>Rank</TableHead>
-                      <TableHead>Tuition ($)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCollegesForSelection.map((college) => {
-                      const alreadyAdded = isCollegeInUserList(college.id);
-                      return (
-                        <TableRow 
-                          key={college.id}
-                          className={`
-                            ${selectedColleges.includes(college.id) ? "bg-muted" : ""}
-                            ${alreadyAdded ? "opacity-50" : ""}
-                          `}
-                          onClick={() => !alreadyAdded && toggleCollegeSelection(college.id)}
-                          style={{ cursor: alreadyAdded ? "not-allowed" : "pointer" }}
-                        >
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={selectedColleges.includes(college.id)}
-                              disabled={alreadyAdded}
-                              onChange={() => {}}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-4 w-4"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {college.name}
-                            {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">(Already added)</span>}
-                          </TableCell>
-                          <TableCell>{college.location}</TableCell>
-                          <TableCell>{college.type}</TableCell>
-                          <TableCell>{college.size}</TableCell>
-                          <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
-                          <TableCell>{college.ranking}</TableCell>
-                          <TableCell>${college.tuition.toLocaleString()}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {filteredCollegesForSelection.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-4">
-                          No colleges match your filters. Try adjusting your search criteria.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              {renderCollegeTable()}
+              {renderPagination()}
               
               {selectedColleges.length > 0 && (
                 <div className="mt-2 p-2 bg-muted rounded-md">
