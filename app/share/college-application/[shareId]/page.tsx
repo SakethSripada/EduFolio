@@ -10,6 +10,7 @@ import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { format } from "date-fns"
+import React from "react"
 
 export default function SharedCollegeApplicationPage() {
   // Use useParams to get the dynamic id from the route.
@@ -115,7 +116,7 @@ export default function SharedCollegeApplicationPage() {
           essaysResponse,
           userCollegesResponse,
         ] = await Promise.all([
-          supabase.from("academics").select("*").eq("user_id", shareData.user_id),
+          supabase.from("courses").select("*").eq("user_id", shareData.user_id),
           supabase.from("test_scores").select("*").eq("user_id", shareData.user_id),
           supabase.from("extracurricular_activities").select("*").eq("user_id", shareData.user_id),
           supabase.from("awards").select("*").eq("user_id", shareData.user_id),
@@ -124,7 +125,7 @@ export default function SharedCollegeApplicationPage() {
         ])
 
         // Check for errors in responses and log them, but continue with empty arrays
-        if (academicsResponse.error) console.error("Error fetching academics:", academicsResponse.error);
+        if (academicsResponse.error) console.error("Error fetching courses:", academicsResponse.error);
         if (testScoresResponse.error) console.error("Error fetching test scores:", testScoresResponse.error);
         if (extracurricularActivitiesResponse.error) console.error("Error fetching extracurriculars:", extracurricularActivitiesResponse.error);
         if (awardsResponse.error) console.error("Error fetching awards:", awardsResponse.error);
@@ -132,8 +133,8 @@ export default function SharedCollegeApplicationPage() {
         if (userCollegesResponse.error) console.error("Error fetching user colleges:", userCollegesResponse.error);
 
         // Log responses to debug what's coming back
+        console.log("Courses data:", academicsResponse);
         console.log("User colleges data:", userCollegesResponse);
-        console.log("Extracurricular activities:", extracurricularActivitiesResponse);
 
         // Only use the extracurricular_activities table
         const extracurriculars = extracurricularActivitiesResponse.data || [];
@@ -207,7 +208,7 @@ export default function SharedCollegeApplicationPage() {
           weightedGPA = totalCredits > 0 ? weightedGPA / totalCredits : 0;
         }
 
-        console.log("Processed colleges data:", collegesData);
+        console.log("Calculated GPA from courses:", { unweightedGPA, weightedGPA, totalCredits });
 
         // Prepare the college data.
         const userColleges = userCollegesResponse.data || [];
@@ -441,47 +442,108 @@ export default function SharedCollegeApplicationPage() {
                       <CardDescription>Academic courses and grades</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="rounded-md border overflow-hidden overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Course</TableHead>
-                              <TableHead>Grade</TableHead>
-                              <TableHead>Level</TableHead>
-                              <TableHead>Grade Level</TableHead>
-                              <TableHead>Term</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {studentData.academics.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                                  No courses added yet
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              studentData.academics.map((course: any) => (
-                                <TableRow key={course.id}>
-                                  <TableCell>{course.name}</TableCell>
-                                  <TableCell>{course.grade}</TableCell>
-                                  <TableCell>
-                                    {course.level === "AP/IB" ? (
-                                      <Badge className="bg-blue-500">AP/IB</Badge>
-                                    ) : course.level === "Honors" ? (
-                                      <Badge className="bg-purple-500">Honors</Badge>
-                                    ) : course.level === "College" ? (
-                                      <Badge className="bg-green-500">College</Badge>
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {React.createElement(() => {
+                          const [selectedGrade, setSelectedGrade] = useState<string>("all");
+                          
+                          // Filter courses based on selected grade level
+                          const filteredCourses = studentData.academics.filter((course: any) => {
+                            if (selectedGrade === "all") return true;
+                            return course.grade_level === selectedGrade;
+                          });
+                          
+                          return (
+                            <>
+                              <div className="flex flex-wrap items-center gap-2 w-full">
+                                <span className="text-sm font-medium">Filter by grade level:</span>
+                                <div className="flex flex-wrap gap-1">
+                                  <Badge 
+                                    variant={selectedGrade === "all" ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => setSelectedGrade("all")}
+                                  >
+                                    All
+                                  </Badge>
+                                  <Badge 
+                                    variant={selectedGrade === "9" ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => setSelectedGrade("9")}
+                                  >
+                                    9th
+                                  </Badge>
+                                  <Badge 
+                                    variant={selectedGrade === "10" ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => setSelectedGrade("10")}
+                                  >
+                                    10th
+                                  </Badge>
+                                  <Badge 
+                                    variant={selectedGrade === "11" ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => setSelectedGrade("11")}
+                                  >
+                                    11th
+                                  </Badge>
+                                  <Badge 
+                                    variant={selectedGrade === "12" ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => setSelectedGrade("12")}
+                                  >
+                                    12th
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              <div className="rounded-md border overflow-hidden overflow-x-auto w-full mt-2">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Course</TableHead>
+                                      <TableHead>Grade</TableHead>
+                                      <TableHead>Level</TableHead>
+                                      <TableHead>Grade Level</TableHead>
+                                      <TableHead>Term</TableHead>
+                                      <TableHead>School Year</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {filteredCourses.length === 0 ? (
+                                      <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                                          {selectedGrade === "all" 
+                                            ? "No courses added yet" 
+                                            : `No courses for ${selectedGrade}th grade`}
+                                        </TableCell>
+                                      </TableRow>
                                     ) : (
-                                      <Badge variant="outline">Regular</Badge>
+                                      filteredCourses.map((course: any) => (
+                                        <TableRow key={course.id}>
+                                          <TableCell>{course.name}</TableCell>
+                                          <TableCell>{course.grade}</TableCell>
+                                          <TableCell>
+                                            {course.level === "AP/IB" ? (
+                                              <Badge className="bg-blue-500">AP/IB</Badge>
+                                            ) : course.level === "Honors" ? (
+                                              <Badge className="bg-purple-500">Honors</Badge>
+                                            ) : course.level === "College" ? (
+                                              <Badge className="bg-green-500">College</Badge>
+                                            ) : (
+                                              <Badge variant="outline">Regular</Badge>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>{course.grade_level}</TableCell>
+                                          <TableCell>{course.term}</TableCell>
+                                          <TableCell>{course.school_year || "N/A"}</TableCell>
+                                        </TableRow>
+                                      ))
                                     )}
-                                  </TableCell>
-                                  <TableCell>{course.grade_level}</TableCell>
-                                  <TableCell>{course.term}</TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </>
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
