@@ -711,99 +711,131 @@ export default function CollegeListTab() {
               No colleges found. Add a college to get started.
             </div>
           ) : (
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>College</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Deadline</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredColleges.map((userCollege) => (
-                    <TableRow key={userCollege.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {userCollege.is_favorite ? (
-                            <Star className="h-4 w-4 text-yellow-500" />
-                          ) : (
-                            <StarOff className="h-4 w-4 text-muted-foreground opacity-0" />
-                          )}
-                          <span>{userCollege.college.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{userCollege.college.location}</TableCell>
-                      <TableCell>{getStatusBadge(userCollege.application_status)}</TableCell>
-                      <TableCell>{userCollege.application_deadline_display || "Not set"}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {userCollege.is_reach && (
-                            <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-200">
-                              Reach
-                            </Badge>
-                          )}
-                          {userCollege.is_target && (
-                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
-                              Target
-                            </Badge>
-                          )}
-                          {userCollege.is_safety && (
-                            <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">
-                              Safety
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleFavorite(userCollege.id)}
-                            title={userCollege.is_favorite ? "Remove from favorites" : "Add to favorites"}
-                          >
-                            {userCollege.is_favorite ? (
-                              <Star className="h-4 w-4 text-yellow-500" />
-                            ) : (
-                              <StarOff className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => startEditCollege(userCollege.id)}
-                            title="Edit college"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setConfirmDeleteCollege(userCollege.id)}
-                            title="Remove college"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              navigateToCollegeApplication(userCollege.college_id, userCollege.college.name)
-                            }
-                            title="View college application"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-4">
+              {filteredColleges.map((userCollege) => (
+                <div 
+                  key={userCollege.id} 
+                  className="flex flex-col bg-card border rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden h-full relative"
+                >
+                  {/* Card Header with Logo and Favorite Button */}
+                  <div className="relative h-32 bg-muted/50 flex items-center justify-center p-4 border-b">
+                    {userCollege.college.logo_url ? (
+                      <img 
+                        src={userCollege.college.logo_url} 
+                        alt={`${userCollege.college.name} logo`} 
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-2xl font-bold text-center text-muted-foreground">
+                        {userCollege.college.name.substring(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 bg-background/70 backdrop-blur-sm hover:bg-background rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(userCollege.id);
+                      }}
+                      title={userCollege.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      {userCollege.is_favorite ? (
+                        <Star className="h-4 w-4 text-yellow-500" />
+                      ) : (
+                        <StarOff className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Card Content */}
+                  <div className="flex flex-col flex-grow p-4 space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-lg line-clamp-1">{userCollege.college.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-1">{userCollege.college.location}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <div className="mt-1">{getStatusBadge(userCollege.application_status)}</div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Deadline</p>
+                        <p className="text-sm truncate">{userCollege.application_deadline_display || "Not set"}</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Category</p>
+                      <div className="flex flex-wrap gap-1">
+                        {userCollege.is_reach && (
+                          <Badge variant="outline" className="bg-red-100 text-red-800 hover:bg-red-200">
+                            Reach
+                          </Badge>
+                        )}
+                        {userCollege.is_target && (
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                            Target
+                          </Badge>
+                        )}
+                        {userCollege.is_safety && (
+                          <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">
+                            Safety
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Notes Preview - optional */}
+                    {userCollege.notes && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Notes</p>
+                        <p className="text-sm line-clamp-2">{userCollege.notes}</p>
+                      </div>
+                    )}
+                    
+                    <div className="mt-auto pt-3 border-t flex justify-between items-center">
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditCollege(userCollege.id);
+                          }}
+                          title="Edit college"
+                          className="h-8 w-8"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteCollege(userCollege.id);
+                          }}
+                          title="Remove college"
+                          className="h-8 w-8"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigateToCollegeApplication(userCollege.college_id, userCollege.college.name)}
+                        title="View college application"
+                        className="ml-auto"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Application
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </TabsContent>
