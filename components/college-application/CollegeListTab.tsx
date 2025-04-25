@@ -665,6 +665,20 @@ export default function CollegeListTab() {
     setRegionFilter("All");
   };
 
+  // Function to check if a college is already in the user's list
+  const isCollegeInUserList = (collegeId: string): boolean => {
+    return userColleges.some(userCollege => userCollege.college_id === collegeId);
+  };
+
+  // Clear all selected colleges
+  const clearSelectedColleges = (): void => {
+    setSelectedColleges([]);
+    toast({
+      title: "Selection cleared",
+      description: "All selected colleges have been cleared."
+    });
+  };
+
   if (isLoading && userColleges.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -1035,9 +1049,19 @@ export default function CollegeListTab() {
                   Showing {filteredCollegesForSelection.length} of {colleges.length} colleges
                 </p>
                 {filteredCollegesForSelection.length > 0 && selectedColleges.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedColleges.length} college{selectedColleges.length !== 1 ? 's' : ''} selected
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedColleges.length} college{selectedColleges.length !== 1 ? 's' : ''} selected
+                    </p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearSelectedColleges}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 )}
               </div>
               
@@ -1056,31 +1080,41 @@ export default function CollegeListTab() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCollegesForSelection.map((college) => (
-                      <TableRow 
-                        key={college.id}
-                        className={selectedColleges.includes(college.id) ? "bg-muted" : ""}
-                        onClick={() => toggleCollegeSelection(college.id)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={selectedColleges.includes(college.id)}
-                            onChange={() => {}}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                        <TableCell>{college.name}</TableCell>
-                        <TableCell>{college.location}</TableCell>
-                        <TableCell>{college.type}</TableCell>
-                        <TableCell>{college.size}</TableCell>
-                        <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
-                        <TableCell>{college.ranking}</TableCell>
-                        <TableCell>${college.tuition.toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredCollegesForSelection.map((college) => {
+                      const alreadyAdded = isCollegeInUserList(college.id);
+                      return (
+                        <TableRow 
+                          key={college.id}
+                          className={`
+                            ${selectedColleges.includes(college.id) ? "bg-muted" : ""}
+                            ${alreadyAdded ? "opacity-50" : ""}
+                          `}
+                          onClick={() => !alreadyAdded && toggleCollegeSelection(college.id)}
+                          style={{ cursor: alreadyAdded ? "not-allowed" : "pointer" }}
+                        >
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedColleges.includes(college.id)}
+                              disabled={alreadyAdded}
+                              onChange={() => {}}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-4 w-4"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {college.name}
+                            {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">(Already added)</span>}
+                          </TableCell>
+                          <TableCell>{college.location}</TableCell>
+                          <TableCell>{college.type}</TableCell>
+                          <TableCell>{college.size}</TableCell>
+                          <TableCell>{(college.acceptance_rate * 100).toFixed(1)}%</TableCell>
+                          <TableCell>{college.ranking}</TableCell>
+                          <TableCell>${college.tuition.toLocaleString()}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {filteredCollegesForSelection.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-4">
@@ -1094,7 +1128,17 @@ export default function CollegeListTab() {
               
               {selectedColleges.length > 0 && (
                 <div className="mt-2 p-2 bg-muted rounded-md">
-                  <p className="text-sm font-medium">Selected Colleges:</p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium">Selected Colleges:</p>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearSelectedColleges}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {selectedColleges.map((collegeId) => {
                       const college = colleges.find((c) => c.id === collegeId);
