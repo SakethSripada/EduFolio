@@ -474,13 +474,36 @@ ${activities.map((activity, index) => `#${index + 1}: ${formatActivityForAI(acti
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Club">Club</SelectItem>
-                          <SelectItem value="Sport">Sport</SelectItem>
-                          <SelectItem value="Volunteer">Volunteer</SelectItem>
-                          <SelectItem value="Work">Work</SelectItem>
-                          <SelectItem value="Internship">Internship</SelectItem>
-                          <SelectItem value="Research">Research</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
+                            <SelectItem value="Academic">Academic</SelectItem>
+                            <SelectItem value="Art">Art</SelectItem>
+                            <SelectItem value="Athletics: Club">Athletics: Club</SelectItem>
+                            <SelectItem value="Athletics: JV/Varsity">Athletics: JV/Varsity</SelectItem>
+                            <SelectItem value="Career Oriented">Career Oriented</SelectItem>
+                            <SelectItem value="Community Service (Volunteer)">Community Service (Volunteer)</SelectItem>
+                            <SelectItem value="Computer/Technology">Computer/Technology</SelectItem>
+                            <SelectItem value="Cultural">Cultural</SelectItem>
+                            <SelectItem value="Dance">Dance</SelectItem>
+                            <SelectItem value="Debate/Speech">Debate/Speech</SelectItem>
+                            <SelectItem value="Environmental">Environmental</SelectItem>
+                            <SelectItem value="Family Responsibilities">Family Responsibilities</SelectItem>
+                            <SelectItem value="Foreign Exchange">Foreign Exchange</SelectItem>
+                            <SelectItem value="Foreign Language">Foreign Language</SelectItem>
+                            <SelectItem value="Internship">Internship</SelectItem>
+                            <SelectItem value="Journalism/Publication">Journalism/Publication</SelectItem>
+                            <SelectItem value="Junior R.O.T.C.">Junior R.O.T.C.</SelectItem>
+                            <SelectItem value="LGBT">LGBT</SelectItem>
+                            <SelectItem value="Music: Instrumental">Music: Instrumental</SelectItem>
+                            <SelectItem value="Music: Vocal">Music: Vocal</SelectItem>
+                            <SelectItem value="Religious">Religious</SelectItem>
+                            <SelectItem value="Research">Research</SelectItem>
+                            <SelectItem value="Robotics">Robotics</SelectItem>
+                            <SelectItem value="School Spirit">School Spirit</SelectItem>
+                            <SelectItem value="Science/Math">Science/Math</SelectItem>
+                            <SelectItem value="Social Justice">Social Justice</SelectItem>
+                            <SelectItem value="Student Govt./Politics">Student Govt./Politics</SelectItem>
+                            <SelectItem value="Theater/Drama">Theater/Drama</SelectItem>
+                            <SelectItem value="Work (Paid)">Work (Paid)</SelectItem>
+                            <SelectItem value="Other Club/Activity">Other Club/Activity</SelectItem>
                         </SelectContent>
                       </Select>
                       {formErrors.activity_type && <p className="text-sm text-red-500">{formErrors.activity_type}</p>}

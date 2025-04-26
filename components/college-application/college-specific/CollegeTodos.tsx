@@ -402,7 +402,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-semibold">College Application To-Do List</h2>
+        <h2 className="text-2xl font-semibold">{collegeName} To-Do List</h2>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
@@ -416,34 +416,31 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
         </div>
       </div>
 
+      <div className="flex space-x-2">
+        <Button
+          variant={activeFilter === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveFilter("all")}
+        >
+          All
+        </Button>
+        <Button
+          variant={activeFilter === "pending" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveFilter("pending")}
+        >
+          Pending
+        </Button>
+        <Button
+          variant={activeFilter === "completed" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveFilter("completed")}
+        >
+          Completed
+        </Button>
+      </div>
+
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Tasks for {collegeName}</CardTitle>
-          <CardDescription>Manage your application tasks for this college</CardDescription>
-          <div className="flex space-x-2 mt-2">
-            <Button
-              variant={activeFilter === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFilter("all")}
-            >
-              All
-            </Button>
-            <Button
-              variant={activeFilter === "pending" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFilter("pending")}
-            >
-              Pending
-            </Button>
-            <Button
-              variant={activeFilter === "completed" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveFilter("completed")}
-            >
-              Completed
-            </Button>
-          </div>
-        </CardHeader>
         <CardContent>
           {filteredTodos.length === 0 ? (
             <div className="text-center text-muted-foreground py-6 border rounded-md">
@@ -727,7 +724,7 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
                 <p className="text-muted-foreground">No general tasks found to import.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
                 {generalTodos.map((todo) => (
                   <div key={todo.id} className="flex items-start space-x-3 p-3 border rounded-md">
                     <input
@@ -738,18 +735,10 @@ export default function CollegeTodos({ collegeId, collegeName }: CollegeTodosPro
                     />
                     <div className="flex-1">
                       <h4 className="font-medium">{todo.title}</h4>
-                      {todo.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">{todo.description}</p>
-                      )}
+                      <p className="text-sm text-muted-foreground line-clamp-2">{todo.description}</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {getPriorityBadge(todo.priority)}
                         <Badge variant="outline">{todo.category}</Badge>
-                        {todo.due_date_display && (
-                          <div className="flex items-center text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {todo.due_date_display}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>

@@ -80,6 +80,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null)
   const [showAIAssistant, setShowAIAssistant] = useState(false)
+  const [collegeName, setCollegeName] = useState<string>("")
   const { user } = useAuth()
   const { toast } = useToast()
   const supabase = createClientComponentClient<Database>()
@@ -93,6 +94,16 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
 
       setTimeout(async () => {
         try {
+          // Fetch college name
+          const { data: collegeData, error: collegeError } = await supabase
+            .from("colleges")
+            .select("name")
+            .eq("id", collegeId)
+            .single()
+
+          if (collegeError) throw collegeError
+          if (collegeData) setCollegeName(collegeData.name)
+          
           // Fetch college-specific activities
           const { data: collegeActivitiesData, error: collegeActivitiesError } = await supabase
             .from("college_extracurricular_activities")
@@ -464,10 +475,10 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">College-Specific Extracurriculars</h2>
-        <div className="flex gap-2">
+        <h2 className="text-xl font-semibold">{collegeName ? `${collegeName} Extracurriculars` : 'College Extracurriculars'}</h2>
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
@@ -623,15 +634,38 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Club">Club</SelectItem>
-                    <SelectItem value="Sport">Sport</SelectItem>
-                    <SelectItem value="Volunteer">Volunteer</SelectItem>
-                    <SelectItem value="Work">Work</SelectItem>
-                    <SelectItem value="Internship">Internship</SelectItem>
-                    <SelectItem value="Research">Research</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
+                      <SelectContent>
+                            <SelectItem value="Academic">Academic</SelectItem>
+                            <SelectItem value="Art">Art</SelectItem>
+                            <SelectItem value="Athletics: Club">Athletics: Club</SelectItem>
+                            <SelectItem value="Athletics: JV/Varsity">Athletics: JV/Varsity</SelectItem>
+                            <SelectItem value="Career Oriented">Career Oriented</SelectItem>
+                            <SelectItem value="Community Service (Volunteer)">Community Service (Volunteer)</SelectItem>
+                            <SelectItem value="Computer/Technology">Computer/Technology</SelectItem>
+                            <SelectItem value="Cultural">Cultural</SelectItem>
+                            <SelectItem value="Dance">Dance</SelectItem>
+                            <SelectItem value="Debate/Speech">Debate/Speech</SelectItem>
+                            <SelectItem value="Environmental">Environmental</SelectItem>
+                            <SelectItem value="Family Responsibilities">Family Responsibilities</SelectItem>
+                            <SelectItem value="Foreign Exchange">Foreign Exchange</SelectItem>
+                            <SelectItem value="Foreign Language">Foreign Language</SelectItem>
+                            <SelectItem value="Internship">Internship</SelectItem>
+                            <SelectItem value="Journalism/Publication">Journalism/Publication</SelectItem>
+                            <SelectItem value="Junior R.O.T.C.">Junior R.O.T.C.</SelectItem>
+                            <SelectItem value="LGBT">LGBT</SelectItem>
+                            <SelectItem value="Music: Instrumental">Music: Instrumental</SelectItem>
+                            <SelectItem value="Music: Vocal">Music: Vocal</SelectItem>
+                            <SelectItem value="Religious">Religious</SelectItem>
+                            <SelectItem value="Research">Research</SelectItem>
+                            <SelectItem value="Robotics">Robotics</SelectItem>
+                            <SelectItem value="School Spirit">School Spirit</SelectItem>
+                            <SelectItem value="Science/Math">Science/Math</SelectItem>
+                            <SelectItem value="Social Justice">Social Justice</SelectItem>
+                            <SelectItem value="Student Govt./Politics">Student Govt./Politics</SelectItem>
+                            <SelectItem value="Theater/Drama">Theater/Drama</SelectItem>
+                            <SelectItem value="Work (Paid)">Work (Paid)</SelectItem>
+                            <SelectItem value="Other Club/Activity">Other Club/Activity</SelectItem>
+                        </SelectContent>
                 </Select>
                 {formErrors.activity_type && <p className="text-sm text-red-500">{formErrors.activity_type}</p>}
               </div>
@@ -756,16 +790,10 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
       </Dialog>
 
       {/* Import Activities Dialog */}
-      <Dialog open={isImportingActivities} onOpenChange={(open) => {
-        if (!open) {
-          // Only handle close events here
-          setIsImportingActivities(false)
-          setSelectedActivities({})
-        }
-      }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <Dialog open={isImportingActivities} onOpenChange={setIsImportingActivities}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Import Activities</DialogTitle>
+            <DialogTitle>Import Extracurricular Activities</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground mb-4">
@@ -776,7 +804,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
                 <p className="text-muted-foreground">No general activities found to import.</p>
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-hidden max-h-[400px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

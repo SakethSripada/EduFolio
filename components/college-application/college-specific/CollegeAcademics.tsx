@@ -71,6 +71,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const supabase = createClientComponentClient<Database>()
+  const [collegeName, setCollegeName] = useState<string>("")
 
   // Update the useEffect to use setTimeout for Supabase calls
   useEffect(() => {
@@ -81,6 +82,16 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
 
       setTimeout(async () => {
         try {
+          // Fetch college name
+          const { data: collegeData, error: collegeError } = await supabase
+            .from("colleges")
+            .select("name")
+            .eq("id", collegeId)
+            .single()
+
+          if (collegeError) throw collegeError
+          if (collegeData) setCollegeName(collegeData.name)
+
           // Fetch college-specific courses
           const { data: collegeCoursesData, error: collegeCoursesError } = await supabase
             .from("college_courses")
@@ -456,7 +467,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">College-Specific Courses</h2>
+        <h2 className="text-xl font-semibold">{collegeName ? `${collegeName} Courses` : 'College Courses'}</h2>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -475,11 +486,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Academic Courses</CardTitle>
-          <CardDescription>Courses you're highlighting for this specific college</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="flex overflow-x-auto pb-2 mb-4">
             <div className="flex space-x-2">
               <Button
@@ -908,7 +915,7 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
                 <p className="text-muted-foreground">No general courses found to import.</p>
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-hidden max-h-[400px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
