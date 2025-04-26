@@ -74,6 +74,7 @@ export default function EssaysTab() {
   const [idCounter, setIdCounter] = useState(0)
   const [aiAction, setAiAction] = useState<"feedback" | "grammar" | "rephrase" | null>(null)
   const [collapsedEssays, setCollapsedEssays] = useState<Record<string, boolean>>({})
+  const [selectedDefaultPrompt, setSelectedDefaultPrompt] = useState<string | null>(null)
   const { user } = useAuth()
   const { toast } = useToast()
   const supabase = createClientComponentClient<Database>()
@@ -112,6 +113,17 @@ export default function EssaysTab() {
   const [savingEssay, setSavingEssay] = useState<string | null>(null)
   // Add a state for initializing collapsedEssays only once
   const [didInitCollapse, setDidInitCollapse] = useState(false)
+
+  // Common App personal statement prompts
+  const commonAppPrompts = [
+    "Some students have a background, identity, interest, or talent that is so meaningful they believe their application would be incomplete without it. If this sounds like you, then please share your story.",
+    "The lessons we take from obstacles we encounter can be fundamental to later success. Recount a time when you faced a challenge, setback, or failure. How did it affect you, and what did you learn from the experience?",
+    "Reflect on a time when you questioned or challenged a belief or idea. What prompted your thinking? What was the outcome?",
+    "Reflect on something that someone has done for you that has made you happy or thankful in a surprising way. How has this gratitude affected or motivated you?",
+    "Discuss an accomplishment, event, or realization that sparked a period of personal growth and a new understanding of yourself or others.",
+    "Describe a topic, idea, or concept you find so engaging that it makes you lose all track of time. Why does it captivate you? What or who do you turn to when you want to learn more?",
+    "Share an essay on any topic of your choice. It can be one you've already written, one that responds to a different prompt, or one of your own design."
+  ]
 
   // Function to generate unique IDs
   const generateUniqueId = () => {
@@ -867,6 +879,34 @@ export default function EssaysTab() {
     }
   }, [editingEssay, essays]);
 
+  // Function to get readable prompt name for the dropdown
+  const getPromptName = (index: number): string => {
+    const truncatedPrompts = [
+      "Background, identity, interest, or talent",
+      "Lessons from obstacles, challenges, or failure",
+      "Questioned or challenged a belief or idea",
+      "Gratitude for something done for you",
+      "Accomplishment that sparked personal growth",
+      "Topic or concept that makes you lose track of time",
+      "Essay on topic of your choice"
+    ]
+    
+    return `Prompt #${index + 1}: ${truncatedPrompts[index]}`
+  }
+  
+  // Handle selecting a default prompt
+  const handleSelectDefaultPrompt = (promptIndex: number) => {
+    const selectedPrompt = commonAppPrompts[promptIndex]
+    setSelectedDefaultPrompt(selectedPrompt)
+    setNewEssay({
+      ...newEssay,
+      prompt: selectedPrompt,
+      title: "Common App Personal Statement",
+      target_word_count: "650", // Common App essays typically have a 650-word limit
+      is_common_app: true
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -921,13 +961,45 @@ export default function EssaysTab() {
                   {formErrors.prompt && <p className="text-xs text-destructive">{formErrors.prompt}</p>}
                 </div>
                 <div className="grid gap-2">
+                  <Label>Use Common App Prompt</Label>
+                  <Select 
+                    value={selectedDefaultPrompt || "custom_prompt"} 
+                    onValueChange={(value) => {
+                      if (value === "custom_prompt") {
+                        setSelectedDefaultPrompt(null)
+                        setNewEssay({ ...newEssay, is_common_app: false })
+                        return
+                      }
+                      const index = commonAppPrompts.findIndex(prompt => prompt === value)
+                      if (index !== -1) {
+                        handleSelectDefaultPrompt(index)
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a Common App prompt (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
+                      {commonAppPrompts.map((prompt, index) => (
+                        <SelectItem key={index} value={prompt}>
+                          {getPromptName(index)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    These are the 2023-2024 Common App personal statement prompts
+                  </p>
+                </div>
+                <div className="grid gap-2">
                   <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
                   <NumericInput
                     id="targetWordCount"
                     min={0}
                     value={newEssay.target_word_count === "" ? null : parseFloat(newEssay.target_word_count)}
                     onChange={(value) => setNewEssay({ ...newEssay, target_word_count: value === null ? "" : value.toString() })}
-                    placeholder="e.g., 650"
+                    placeholder="e.g., 650 for Common App"
                   />
                   {formErrors.target_word_count && <p className="text-xs text-destructive">{formErrors.target_word_count}</p>}
                 </div>
@@ -983,10 +1055,27 @@ export default function EssaysTab() {
                 </div>
               </div>
               <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                  setFormSubmitted(false);
+                  setFormErrors({});
+                  setNewEssay({
+                    title: "",
+                    prompt: "",
+                    content: "",
+                    target_word_count: "",
+                    is_common_app: false,
+                    status: "Draft",
+                    external_link: "",
+                  });
+                  setSelectedDefaultPrompt(null);
+                }} className="mr-2">
+                  Cancel
+                </Button>
                 <Button onClick={addEssay} disabled={isLoading}>
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Adding...
                     </>
                   ) : (
                     "Add Essay"
@@ -1398,7 +1487,21 @@ export default function EssaysTab() {
           key={`edit-dialog-${essay.id}`}
           open={editingEssayDetails === essay.id} 
           onOpenChange={(open) => {
-            if (!open) setEditingEssayDetails(null);
+            if (!open) {
+              setEditingEssayDetails(null);
+              setSelectedDefaultPrompt(null);
+            } else {
+              // Check if this essay uses a Common App prompt
+              const commonAppPromptIndex = commonAppPrompts.findIndex(
+                (prompt) => prompt === essay.prompt
+              );
+              
+              if (commonAppPromptIndex !== -1) {
+                setSelectedDefaultPrompt(commonAppPrompts[commonAppPromptIndex]);
+              } else {
+                setSelectedDefaultPrompt(null);
+              }
+            }
           }}
         >
           <DialogContent>
@@ -1420,6 +1523,56 @@ export default function EssaysTab() {
                 />
               </div>
               <div className="grid gap-2">
+                <Label>Use Common App Prompt</Label>
+                <Select 
+                  value={selectedDefaultPrompt || "custom_prompt"} 
+                  onValueChange={(value) => {
+                    if (value === "custom_prompt") {
+                      setSelectedDefaultPrompt(null);
+                      
+                      // Update essay without changing the current prompt
+                      const updatedEssay = { ...essay, is_common_app: false };
+                      const updatedEssays = [...essays];
+                      updatedEssays[index] = updatedEssay;
+                      setEssays(updatedEssays);
+                      return;
+                    }
+                    
+                    const promptIndex = commonAppPrompts.findIndex(prompt => prompt === value);
+                    if (promptIndex !== -1) {
+                      setSelectedDefaultPrompt(value);
+                      
+                      // Update essay with Common App prompt
+                      const updatedEssay = { 
+                        ...essay, 
+                        prompt: value,
+                        title: essay.title === "" ? "Common App Personal Statement" : essay.title,
+                        target_word_count: essay.target_word_count || 650,
+                        is_common_app: true
+                      };
+                      const updatedEssays = [...essays];
+                      updatedEssays[index] = updatedEssay;
+                      setEssays(updatedEssays);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a Common App prompt (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
+                    {commonAppPrompts.map((prompt, idx) => (
+                      <SelectItem key={idx} value={prompt}>
+                        {getPromptName(idx)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  These are the 2023-2024 Common App personal statement prompts
+                </p>
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="edit-prompt">Essay Prompt</Label>
                 <Textarea
                   id="edit-prompt"
@@ -1433,13 +1586,16 @@ export default function EssaysTab() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-target-word-count">Target Word Count</Label>
-                <Input
-                  id="edit-target-word-count"
-                  type="number"
-                  defaultValue={essay.target_word_count || ""}
-                  onChange={(e) => {
-                    const updatedEssay = { ...essay, target_word_count: e.target.value ? parseInt(e.target.value) : null };
+                <Label htmlFor="edit-target-count">Target Word Count (Optional)</Label>
+                <NumericInput
+                  id="edit-target-count"
+                  min={0}
+                  value={essay.target_word_count ? parseFloat(essay.target_word_count.toString()) : null}
+                  onChange={(value) => {
+                    const updatedEssay = { 
+                      ...essay, 
+                      target_word_count: value
+                    };
                     const updatedEssays = [...essays];
                     updatedEssays[index] = updatedEssay;
                     setEssays(updatedEssays);

@@ -105,6 +105,18 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const [aiIsLoading, setAiIsLoading] = useState(false)
   const [aiFeedbackFocus, setAiFeedbackFocus] = useState("")
   const [selectedEssayForAi, setSelectedEssayForAi] = useState<string | null>(null)
+  const [selectedDefaultPrompt, setSelectedDefaultPrompt] = useState<string | null>(null)
+  
+  // Common App personal statement prompts
+  const commonAppPrompts = [
+    "Some students have a background, identity, interest, or talent that is so meaningful they believe their application would be incomplete without it. If this sounds like you, then please share your story.",
+    "The lessons we take from obstacles we encounter can be fundamental to later success. Recount a time when you faced a challenge, setback, or failure. How did it affect you, and what did you learn from the experience?",
+    "Reflect on a time when you questioned or challenged a belief or idea. What prompted your thinking? What was the outcome?",
+    "Reflect on something that someone has done for you that has made you happy or thankful in a surprising way. How has this gratitude affected or motivated you?",
+    "Discuss an accomplishment, event, or realization that sparked a period of personal growth and a new understanding of yourself or others.",
+    "Describe a topic, idea, or concept you find so engaging that it makes you lose all track of time. Why does it captivate you? What or who do you turn to when you want to learn more?",
+    "Share an essay on any topic of your choice. It can be one you've already written, one that responds to a different prompt, or one of your own design."
+  ]
   
   // Constants
   const SAVE_DEBOUNCE_DELAY = 2000; // 2 seconds
@@ -270,14 +282,25 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   }
 
   const startEditEssay = (essayId: string) => {
-    const essayToEdit = essays.find((e) => e.id === essayId)
+    const essayToEdit = essays.find((essay) => essay.id === essayId)
     if (essayToEdit) {
+      // Check if this essay uses a Common App prompt
+      const commonAppPromptIndex = commonAppPrompts.findIndex(
+        (prompt) => prompt === essayToEdit.prompt
+      )
+      
+      if (commonAppPromptIndex !== -1) {
+        setSelectedDefaultPrompt(commonAppPrompts[commonAppPromptIndex])
+      } else {
+        setSelectedDefaultPrompt(null)
+      }
+      
       setNewEssay({
         title: essayToEdit.title,
         prompt: essayToEdit.prompt,
-        content: essayToEdit.content,
         target_word_count: essayToEdit.target_word_count,
         status: essayToEdit.status,
+        external_link: essayToEdit.external_link,
       })
       setEditingEssayId(essayId)
       setIsEditingEssay(true)
@@ -728,6 +751,33 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     });
   }
 
+  // Handle selecting a default prompt
+  const handleSelectDefaultPrompt = (promptIndex: number) => {
+    const selectedPrompt = commonAppPrompts[promptIndex]
+    setSelectedDefaultPrompt(selectedPrompt)
+    setNewEssay({
+      ...newEssay,
+      prompt: selectedPrompt,
+      title: "Common App Personal Statement",
+      target_word_count: 650 // Common App essays typically have a 650-word limit
+    })
+  }
+
+  // Get readable prompt name for the dropdown
+  const getPromptName = (index: number): string => {
+    const truncatedPrompts = [
+      "Background, identity, interest, or talent",
+      "Lessons from obstacles, challenges, or failure",
+      "Questioned or challenged a belief or idea",
+      "Gratitude for something done for you",
+      "Accomplishment that sparked personal growth",
+      "Topic or concept that makes you lose track of time",
+      "Essay on topic of your choice"
+    ]
+    
+    return `Prompt #${index + 1}: ${truncatedPrompts[index]}`
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -957,13 +1007,48 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               />
               {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
             </div>
+            
+            <div className="grid gap-2">
+              <Label>Use Common App Personal Statement Prompt</Label>
+              <Select 
+                value={selectedDefaultPrompt || "custom_prompt"} 
+                onValueChange={(value) => {
+                  if (value === "custom_prompt") {
+                    setSelectedDefaultPrompt(null)
+                    return
+                  }
+                  const index = commonAppPrompts.findIndex(prompt => prompt === value)
+                  if (index !== -1) {
+                    handleSelectDefaultPrompt(index)
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a Common App prompt (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
+                  {commonAppPrompts.map((prompt, index) => (
+                    <SelectItem key={index} value={prompt}>
+                      {getPromptName(index)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                These are the 2023-2024 Common App personal statement prompts
+              </p>
+            </div>
+            
             <div className="grid gap-2">
               <Label htmlFor="prompt">Essay Prompt</Label>
               <Textarea
                 id="prompt"
                 value={newEssay.prompt || ""}
                 onChange={(e) => setNewEssay({ ...newEssay, prompt: e.target.value })}
+                rows={4}
               />
+              {formErrors.prompt && <p className="text-sm text-red-500">{formErrors.prompt}</p>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="targetWordCount">Target Word Count (Optional)</Label>
@@ -1045,6 +1130,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               status: "Draft",
             })
             setFormErrors({})
+            setSelectedDefaultPrompt(null)
           }
         }}
       >
@@ -1062,12 +1148,46 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               />
               {formErrors.title && <p className="text-sm text-red-500">{formErrors.title}</p>}
             </div>
+            
+            <div className="grid gap-2">
+              <Label>Use Common App Personal Statement Prompt</Label>
+              <Select 
+                value={selectedDefaultPrompt || "custom_prompt"} 
+                onValueChange={(value) => {
+                  if (value === "custom_prompt") {
+                    setSelectedDefaultPrompt(null)
+                    return
+                  }
+                  const index = commonAppPrompts.findIndex(prompt => prompt === value)
+                  if (index !== -1) {
+                    handleSelectDefaultPrompt(index)
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a Common App prompt (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
+                  {commonAppPrompts.map((prompt, index) => (
+                    <SelectItem key={index} value={prompt}>
+                      {getPromptName(index)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                These are the 2023-2024 Common App personal statement prompts
+              </p>
+            </div>
+            
             <div className="grid gap-2">
               <Label htmlFor="prompt">Essay Prompt</Label>
               <Textarea
                 id="prompt"
                 value={newEssay.prompt || ""}
                 onChange={(e) => setNewEssay({ ...newEssay, prompt: e.target.value })}
+                rows={4}
               />
               {formErrors.prompt && <p className="text-sm text-red-500">{formErrors.prompt}</p>}
             </div>
