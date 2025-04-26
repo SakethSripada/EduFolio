@@ -893,6 +893,7 @@ export default function EssaysTab() {
     }
   };
 
+  // Add external essay function
   const addExternalEssay = async () => {
     if (!user) return
     
@@ -1374,6 +1375,75 @@ export default function EssaysTab() {
     )
   }
 
+  // Add a function to update essay details
+  const updateEssayDetails = async () => {
+    if (!user || !editingEssayDetails) return
+    
+    setFormSubmitted(true)
+    
+    // Validate the form
+    const errors: Record<string, string> = {}
+    if (!newEssay.title.trim()) errors.title = "Essay title is required"
+    if (!newEssay.prompt.trim()) errors.prompt = "Essay prompt is required"
+    
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) return
+    
+    const essayToUpdate = essays.find(essay => essay.id === editingEssayDetails)
+    if (!essayToUpdate) {
+      setEditingEssayDetails(null)
+      return
+    }
+    
+    setIsLoading(true)
+    try {
+      const { error } = await supabase
+        .from("essays")
+        .update({
+          title: newEssay.title.trim(),
+          prompt: newEssay.prompt.trim(),
+          is_common_app: newEssay.is_common_app,
+          status: newEssay.status,
+          target_word_count: newEssay.target_word_count ? parseFloat(newEssay.target_word_count.toString()) : null,
+          external_link: newEssay.external_link?.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingEssayDetails)
+      
+      if (error) throw error
+      
+      // Update the essay in local state
+      setEssays(essays.map(essay => {
+        if (essay.id === editingEssayDetails) {
+          return {
+            ...essay,
+            title: newEssay.title.trim(),
+            prompt: newEssay.prompt.trim(),
+            is_common_app: newEssay.is_common_app,
+            status: newEssay.status,
+            target_word_count: newEssay.target_word_count ? parseFloat(newEssay.target_word_count.toString()) : null,
+            external_link: newEssay.external_link?.trim() || null
+          }
+        }
+        return essay
+      }))
+      
+      setEditingEssayDetails(null)
+      toast({
+        title: "Essay updated",
+        description: "Essay details have been updated successfully."
+      })
+    } catch (error) {
+      toast({
+        title: "Error updating essay",
+        description: handleSupabaseError(error, "There was a problem updating the essay details."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -1692,7 +1762,34 @@ export default function EssaysTab() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => setEditingEssayDetails(essay.id)}
+                          onClick={() => {
+                            // First populate the form with current data
+                            setNewEssay({
+                              title: essay.title,
+                              prompt: essay.prompt,
+                              content: essay.content,
+                              target_word_count: essay.target_word_count !== null 
+                                ? essay.target_word_count.toString() 
+                                : "",
+                              is_common_app: essay.is_common_app || false,
+                              status: essay.status || "Draft",
+                              external_link: essay.external_link || "",
+                            });
+                            
+                            // Check if this essay uses a Common App prompt
+                            const commonAppPromptIndex = commonAppPrompts.findIndex(
+                              (prompt) => prompt === essay.prompt
+                            );
+                            
+                            if (commonAppPromptIndex !== -1) {
+                              setSelectedDefaultPrompt(commonAppPrompts[commonAppPromptIndex]);
+                            } else {
+                              setSelectedDefaultPrompt(null);
+                            }
+                            
+                            // Then set the editing ID to open the dialog
+                            setEditingEssayDetails(essay.id);
+                          }}
                         >
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit Details</span>
@@ -2021,6 +2118,154 @@ export default function EssaysTab() {
         }}
         variant="destructive"
       />
+
+      {/* Edit Essay Details Dialog */}
+      <Dialog 
+        open={!!editingEssayDetails} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingEssayDetails(null);
+            setFormErrors({});
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Essay Details</DialogTitle>
+          </DialogHeader>
+          
+          <FormErrorSummary errors={formErrors} show={formSubmitted} />
+          
+          <div className="grid gap-4 py-4">
+            {editingEssayDetails && (
+              <>
+                <div className="grid gap-2">
+                  <RequiredLabel htmlFor="edit-title">Essay Title</RequiredLabel>
+                  <Input
+                    id="edit-title"
+                    value={newEssay.title}
+                    onChange={(e) => setNewEssay({ ...newEssay, title: e.target.value })}
+                  />
+                  {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
+                </div>
+                <div className="grid gap-2">
+                  <RequiredLabel htmlFor="edit-prompt">Essay Prompt</RequiredLabel>
+                  <Textarea
+                    id="edit-prompt"
+                    value={newEssay.prompt}
+                    onChange={(e) => setNewEssay({ ...newEssay, prompt: e.target.value })}
+                  />
+                  {formErrors.prompt && <p className="text-xs text-destructive">{formErrors.prompt}</p>}
+                </div>
+                <div className="grid gap-2">
+                  <Label>Use Common App Prompt</Label>
+                  <Select 
+                    value={selectedDefaultPrompt || "custom_prompt"} 
+                    onValueChange={(value) => {
+                      if (value === "custom_prompt") {
+                        setSelectedDefaultPrompt(null)
+                        setNewEssay({ ...newEssay, is_common_app: false })
+                        return
+                      }
+                      const index = commonAppPrompts.findIndex(prompt => prompt === value)
+                      if (index !== -1) {
+                        handleSelectDefaultPrompt(index)
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a Common App prompt (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
+                      {commonAppPrompts.map((prompt, index) => (
+                        <SelectItem key={index} value={prompt}>
+                          {getPromptName(index)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-targetWordCount">Target Word Count (Optional)</Label>
+                  <NumericInput
+                    id="edit-targetWordCount"
+                    min={0}
+                    value={newEssay.target_word_count === "" ? null : parseFloat(newEssay.target_word_count)}
+                    onChange={(value) => setNewEssay({ ...newEssay, target_word_count: value === null ? "" : value.toString() })}
+                  />
+                  {formErrors.target_word_count && <p className="text-xs text-destructive">{formErrors.target_word_count}</p>}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select
+                    defaultValue={newEssay.status}
+                    onValueChange={(value) => setNewEssay({ ...newEssay, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Draft">Draft</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Reviewing">Reviewing</SelectItem>
+                      <SelectItem value="Complete">Complete</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="edit-isCommonApp"
+                      checked={newEssay.is_common_app}
+                      onCheckedChange={(checked) => setNewEssay({ ...newEssay, is_common_app: !!checked })}
+                    />
+                    <Label htmlFor="edit-isCommonApp">This is a Common App essay</Label>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-externalLink">External Link (Optional)</Label>
+                  <Input
+                    id="edit-externalLink"
+                    type="url"
+                    placeholder="e.g. https://docs.google.com/document/d/..."
+                    value={newEssay.external_link}
+                    onChange={(e) => setNewEssay({ ...newEssay, external_link: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Add a link to an external document (Google Docs, Microsoft Word, etc.)
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setEditingEssayDetails(null);
+                setFormErrors({});
+              }} 
+              className="mr-2"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => updateEssayDetails()} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

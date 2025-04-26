@@ -1431,17 +1431,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => {
-                            setEditingEssayId(essay.id);
-                            setIsEditingEssay(true);
-                            setNewEssay({
-                              title: essay.title,
-                              prompt: essay.prompt,
-                              target_word_count: essay.target_word_count,
-                              status: essay.status,
-                              external_link: essay.external_link,
-                            });
-                          }}
+                          onClick={() => startEditEssay(essay.id)}
                         >
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit Details</span>
@@ -1725,6 +1715,31 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
             })
             setFormErrors({})
             setSelectedDefaultPrompt(null)
+          } else if (editingEssayId) {
+            // Find the essay to edit and populate the form
+            const essayToEdit = essays.find(essay => essay.id === editingEssayId);
+            if (essayToEdit) {
+              // Check if this essay uses a Common App prompt
+              const commonAppPromptIndex = commonAppPrompts.findIndex(
+                (prompt) => prompt === essayToEdit.prompt
+              );
+              
+              if (commonAppPromptIndex !== -1) {
+                setSelectedDefaultPrompt(commonAppPrompts[commonAppPromptIndex]);
+              } else {
+                setSelectedDefaultPrompt(null);
+              }
+              
+              // Make sure we have the latest data in the form
+              setNewEssay({
+                title: essayToEdit.title,
+                prompt: essayToEdit.prompt,
+                content: essayToEdit.content,
+                target_word_count: essayToEdit.target_word_count,
+                status: essayToEdit.status,
+                external_link: essayToEdit.external_link,
+              });
+            }
           }
         }}
       >
