@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink, MoveRight } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink, MoveRight, Folder, ChevronRight } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
@@ -58,6 +58,72 @@ const handleSupabaseError = (error: any, defaultMessage: string): string => {
   }
   return defaultMessage
 }
+
+// Recursive component for rendering folders hierarchically
+const FolderItem = ({ 
+  folder, 
+  folders, 
+  selectedFolder, 
+  setSelectedFolder, 
+  level = 0 
+}: { 
+  folder: EssayFolder, 
+  folders: EssayFolder[], 
+  selectedFolder: string | null, 
+  setSelectedFolder: (id: string | null) => void,
+  level?: number 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasChildren = folders.some(f => f.parent_folder_id === folder.id);
+  const childFolders = folders.filter(f => f.parent_folder_id === folder.id);
+  
+  return (
+    <div className="ml-0">
+      <div 
+        className={`p-2 rounded-md cursor-pointer hover:bg-secondary flex items-center gap-2 ${selectedFolder === folder.id ? 'bg-secondary' : ''}`}
+        onClick={() => setSelectedFolder(folder.id)}
+        style={{ paddingLeft: `${(level * 12) + 8}px` }}
+      >
+        {hasChildren ? (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-5 w-5 p-0" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </Button>
+        ) : (
+          <div className="w-5" /> // Spacer for alignment
+        )}
+        <Folder className="h-4 w-4" />
+        <span className="text-sm">{folder.name}</span>
+      </div>
+      
+      {isExpanded && childFolders.length > 0 && (
+        <div>
+          {childFolders.map(childFolder => (
+            <FolderItem
+              key={childFolder.id}
+              folder={childFolder}
+              folders={folders}
+              selectedFolder={selectedFolder}
+              setSelectedFolder={setSelectedFolder}
+              level={level + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysProps) {
   const [essays, setEssays] = useState<Essay[]>([])
@@ -1324,6 +1390,22 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         <Button 
                           variant="ghost" 
                           size="sm" 
+                          onClick={() => setIsMovingEssay(essay.id)}
+                        >
+                          <MoveRight className="h-4 w-4" />
+                          <span className="sr-only">Move</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => duplicateEssay(essay.id)}
+                        >
+                          <Copy className="h-4 w-4" />
+                          <span className="sr-only">Duplicate</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
                           onClick={() => {
                             setEditingEssayId(essay.id);
                             setIsEditingEssay(true);
@@ -1428,16 +1510,6 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                       </Button>
                     ) : (
                       <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingEssay(index)
-                            setEssayContent(essay.content)
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-1" /> Edit Content
-                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -1451,6 +1523,16 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                           onClick={() => duplicateEssay(essay.id)}
                         >
                           <Copy className="h-4 w-4 mr-1" /> Duplicate
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingEssay(index)
+                            setEssayContent(essay.content)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" /> Edit Content
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => getAiFeedback(essay)}>
                           <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
@@ -2144,7 +2226,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Move Essay to Folder</DialogTitle>
             <DialogDescription>
@@ -2153,23 +2235,30 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           </DialogHeader>
           <div className="py-4">
             <div className="mb-4">
-              <Label htmlFor="select-folder">Destination Folder</Label>
-              <Select
-                value={selectedFolder || "root"}
-                onValueChange={(value) => setSelectedFolder(value === "root" ? null : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a folder" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="root">Root (No Folder)</SelectItem>
-                  {folders.map((folder) => (
-                    <SelectItem key={folder.id} value={folder.id}>
-                      {folder.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="mb-2 block">Select Destination Folder</Label>
+              <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-2">
+                <div 
+                  className={`p-2 rounded-md cursor-pointer hover:bg-secondary flex items-center gap-2 ${selectedFolder === null ? 'bg-secondary' : ''}`}
+                  onClick={() => setSelectedFolder(null)}
+                >
+                  <Folder className="h-4 w-4" />
+                  <span>Root (No Folder)</span>
+                </div>
+                
+                {/* Render root-level folders */}
+                {folders
+                  .filter(folder => !folder.parent_folder_id)
+                  .map(folder => (
+                    <FolderItem
+                      key={folder.id}
+                      folder={folder}
+                      folders={folders}
+                      selectedFolder={selectedFolder}
+                      setSelectedFolder={setSelectedFolder}
+                    />
+                  ))
+                }
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -4,10 +4,10 @@ import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink, FolderPlus, Folder, FolderOpen, MoveRight, ArrowLeft, Copy } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink, FolderPlus, Folder, FolderOpen, MoveRight, ArrowLeft, Copy, ChevronRight } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { handleSupabaseError } from "@/lib/supabase"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -62,6 +62,72 @@ type EssayFolder = {
   college_id: string | null
   created_at: string
 }
+
+// Recursive component for rendering folders hierarchically
+const FolderItem = ({ 
+  folder, 
+  folders, 
+  selectedFolder, 
+  setSelectedFolder, 
+  level = 0 
+}: { 
+  folder: EssayFolder, 
+  folders: EssayFolder[], 
+  selectedFolder: string | null, 
+  setSelectedFolder: (id: string | null) => void,
+  level?: number 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasChildren = folders.some(f => f.parent_folder_id === folder.id);
+  const childFolders = folders.filter(f => f.parent_folder_id === folder.id);
+  
+  return (
+    <div className="ml-0">
+      <div 
+        className={`p-2 rounded-md cursor-pointer hover:bg-secondary flex items-center gap-2 ${selectedFolder === folder.id ? 'bg-secondary' : ''}`}
+        onClick={() => setSelectedFolder(folder.id)}
+        style={{ paddingLeft: `${(level * 12) + 8}px` }}
+      >
+        {hasChildren ? (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-5 w-5 p-0" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </Button>
+        ) : (
+          <div className="w-5" /> // Spacer for alignment
+        )}
+        <Folder className="h-4 w-4" />
+        <span className="text-sm">{folder.name}</span>
+      </div>
+      
+      {isExpanded && childFolders.length > 0 && (
+        <div>
+          {childFolders.map(childFolder => (
+            <FolderItem
+              key={childFolder.id}
+              folder={childFolder}
+              folders={folders}
+              selectedFolder={selectedFolder}
+              setSelectedFolder={setSelectedFolder}
+              level={level + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function EssaysTab() {
   const [essays, setEssays] = useState<Essay[]>([])
@@ -1619,6 +1685,23 @@ export default function EssaysTab() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
+                          onClick={() => duplicateEssay(essay.id)}
+                          className="gap-1"
+                        >
+                          <Copy className="h-4 w-4" />
+                          <span className="hidden sm:inline">Duplicate</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditingEssayDetails(essay.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit Details</span>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
                           onClick={() => {
                             setCollapsedEssays({
                               ...collapsedEssays, 
@@ -1634,23 +1717,6 @@ export default function EssaysTab() {
                           <span className="sr-only">
                             {collapsedEssays[essay.id] ? "Expand" : "Collapse"}
                           </span>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setEditingEssayDetails(essay.id)}
-                        >
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit Details</span>
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => duplicateEssay(essay.id)}
-                          className="gap-1"
-                        >
-                          <Copy className="h-4 w-4" />
-                          <span className="hidden sm:inline">Duplicate</span>
                         </Button>
                       </div>
                     </div>
@@ -1723,6 +1789,23 @@ export default function EssaysTab() {
                       </Button>
                     ) : (
                       <>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setIsMovingEssay(essay.id);
+                            setSelectedFolder(essay.folder_id);
+                          }}
+                        >
+                          <MoveRight className="h-4 w-4 mr-1" /> Move
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => duplicateEssay(essay.id)}
+                        >
+                          <Copy className="h-4 w-4 mr-1" /> Duplicate
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -1852,9 +1935,12 @@ export default function EssaysTab() {
 
       {/* Move Essay Dialog */}
       <Dialog open={!!isMovingEssay} onOpenChange={(open) => !open && setIsMovingEssay(null)}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Move Essay to Folder</DialogTitle>
+            <DialogDescription>
+              Choose a destination folder for this essay
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="mb-4">
@@ -1867,16 +1953,20 @@ export default function EssaysTab() {
                   <Folder className="h-4 w-4" />
                   <span>Root (No Folder)</span>
                 </div>
-                {folders.map(folder => (
-                  <div 
-                    key={folder.id}
-                    className={`p-2 rounded-md cursor-pointer hover:bg-secondary flex items-center gap-2 ${selectedFolder === folder.id ? 'bg-secondary' : ''}`}
-                    onClick={() => setSelectedFolder(folder.id)}
-                  >
-                    <Folder className="h-4 w-4" />
-                    <span>{folder.name}</span>
-                  </div>
-                ))}
+                
+                {/* Render root-level folders */}
+                {folders
+                  .filter(folder => !folder.parent_folder_id)
+                  .map(folder => (
+                    <FolderItem
+                      key={folder.id}
+                      folder={folder}
+                      folders={folders}
+                      selectedFolder={selectedFolder}
+                      setSelectedFolder={setSelectedFolder}
+                    />
+                  ))
+                }
               </div>
             </div>
           </div>
@@ -1916,7 +2006,23 @@ export default function EssaysTab() {
         variant="destructive"
       />
 
-      {/* ... existing dialogs ... */}
+      {/* Confirmation Dialog for Deleting Essay */}
+      <ConfirmationDialog
+        open={!!confirmDeleteEssay}
+        onOpenChange={(open) => !open && setConfirmDeleteEssay(null)}
+        title="Delete Essay"
+        description="Are you sure you want to delete this essay? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDeleteEssay) {
+            const index = essays.findIndex((essay) => essay.id === confirmDeleteEssay)
+            if (index !== -1) {
+              deleteEssay(confirmDeleteEssay, index)
+            }
+          }
+        }}
+        variant="destructive"
+      />
     </div>
   )
 }
