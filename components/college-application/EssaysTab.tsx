@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, Info, ChevronUp, ChevronDown, ExternalLink, FolderPlus, Folder, FolderOpen, MoveRight, ArrowLeft, Copy } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { handleSupabaseError } from "@/lib/supabase"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -26,6 +26,7 @@ import AIAssistant from "@/components/ai/AIAssistant"
 import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
 import { NumericInput } from "@/components/ui/numeric-input"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 
 type Essay = {
   id: string
@@ -40,6 +41,7 @@ type Essay = {
   is_common_app: boolean | null
   status: string | null
   external_link: string | null
+  folder_id: string | null
 }
 
 type EssayVersion = {
@@ -49,6 +51,15 @@ type EssayVersion = {
   word_count: number
   character_count: number
   version_name: string | null
+  created_at: string
+}
+
+type EssayFolder = {
+  id: string
+  name: string
+  description: string | null
+  parent_folder_id: string | null
+  college_id: string | null
   created_at: string
 }
 
@@ -114,6 +125,20 @@ export default function EssaysTab() {
   // Add a state for initializing collapsedEssays only once
   const [didInitCollapse, setDidInitCollapse] = useState(false)
 
+  // Add state for folders
+  const [folders, setFolders] = useState<EssayFolder[]>([])
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [isAddingFolder, setIsAddingFolder] = useState(false)
+  const [isMovingEssay, setIsMovingEssay] = useState<string | null>(null)
+  const [newFolder, setNewFolder] = useState({
+    name: "",
+    description: "",
+  })
+  const [folderNavStack, setFolderNavStack] = useState<EssayFolder[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
+
   // Common App personal statement prompts
   const commonAppPrompts = [
     "Some students have a background, identity, interest, or talent that is so meaningful they believe their application would be incomplete without it. If this sounds like you, then please share your story.",
@@ -156,24 +181,35 @@ export default function EssaysTab() {
     const fetchData = async () => {
       performDatabaseOperation(
         async () => {
-          const { data, error } = await supabase
+          // Fetch essays
+          const { data: essaysData, error: essaysError } = await supabase
             .from("essays")
             .select("*")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
 
-          if (error) throw error
+          if (essaysError) throw essaysError
+
+          // Fetch folders
+          const { data: foldersData, error: foldersError } = await supabase
+            .from("essay_folders")
+            .select("*")
+            .eq("user_id", user.id)
+            .is("college_id", null)
+            .order("created_at", { ascending: false })
+
+          if (foldersError) throw foldersError
 
           // Fetch versions for each essay if essays exist
           const versionsMap: Record<string, EssayVersion[]> = {}
-          if (data && data.length > 0) {
-            const versionsPromises = data.map((essay) =>
+          if (essaysData && essaysData.length > 0) {
+            const versionsPromises = essaysData.map((essay) =>
               supabase
                 .from("essay_versions")
                 .select("*")
                 .eq("essay_id", essay.id)
                 .order("created_at", { ascending: false })
-                .limit(MAX_VERSIONS_PER_ESSAY) // Limit to max versions per essay
+                .limit(MAX_VERSIONS_PER_ESSAY)
             )
 
             const versionsResults = await Promise.all(versionsPromises)
@@ -182,7 +218,7 @@ export default function EssaysTab() {
             for (let i = 0; i < versionsResults.length; i++) {
               const result = versionsResults[i];
               if (!result.error && result.data) {
-                const essayId = data[i].id;
+                const essayId = essaysData[i].id;
                 versionsMap[essayId] = result.data;
                 
                 // Check if we need to clean up old versions in the database
@@ -193,11 +229,21 @@ export default function EssaysTab() {
             }
           }
 
-          return { essays: data || [], versions: versionsMap }
+          return { 
+            essays: essaysData || [], 
+            versions: versionsMap,
+            folders: foldersData || []
+          }
         },
         setIsLoading,
         (data) => {
-          setEssays(data.essays)
+          // Filter essays based on current folder
+          const filtered = currentFolderId ? 
+            data.essays.filter((essay: Essay) => essay.folder_id === currentFolderId) : 
+            data.essays.filter((essay: Essay) => !essay.folder_id);
+          
+          setEssays(filtered)
+          setFolders(data.folders)
           setEssayVersions(data.versions)
           
           // Initialize the lastSavedContent and lastVersionTimestamp from loaded data
@@ -219,8 +265,8 @@ export default function EssaysTab() {
         },
         (error) => {
           toast({
-            title: "Error loading essays",
-            description: handleSupabaseError(error, "There was a problem loading your essays."),
+            title: "Error loading essays and folders",
+            description: handleSupabaseError(error, "There was a problem loading your essays and folders."),
             variant: "destructive",
           })
         },
@@ -228,7 +274,7 @@ export default function EssaysTab() {
     }
 
     fetchData()
-  }, [user, toast, MAX_VERSIONS_PER_ESSAY])
+  }, [user, toast, MAX_VERSIONS_PER_ESSAY, currentFolderId])
 
   // New function to clean up versions in the database during initial load
   const cleanupExistingVersions = async (essayId: string, existingVersions: EssayVersion[]) => {
@@ -324,6 +370,7 @@ export default function EssaysTab() {
               is_common_app: newEssay.is_common_app,
               status: newEssay.status,
               external_link: newEssay.external_link || null,
+              folder_id: currentFolderId,
             },
           ])
           .select()
@@ -359,6 +406,10 @@ export default function EssaysTab() {
             [data[0].id]: data[0].content
           });
         }
+        setNewFolder({
+          name: "",
+          description: "",
+        });
         setNewEssay({
           title: "",
           prompt: "",
@@ -907,6 +958,356 @@ export default function EssaysTab() {
     })
   }
 
+  // Function to get folder breadcrumb path
+  const getFolderPath = async (folderId: string): Promise<EssayFolder[]> => {
+    const path: EssayFolder[] = [];
+    let currentId: string | null = folderId;
+    
+    while (currentId) {
+      const folder = folders.find(f => f.id === currentId);
+      if (folder) {
+        path.unshift(folder);
+        currentId = folder.parent_folder_id;
+      } else {
+        // If folder not in state, fetch it from database
+        const { data, error } = await supabase
+          .from("essay_folders")
+          .select("*")
+          .eq("id", currentId)
+          .single();
+        
+        if (error || !data) break;
+        
+        const typedFolderData = data as EssayFolder;
+        path.unshift(typedFolderData);
+        currentId = typedFolderData.parent_folder_id;
+      }
+    }
+    
+    return path;
+  }
+
+  // Function to navigate to a folder
+  const navigateToFolder = async (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+    
+    if (folderId) {
+      const path = await getFolderPath(folderId);
+      setFolderNavStack(path);
+    } else {
+      setFolderNavStack([]);
+    }
+  }
+
+  // Function to add a new folder
+  const addFolder = async () => {
+    if (!user) return
+    
+    if (!newFolder.name.trim()) {
+      toast({
+        title: "Folder name required",
+        description: "Please enter a name for your folder.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    performDatabaseOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("essay_folders")
+          .insert([
+            {
+              user_id: user.id,
+              name: newFolder.name.trim(),
+              description: newFolder.description.trim() || null,
+              parent_folder_id: currentFolderId,
+              college_id: null,
+            },
+          ])
+          .select()
+
+        if (error) throw error
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          setFolders([data[0], ...folders])
+          setNewFolder({
+            name: "",
+            description: "",
+          })
+          setIsAddingFolder(false)
+
+          toast({
+            title: "Folder added",
+            description: "Your folder has been added successfully.",
+          })
+        }
+      },
+      (error) => {
+        toast({
+          title: "Error adding folder",
+          description: handleSupabaseError(error, "There was a problem adding the folder."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  // Function to delete a folder
+  const deleteFolder = async (folderId: string) => {
+    if (!user) return
+    
+    performDatabaseOperation(
+      async () => {
+        // First check if folder has essays or subfolders
+        const { data: folderEssays, error: folderEssaysError } = await supabase
+          .from("essays")
+          .select("id")
+          .eq("folder_id", folderId)
+          .limit(1)
+        
+        if (folderEssaysError) throw folderEssaysError
+        
+        const { data: subfolders, error: subfoldersError } = await supabase
+          .from("essay_folders")
+          .select("id")
+          .eq("parent_folder_id", folderId)
+          .limit(1)
+          
+        if (subfoldersError) throw subfoldersError
+        
+        if ((folderEssays && folderEssays.length > 0) || (subfolders && subfolders.length > 0)) {
+          throw new Error("FOLDER_NOT_EMPTY")
+        }
+        
+        // If folder is empty, delete it
+        const { error } = await supabase
+          .from("essay_folders")
+          .delete()
+          .eq("id", folderId)
+
+        if (error) throw error
+        return { success: true }
+      },
+      setIsLoading,
+      () => {
+        setFolders(folders.filter(folder => folder.id !== folderId))
+        setConfirmDeleteFolder(null)
+        
+        // If we deleted the current folder, navigate back to root
+        if (currentFolderId === folderId) {
+          navigateToFolder(null)
+        }
+        
+        toast({
+          title: "Folder deleted",
+          description: "Your folder has been deleted successfully.",
+        })
+      },
+      (error) => {
+        if (error.message === "FOLDER_NOT_EMPTY") {
+          toast({
+            title: "Folder not empty",
+            description: "Please remove all essays and subfolders before deleting this folder.",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Error deleting folder",
+            description: handleSupabaseError(error, "There was a problem deleting the folder."),
+            variant: "destructive",
+          })
+        }
+      },
+    )
+  }
+
+  // Function to update a folder
+  const updateFolder = async (folderId: string) => {
+    if (!user) return
+    
+    if (!newFolder.name.trim()) {
+      toast({
+        title: "Folder name required",
+        description: "Please enter a name for your folder.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    performDatabaseOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("essay_folders")
+          .update({
+            name: newFolder.name.trim(),
+            description: newFolder.description.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", folderId)
+          .select()
+
+        if (error) throw error
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          setFolders(folders.map(folder => folder.id === folderId ? data[0] : folder))
+          setNewFolder({
+            name: "",
+            description: "",
+          })
+          setEditingFolderId(null)
+
+          // Update breadcrumb path if needed
+          if (folderNavStack.some(folder => folder.id === folderId)) {
+            navigateToFolder(currentFolderId)
+          }
+
+          toast({
+            title: "Folder updated",
+            description: "Your folder has been updated successfully.",
+          })
+        }
+      },
+      (error) => {
+        toast({
+          title: "Error updating folder",
+          description: handleSupabaseError(error, "There was a problem updating the folder."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  // Function to move an essay to a folder
+  const moveEssayToFolder = async (essayId: string, targetFolderId: string | null) => {
+    if (!user) return
+    
+    performDatabaseOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("essays")
+          .update({
+            folder_id: targetFolderId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", essayId)
+          .select()
+
+        if (error) throw error
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          // Update the essays list
+          const essayIndex = essays.findIndex(e => e.id === essayId);
+          
+          if (essayIndex !== -1) {
+            // If current view matches the target folder, update the essay
+            if ((currentFolderId === targetFolderId) || (!currentFolderId && !targetFolderId)) {
+              const updatedEssays = [...essays];
+              updatedEssays[essayIndex] = data[0];
+              setEssays(updatedEssays);
+            } else {
+              // Otherwise, remove it from current view
+              setEssays(essays.filter(e => e.id !== essayId));
+            }
+          } else if ((currentFolderId === targetFolderId) || (!currentFolderId && !targetFolderId)) {
+            // If the essay wasn't in the current view but should be now, add it
+            setEssays([data[0], ...essays]);
+          }
+          
+          setIsMovingEssay(null);
+          setSelectedFolder(null);
+          
+          toast({
+            title: "Essay moved",
+            description: "Your essay has been moved successfully.",
+          })
+        }
+      },
+      (error) => {
+        toast({
+          title: "Error moving essay",
+          description: handleSupabaseError(error, "There was a problem moving the essay."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  // Function to duplicate an essay
+  const duplicateEssay = async (essayId: string) => {
+    if (!user) return
+    
+    performDatabaseOperation(
+      async () => {
+        // First get the essay to duplicate
+        const { data: sourceEssay, error: fetchError } = await supabase
+          .from("essays")
+          .select("*")
+          .eq("id", essayId)
+          .single()
+        
+        if (fetchError) throw fetchError
+        if (!sourceEssay) throw new Error("Essay not found")
+        
+        // Now insert a new essay with the same data
+        const { data: newEssay, error: insertError } = await supabase
+          .from("essays")
+          .insert([
+            {
+              user_id: user.id,
+              title: `${sourceEssay.title} (Copy)`,
+              prompt: sourceEssay.prompt,
+              content: sourceEssay.content,
+              word_count: sourceEssay.word_count,
+              character_count: sourceEssay.character_count,
+              target_word_count: sourceEssay.target_word_count,
+              last_edited: new Date().toISOString(),
+              status: sourceEssay.status,
+              external_link: sourceEssay.external_link,
+              folder_id: sourceEssay.folder_id, // Keep it in the same folder
+              is_common_app: sourceEssay.is_common_app,
+              college_id: sourceEssay.college_id,
+            }
+          ])
+          .select()
+        
+        if (insertError) throw insertError
+        return newEssay
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          // Add the new essay to the current view if it belongs there
+          if ((currentFolderId === data[0].folder_id) || 
+              (!currentFolderId && !data[0].folder_id)) {
+            setEssays([data[0], ...essays])
+          }
+          
+          toast({
+            title: "Essay duplicated",
+            description: "Your essay has been duplicated successfully.",
+          })
+        }
+      },
+      (error) => {
+        toast({
+          title: "Error duplicating essay",
+          description: handleSupabaseError(error, "There was a problem duplicating the essay."),
+          variant: "destructive",
+        })
+      }
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -925,6 +1326,9 @@ export default function EssaysTab() {
           </Button>
           <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>
             <ExternalLink className="h-4 w-4" /> Add External Essay
+          </Button>
+          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingFolder(true)}>
+            <FolderPlus className="h-4 w-4" /> Add Folder
           </Button>
           <Dialog>
             <DialogTrigger asChild>
@@ -1087,39 +1491,103 @@ export default function EssaysTab() {
         </div>
       </div>
 
-      {essays.length > 0 && (
-        <div className="flex justify-end gap-2 mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              const allEssayIds = essays.reduce((acc, essay) => {
-                acc[essay.id] = false;
-                return acc;
-              }, {} as Record<string, boolean>);
-              setCollapsedEssays(allEssayIds);
-            }}
-          >
-            <ChevronUp className="h-4 w-4 mr-1" /> Expand All
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              const allEssayIds = essays.reduce((acc, essay) => {
-                acc[essay.id] = true;
-                return acc;
-              }, {} as Record<string, boolean>);
-              setCollapsedEssays(allEssayIds);
-            }}
-          >
-            <ChevronDown className="h-4 w-4 mr-1" /> Collapse All
-          </Button>
+      {/* Breadcrumb navigation */}
+      {folderNavStack.length > 0 && (
+        <div className="flex items-center mb-4">
+          <Breadcrumb className="mb-4">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={() => navigateToFolder(null)} className="cursor-pointer">
+                  Root
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              {folderNavStack.map((folder, index) => (
+                <React.Fragment key={folder.id}>
+                  {index < folderNavStack.length - 1 ? (
+                    <>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink 
+                          onClick={() => navigateToFolder(folder.id)} 
+                          className="cursor-pointer"
+                        >
+                          {folder.name}
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                    </>
+                  ) : (
+                    <BreadcrumbItem>
+                      <span className="font-medium">{folder.name}</span>
+                    </BreadcrumbItem>
+                  )}
+                </React.Fragment>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
       )}
 
-      {essays.length === 0 ? (
-        <div className="text-center text-muted-foreground py-12 border rounded-md">No essays added yet</div>
+      {/* Folders grid */}
+      {folders.filter(folder => folder.parent_folder_id === currentFolderId).length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+          {folders
+            .filter(folder => folder.parent_folder_id === currentFolderId)
+            .map(folder => (
+              <Card 
+                key={folder.id} 
+                className="cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => navigateToFolder(folder.id)}
+              >
+                <CardHeader className="p-4 flex flex-row items-center gap-2">
+                  <FolderOpen className="h-5 w-5 text-amber-500" />
+                  <div>
+                    <CardTitle className="text-base">{folder.name}</CardTitle>
+                    {folder.description && (
+                      <CardDescription className="text-xs line-clamp-1">
+                        {folder.description}
+                      </CardDescription>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardFooter className="p-2 border-t bg-muted/20 flex justify-end">
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingFolderId(folder.id);
+                        setNewFolder({
+                          name: folder.name,
+                          description: folder.description || "",
+                        });
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDeleteFolder(folder.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            ))}
+        </div>
+      )}
+
+      {/* If in a folder and there are no essays, show empty message */}
+      {essays.length === 0 && folders.filter(folder => folder.parent_folder_id === currentFolderId).length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 border rounded-md">
+          {currentFolderId ? "This folder is empty" : "No essays added yet"}
+        </div>
       ) : (
         <div className="grid gap-6">
           {essays.map((essay, index) => (
@@ -1135,18 +1603,22 @@ export default function EssaysTab() {
                         )}
                         {getStatusBadge(essay.status)}
                       </CardTitle>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center">
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => setShowVersionHistory(essay.id)}
+                          onClick={() => {
+                            setIsMovingEssay(essay.id);
+                            setSelectedFolder(essay.folder_id);
+                          }}
+                          className="gap-1"
                         >
-                          <History className="h-4 w-4" />
-                          <span className="sr-only">Version History</span>
+                          <MoveRight className="h-4 w-4" />
+                          <span className="hidden sm:inline">Move</span>
                         </Button>
                         <Button 
                           variant="ghost" 
-                          size="sm"
+                          size="sm" 
                           onClick={() => {
                             setCollapsedEssays({
                               ...collapsedEssays, 
@@ -1170,6 +1642,15 @@ export default function EssaysTab() {
                         >
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit Details</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => duplicateEssay(essay.id)}
+                          className="gap-1"
+                        >
+                          <Copy className="h-4 w-4" />
+                          <span className="hidden sm:inline">Duplicate</span>
                         </Button>
                       </div>
                     </div>
@@ -1278,429 +1759,164 @@ export default function EssaysTab() {
         </div>
       )}
 
-      {/* Version History Dialog */}
-      <Dialog open={!!showVersionHistory} onOpenChange={(open) => !open && setShowVersionHistory(null)}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      {/* Add Folder Dialog */}
+      <Dialog open={isAddingFolder} onOpenChange={setIsAddingFolder}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <div className="flex justify-between items-center">
-              <DialogTitle>Version History</DialogTitle>
-              {showVersionHistory && essayVersions[showVersionHistory] && essayVersions[showVersionHistory].length > MAX_VERSIONS_PER_ESSAY && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="flex items-center gap-1"
-                  onClick={() => manualCleanupVersions(showVersionHistory)}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <History className="h-4 w-4" />
-                      <span>Clean Up History</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex ml-1">
-                              <Info className="h-4 w-4 text-muted-foreground" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p>Keep only the {MAX_VERSIONS_PER_ESSAY} most recent versions and delete older ones.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            <DialogTitle>Add New Folder</DialogTitle>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            {showVersionHistory && essayVersions[showVersionHistory] && essayVersions[showVersionHistory].length > 0 ? (
-              <div className="space-y-4">
-                {essayVersions[showVersionHistory].map((version) => (
-                  <Card key={version.id}>
-                    <CardHeader className="py-3">
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="text-base">{version.version_name || "Unnamed Version"}</CardTitle>
-                        <CardDescription>
-                          {new Date(version.created_at).toLocaleString()} • Words: {version.word_count} • Characters:{" "}
-                          {version.character_count}
-                        </CardDescription>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="py-2">
-                      <div 
-                        className="p-3 bg-muted/30 rounded-md text-sm max-h-[200px] overflow-y-auto"
-                        dangerouslySetInnerHTML={{ __html: renderSafeHTML(version.content) }}
-                      />
-                    </CardContent>
-                    <CardFooter className="py-2">
-                      <Button size="sm" onClick={() => restoreVersion(showVersionHistory, version.id, version.content)}>
-                        Restore This Version
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">No version history available for this essay</div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add AIAssistant component conditionally */}
-      {showAIAssistant && (
-        <AIAssistant
-          showOnLoad={true}
-          initialContext={{
-            type: "essay",
-            id: selectedEssay?.id,
-            title: selectedEssay?.title || selectedEssay?.prompt || "Essay Writing",
-          }}
-          initialPrompt={
-            selectedEssay && aiAction 
-              ? aiAction === "feedback"
-                ? `Please provide feedback on this essay${selectedEssay.is_common_app ? " (Common App)" : ""}:\n\n${stripHTML(selectedEssay.content)}`
-                : aiAction === "grammar"
-                  ? `Please check this essay${selectedEssay.is_common_app ? " (Common App)" : ""} for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay.content)}`
-                  : `Please help me rephrase this essay${selectedEssay.is_common_app ? " (Common App)" : ""} to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay.content)}`
-              : undefined
-          }
-          onClose={() => {
-            setShowAIAssistant(false);
-            setAiAction(null);
-          }}
-        />
-      )}
-
-      {/* Confirmation Dialog */}
-      <ConfirmationDialog
-        open={!!confirmDeleteEssay}
-        onOpenChange={(open) => !open && setConfirmDeleteEssay(null)}
-        title="Delete Essay"
-        description="Are you sure you want to delete this essay? This action cannot be undone."
-        confirmText="Delete"
-        onConfirm={() => {
-          if (confirmDeleteEssay) {
-            const index = essays.findIndex((essay) => essay.id === confirmDeleteEssay)
-            if (index !== -1) {
-              deleteEssay(confirmDeleteEssay, index)
-            }
-          }
-        }}
-        variant="destructive"
-      />
-
-      {/* Add External Essay Dialog */}
-      <Dialog open={isAddingExternalEssay} onOpenChange={setIsAddingExternalEssay}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add External Essay Link</DialogTitle>
-          </DialogHeader>
-          
-          <FormErrorSummary errors={formErrors} show={formSubmitted} />
-          
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <RequiredLabel htmlFor="ext-title">Essay Title</RequiredLabel>
+              <Label htmlFor="folder-name">Folder Name</Label>
               <Input
-                id="ext-title"
-                value={externalEssay.title}
-                onChange={(e) => setExternalEssay({ ...externalEssay, title: e.target.value })}
-                placeholder="e.g., Common App Personal Statement"
+                id="folder-name"
+                value={newFolder.name}
+                onChange={(e) => setNewFolder({ ...newFolder, name: e.target.value })}
+                placeholder="My Essays"
               />
-              {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="ext-prompt">Essay Prompt (Optional)</Label>
+              <Label htmlFor="folder-description">Description (Optional)</Label>
               <Textarea
-                id="ext-prompt"
-                value={externalEssay.prompt}
-                onChange={(e) => setExternalEssay({ ...externalEssay, prompt: e.target.value })}
-                placeholder="Enter the essay prompt or question..."
-                rows={2}
+                id="folder-description"
+                value={newFolder.description}
+                onChange={(e) => setNewFolder({ ...newFolder, description: e.target.value })}
+                placeholder="A brief description of this folder..."
+                rows={3}
               />
-            </div>
-            <div className="grid gap-2">
-              <RequiredLabel htmlFor="ext-link">External Link</RequiredLabel>
-              <Input
-                id="ext-link"
-                type="url"
-                value={externalEssay.external_link}
-                onChange={(e) => setExternalEssay({ ...externalEssay, external_link: e.target.value })}
-                placeholder="e.g. https://docs.google.com/document/d/..."
-              />
-              {formErrors.external_link && <p className="text-xs text-destructive">{formErrors.external_link}</p>}
-              <p className="text-xs text-muted-foreground">
-                Add a link to your essay in Google Docs, Microsoft Word, etc.
-              </p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="ext-status">Status</Label>
-              <Select
-                value={externalEssay.status}
-                onValueChange={(value) => setExternalEssay({ ...externalEssay, status: value })}
-              >
-                <SelectTrigger id="ext-status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Draft">Draft</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="Reviewing">Reviewing</SelectItem>
-                  <SelectItem value="Complete">Complete</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="ext-common-app"
-                checked={externalEssay.is_common_app}
-                onCheckedChange={(checked) => setExternalEssay({ ...externalEssay, is_common_app: !!checked })}
-              />
-              <Label htmlFor="ext-common-app">This is a Common App essay</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddingExternalEssay(false)}>
+            <Button variant="outline" onClick={() => setIsAddingFolder(false)} className="mr-2">
               Cancel
             </Button>
-            <Button onClick={addExternalEssay} disabled={isLoading}>
+            <Button onClick={addFolder} disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
                 </>
               ) : (
-                "Add External Essay"
+                "Add Folder"
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add all modal dialogs here */}
-      {essays.map((essay, index) => (
-        <Dialog 
-          key={`edit-dialog-${essay.id}`}
-          open={editingEssayDetails === essay.id} 
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingEssayDetails(null);
-              setSelectedDefaultPrompt(null);
-            } else {
-              // Check if this essay uses a Common App prompt
-              const commonAppPromptIndex = commonAppPrompts.findIndex(
-                (prompt) => prompt === essay.prompt
-              );
-              
-              if (commonAppPromptIndex !== -1) {
-                setSelectedDefaultPrompt(commonAppPrompts[commonAppPromptIndex]);
-              } else {
-                setSelectedDefaultPrompt(null);
-              }
-            }
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Essay Details</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-title">Essay Title</Label>
-                <Input
-                  id="edit-title"
-                  defaultValue={essay.title}
-                  onChange={(e) => {
-                    const updatedEssay = { ...essay, title: e.target.value };
-                    const updatedEssays = [...essays];
-                    updatedEssays[index] = updatedEssay;
-                    setEssays(updatedEssays);
-                  }}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Use Common App Prompt</Label>
-                <Select 
-                  value={selectedDefaultPrompt || "custom_prompt"} 
-                  onValueChange={(value) => {
-                    if (value === "custom_prompt") {
-                      setSelectedDefaultPrompt(null);
-                      
-                      // Update essay without changing the current prompt
-                      const updatedEssay = { ...essay, is_common_app: false };
-                      const updatedEssays = [...essays];
-                      updatedEssays[index] = updatedEssay;
-                      setEssays(updatedEssays);
-                      return;
-                    }
-                    
-                    const promptIndex = commonAppPrompts.findIndex(prompt => prompt === value);
-                    if (promptIndex !== -1) {
-                      setSelectedDefaultPrompt(value);
-                      
-                      // Update essay with Common App prompt
-                      const updatedEssay = { 
-                        ...essay, 
-                        prompt: value,
-                        title: essay.title === "" ? "Common App Personal Statement" : essay.title,
-                        target_word_count: essay.target_word_count || 650,
-                        is_common_app: true
-                      };
-                      const updatedEssays = [...essays];
-                      updatedEssays[index] = updatedEssay;
-                      setEssays(updatedEssays);
-                    }
-                  }}
+      {/* Edit Folder Dialog */}
+      <Dialog open={!!editingFolderId} onOpenChange={(open) => !open && setEditingFolderId(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Folder</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-folder-name">Folder Name</Label>
+              <Input
+                id="edit-folder-name"
+                value={newFolder.name}
+                onChange={(e) => setNewFolder({ ...newFolder, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-folder-description">Description (Optional)</Label>
+              <Textarea
+                id="edit-folder-description"
+                value={newFolder.description}
+                onChange={(e) => setNewFolder({ ...newFolder, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingFolderId(null)} className="mr-2">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => editingFolderId && updateFolder(editingFolderId)} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Updating...
+                </>
+              ) : (
+                "Update Folder"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Essay Dialog */}
+      <Dialog open={!!isMovingEssay} onOpenChange={(open) => !open && setIsMovingEssay(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Move Essay to Folder</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="mb-4">
+              <Label className="mb-2 block">Select Destination Folder</Label>
+              <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-2">
+                <div 
+                  className={`p-2 rounded-md cursor-pointer hover:bg-secondary flex items-center gap-2 ${selectedFolder === null ? 'bg-secondary' : ''}`}
+                  onClick={() => setSelectedFolder(null)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a Common App prompt (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="custom_prompt">Custom Prompt</SelectItem>
-                    {commonAppPrompts.map((prompt, idx) => (
-                      <SelectItem key={idx} value={prompt}>
-                        {getPromptName(idx)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  These are the 2023-2024 Common App personal statement prompts
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-prompt">Essay Prompt</Label>
-                <Textarea
-                  id="edit-prompt"
-                  defaultValue={essay.prompt}
-                  onChange={(e) => {
-                    const updatedEssay = { ...essay, prompt: e.target.value };
-                    const updatedEssays = [...essays];
-                    updatedEssays[index] = updatedEssay;
-                    setEssays(updatedEssays);
-                  }}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-target-count">Target Word Count (Optional)</Label>
-                <NumericInput
-                  id="edit-target-count"
-                  min={0}
-                  value={essay.target_word_count ? parseFloat(essay.target_word_count.toString()) : null}
-                  onChange={(value) => {
-                    const updatedEssay = { 
-                      ...essay, 
-                      target_word_count: value
-                    };
-                    const updatedEssays = [...essays];
-                    updatedEssays[index] = updatedEssay;
-                    setEssays(updatedEssays);
-                  }}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select
-                  defaultValue={essay.status || "Draft"}
-                  onValueChange={(value) => {
-                    const updatedEssay = { ...essay, status: value };
-                    const updatedEssays = [...essays];
-                    updatedEssays[index] = updatedEssay;
-                    setEssays(updatedEssays);
-                  }}
-                >
-                  <SelectTrigger id="edit-status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Reviewing">Reviewing</SelectItem>
-                    <SelectItem value="Complete">Complete</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="edit-is-common-app"
-                    checked={essay.is_common_app || false}
-                    onCheckedChange={(checked) => {
-                      const updatedEssay = { ...essay, is_common_app: !!checked };
-                      const updatedEssays = [...essays];
-                      updatedEssays[index] = updatedEssay;
-                      setEssays(updatedEssays);
-                    }}
-                  />
-                  <Label htmlFor="edit-is-common-app">This is a Common App essay</Label>
+                  <Folder className="h-4 w-4" />
+                  <span>Root (No Folder)</span>
                 </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-external-link">External Link</Label>
-                <Input
-                  id="edit-external-link"
-                  type="url"
-                  defaultValue={essay.external_link || ""}
-                  placeholder="e.g. https://docs.google.com/document/d/..."
-                  onChange={(e) => {
-                    const updatedEssay = { ...essay, external_link: e.target.value };
-                    const updatedEssays = [...essays];
-                    updatedEssays[index] = updatedEssay;
-                    setEssays(updatedEssays);
-                  }}
-                />
+                {folders.map(folder => (
+                  <div 
+                    key={folder.id}
+                    className={`p-2 rounded-md cursor-pointer hover:bg-secondary flex items-center gap-2 ${selectedFolder === folder.id ? 'bg-secondary' : ''}`}
+                    onClick={() => setSelectedFolder(folder.id)}
+                  >
+                    <Folder className="h-4 w-4" />
+                    <span>{folder.name}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={async () => {
-                try {
-                  setIsLoading(true);
-                  const { error } = await supabase
-                    .from("essays")
-                    .update({
-                      title: essay.title,
-                      prompt: essay.prompt,
-                      external_link: essay.external_link,
-                      target_word_count: essay.target_word_count,
-                      status: essay.status,
-                      is_common_app: essay.is_common_app,
-                    })
-                    .eq("id", essay.id);
-                  
-                  if (error) throw error;
-                  
-                  toast({
-                    title: "Essay details updated",
-                    description: "Your essay details have been updated successfully.",
-                  });
-                  setEditingEssayDetails(null);
-                } catch (error) {
-                  console.error("Error updating essay details:", error);
-                  toast({
-                    title: "Error updating essay details",
-                    description: handleSupabaseError(error, "There was a problem updating the essay details."),
-                    variant: "destructive",
-                  });
-                } finally {
-                  setIsLoading(false);
-                }
-              }} disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...
-                  </>
-                ) : (
-                  "Save Changes"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMovingEssay(null)} className="mr-2">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => isMovingEssay && moveEssayToFolder(isMovingEssay, selectedFolder)} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Moving...
+                </>
+              ) : (
+                "Move Essay"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog for Deleting Folder */}
+      <ConfirmationDialog
+        open={!!confirmDeleteFolder}
+        onOpenChange={(open) => !open && setConfirmDeleteFolder(null)}
+        title="Delete Folder"
+        description="Are you sure you want to delete this folder? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDeleteFolder) {
+            deleteFolder(confirmDeleteFolder)
+          }
+        }}
+        variant="destructive"
+      />
+
+      {/* ... existing dialogs ... */}
     </div>
   )
 }

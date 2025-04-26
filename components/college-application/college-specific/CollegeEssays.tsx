@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink, MoveRight } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
@@ -40,6 +40,15 @@ type Essay = {
   last_edited: string
   status: string
   external_link?: string | null
+}
+
+type EssayFolder = {
+  id: string
+  name: string
+  description: string | null
+  parent_folder_id: string | null
+  college_id: string | null
+  created_at: string
 }
 
 // Function to handle Supabase errors
@@ -107,6 +116,20 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const [selectedEssayForAi, setSelectedEssayForAi] = useState<string | null>(null)
   const [selectedDefaultPrompt, setSelectedDefaultPrompt] = useState<string | null>(null)
   
+  // Add state for folders after the existing state declarations (around line 65-100)
+  const [folders, setFolders] = useState<EssayFolder[]>([])
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [isAddingFolder, setIsAddingFolder] = useState(false)
+  const [isMovingEssay, setIsMovingEssay] = useState<string | null>(null)
+  const [newFolder, setNewFolder] = useState({
+    name: "",
+    description: "",
+  })
+  const [folderNavStack, setFolderNavStack] = useState<EssayFolder[]>([])
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
+  
   // Common App personal statement prompts
   const commonAppPrompts = [
     "Some students have a background, identity, interest, or talent that is so meaningful they believe their application would be incomplete without it. If this sounds like you, then please share your story.",
@@ -137,6 +160,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
       setTimeout(async () => {
         try {
+          // Fetch college essays (existing code)
           const { data: collegeEssaysData, error: collegeEssaysError } = await supabase
             .from("college_essays")
             .select("*")
@@ -146,7 +170,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
           if (collegeEssaysError) throw collegeEssaysError
 
-          // Fetch general essays for import
+          // Fetch general essays for import (existing code)
           const { data: generalEssaysData, error: generalEssaysError } = await supabase
             .from("essays")
             .select("*")
@@ -155,8 +179,27 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
           if (generalEssaysError) throw generalEssaysError
 
-          setEssays(collegeEssaysData || [])
+          // Fetch folders for this college
+          const { data: foldersData, error: foldersError } = await supabase
+            .from("essay_folders")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("college_id", collegeId)
+            .order("created_at", { ascending: false })
+
+          if (foldersError) throw foldersError
+
+          // Filter essays based on current folder
+          let filteredEssays = collegeEssaysData || [];
+          if (currentFolderId) {
+            filteredEssays = filteredEssays.filter(essay => essay.folder_id === currentFolderId);
+          } else {
+            filteredEssays = filteredEssays.filter(essay => !essay.folder_id);
+          }
+
+          setEssays(filteredEssays)
           setGeneralEssays(generalEssaysData || [])
+          setFolders(foldersData || [])
         } catch (error) {
           console.error("Error loading essays:", error)
           toast({
@@ -778,6 +821,371 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     return `Prompt #${index + 1}: ${truncatedPrompts[index]}`
   }
 
+  // Function to get folder breadcrumb path
+  const getFolderPath = async (folderId: string): Promise<EssayFolder[]> => {
+    const path: EssayFolder[] = [];
+    let currentId: string | null = folderId;
+    
+    while (currentId) {
+      const folder = folders.find(f => f.id === currentId);
+      if (folder) {
+        path.unshift(folder);
+        currentId = folder.parent_folder_id;
+      } else {
+        // If folder not in state, fetch it from database
+        const response = await supabase
+          .from("essay_folders")
+          .select("*")
+          .eq("id", currentId)
+          .single();
+        
+        if (response.error || !response.data) break;
+        
+        const folderData = response.data as EssayFolder;
+        path.unshift(folderData);
+        currentId = folderData.parent_folder_id;
+      }
+    }
+    
+    return path;
+  }
+
+  // Function to navigate to a folder
+  const navigateToFolder = async (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+    
+    if (folderId) {
+      const path = await getFolderPath(folderId);
+      setFolderNavStack(path);
+    } else {
+      setFolderNavStack([]);
+    }
+    
+    // Fetch essays for this folder
+    if (!user || !collegeId) return; // Added null check
+    
+    try {
+      const { data: essaysData, error: essaysError } = await supabase
+        .from("college_essays")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("college_id", collegeId)
+        .order("created_at", { ascending: false })
+
+      if (essaysError) throw essaysError
+
+      // Filter essays based on folder_id
+      let filteredEssays = essaysData || [];
+      if (folderId) {
+        filteredEssays = filteredEssays.filter(essay => essay.folder_id === folderId);
+      } else {
+        filteredEssays = filteredEssays.filter(essay => !essay.folder_id);
+      }
+
+      setEssays(filteredEssays);
+    } catch (error) {
+      toast({
+        title: "Error loading essays",
+        description: handleSupabaseError(error, "There was a problem loading essays for this folder."),
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Function to add a new folder
+  const addFolder = async () => {
+    if (!user || !collegeId) return
+    
+    if (!newFolder.name.trim()) {
+      toast({
+        title: "Folder name required",
+        description: "Please enter a name for your folder.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    setIsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from("essay_folders")
+        .insert([
+          {
+            user_id: user.id,
+            college_id: collegeId,
+            name: newFolder.name.trim(),
+            description: newFolder.description.trim() || null,
+            parent_folder_id: currentFolderId,
+          },
+        ])
+        .select()
+
+      if (error) throw error
+      
+      if (data && data[0]) {
+        setFolders([data[0], ...folders])
+        setNewFolder({
+          name: "",
+          description: "",
+        })
+        setIsAddingFolder(false)
+
+        toast({
+          title: "Folder added",
+          description: "Your folder has been added successfully.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error adding folder",
+        description: handleSupabaseError(error, "There was a problem adding the folder."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Function to delete a folder
+  const deleteFolder = async (folderId: string) => {
+    if (!user || !collegeId) return
+    
+    setIsLoading(true)
+    try {
+      // First check if folder has essays or subfolders
+      const { data: folderEssays, error: folderEssaysError } = await supabase
+        .from("college_essays")
+        .select("id")
+        .eq("folder_id", folderId)
+        .limit(1)
+      
+      if (folderEssaysError) throw folderEssaysError
+      
+      const { data: subfolders, error: subfoldersError } = await supabase
+        .from("essay_folders")
+        .select("id")
+        .eq("parent_folder_id", folderId)
+        .limit(1)
+        
+      if (subfoldersError) throw subfoldersError
+      
+      if ((folderEssays && folderEssays.length > 0) || (subfolders && subfolders.length > 0)) {
+        throw new Error("FOLDER_NOT_EMPTY")
+      }
+      
+      // If folder is empty, delete it
+      const { error } = await supabase
+        .from("essay_folders")
+        .delete()
+        .eq("id", folderId)
+
+      if (error) throw error
+
+      setFolders(folders.filter(folder => folder.id !== folderId))
+      setConfirmDeleteFolder(null)
+      
+      // If we deleted the current folder, navigate back to root
+      if (currentFolderId === folderId) {
+        navigateToFolder(null)
+      }
+      
+      toast({
+        title: "Folder deleted",
+        description: "Your folder has been deleted successfully.",
+      })
+    } catch (error) {
+      if (error instanceof Error && error.message === "FOLDER_NOT_EMPTY") {
+        toast({
+          title: "Folder not empty",
+          description: "Please remove all essays and subfolders before deleting this folder.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error deleting folder",
+          description: handleSupabaseError(error, "There was a problem deleting the folder."),
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Function to update a folder
+  const updateFolder = async (folderId: string) => {
+    if (!user || !collegeId) return
+    
+    if (!newFolder.name.trim()) {
+      toast({
+        title: "Folder name required",
+        description: "Please enter a name for your folder.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    setIsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from("essay_folders")
+        .update({
+          name: newFolder.name.trim(),
+          description: newFolder.description.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", folderId)
+        .select()
+
+      if (error) throw error
+
+      if (data && data[0]) {
+        setFolders(folders.map(folder => folder.id === folderId ? data[0] : folder))
+        setNewFolder({
+          name: "",
+          description: "",
+        })
+        setEditingFolderId(null)
+
+        // Update breadcrumb path if needed
+        if (folderNavStack.some(folder => folder.id === folderId)) {
+          navigateToFolder(currentFolderId)
+        }
+
+        toast({
+          title: "Folder updated",
+          description: "Your folder has been updated successfully.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error updating folder",
+        description: handleSupabaseError(error, "There was a problem updating the folder."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Function to move an essay to a folder
+  const moveEssayToFolder = async (essayId: string, targetFolderId: string | null) => {
+    if (!user || !collegeId) return
+    
+    setIsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from("college_essays")
+        .update({
+          folder_id: targetFolderId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", essayId)
+        .select()
+
+      if (error) throw error
+
+      if (data && data[0]) {
+        // Update the essays list
+        const essayIndex = essays.findIndex(e => e.id === essayId);
+        
+        if (essayIndex !== -1) {
+          // If current view matches the target folder, update the essay
+          if ((currentFolderId === targetFolderId) || (!currentFolderId && !targetFolderId)) {
+            const updatedEssays = [...essays];
+            updatedEssays[essayIndex] = data[0];
+            setEssays(updatedEssays);
+          } else {
+            // Otherwise, remove it from current view
+            setEssays(essays.filter(e => e.id !== essayId));
+          }
+        } else if ((currentFolderId === targetFolderId) || (!currentFolderId && !targetFolderId)) {
+          // If the essay wasn't in the current view but should be now, add it
+          setEssays([data[0], ...essays]);
+        }
+        
+        setIsMovingEssay(null);
+        setSelectedFolder(null);
+        
+        toast({
+          title: "Essay moved",
+          description: "Your essay has been moved successfully.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error moving essay",
+        description: handleSupabaseError(error, "There was a problem moving the essay."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Add this function after the moveEssayToFolder function
+  // Function to duplicate an essay
+  const duplicateEssay = async (essayId: string) => {
+    if (!user || !collegeId) return
+    
+    setIsLoading(true)
+    try {
+      // First get the essay to duplicate
+      const { data: sourceEssay, error: fetchError } = await supabase
+        .from("college_essays")
+        .select("*")
+        .eq("id", essayId)
+        .single()
+      
+      if (fetchError) throw fetchError
+      if (!sourceEssay) throw new Error("Essay not found")
+      
+      // Now insert a new essay with the same data
+      const { data: newEssay, error: insertError } = await supabase
+        .from("college_essays")
+        .insert([
+          {
+            user_id: user.id,
+            college_id: collegeId,
+            title: `${sourceEssay.title} (Copy)`,
+            prompt: sourceEssay.prompt,
+            content: sourceEssay.content,
+            word_count: sourceEssay.word_count,
+            character_count: sourceEssay.character_count,
+            target_word_count: sourceEssay.target_word_count,
+            last_edited: new Date().toISOString(),
+            status: sourceEssay.status,
+            external_link: sourceEssay.external_link,
+            folder_id: sourceEssay.folder_id, // Keep it in the same folder
+          }
+        ])
+        .select()
+      
+      if (insertError) throw insertError
+      
+      if (newEssay && newEssay[0]) {
+        // Add the new essay to the current view if it belongs there
+        if ((currentFolderId === newEssay[0].folder_id) || 
+            (!currentFolderId && !newEssay[0].folder_id)) {
+          setEssays([newEssay[0], ...essays])
+        }
+        
+        toast({
+          title: "Essay duplicated",
+          description: "Your essay has been duplicated successfully.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error duplicating essay",
+        description: handleSupabaseError(error, "There was a problem duplicating the essay."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -789,56 +1197,117 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h2 className="text-xl font-semibold mb-4 sm:mb-0">{collegeName} Essays</h2>
-        <div className="flex items-center gap-2">
+        <h2 className="text-2xl font-semibold mb-4 sm:mb-0">{collegeName} Essays</h2>
+        <div className="flex gap-2">
           <Button variant="outline" className="flex items-center gap-2" onClick={() => openGenericAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistant
           </Button>
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsImportingEssays(true)}>
+          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsImportingEssays(true)}>
             <Copy className="h-4 w-4" /> Import Essays
           </Button>
-          <Button variant="outline" className="flex items-center gap-2" onClick={() => setIsAddingExternalEssay(true)}>
+          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsAddingExternalEssay(true)}>
             <ExternalLink className="h-4 w-4" /> Add External Essay
           </Button>
-          <Button className="flex items-center gap-2" onClick={() => setIsAddingEssay(true)}>
+          <Button variant="outline" className="flex items-center gap-1" onClick={() => setIsAddingFolder(true)}>
+            <PlusCircle className="h-4 w-4" /> Add Folder
+          </Button>
+          <Button className="flex items-center gap-1" onClick={() => setIsAddingEssay(true)}>
             <PlusCircle className="h-4 w-4" /> Add Essay
           </Button>
         </div>
       </div>
       
-      {essays.length > 0 && (
-        <div className="flex justify-end gap-2 mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              const allEssayIds = essays.reduce((acc, essay) => {
-                acc[essay.id] = false;
-                return acc;
-              }, {} as Record<string, boolean>);
-              setCollapsedEssays(allEssayIds);
-            }}
-          >
-            <ChevronUp className="h-4 w-4 mr-1" /> Expand All
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              const allEssayIds = essays.reduce((acc, essay) => {
-                acc[essay.id] = true;
-                return acc;
-              }, {} as Record<string, boolean>);
-              setCollapsedEssays(allEssayIds);
-            }}
-          >
-            <ChevronDown className="h-4 w-4 mr-1" /> Collapse All
-          </Button>
+      {/* Breadcrumb navigation */}
+      {folderNavStack.length > 0 && (
+        <div className="flex items-center mb-4 overflow-x-auto">
+          <div className="flex items-center text-sm">
+            <Button 
+              variant="link" 
+              onClick={() => navigateToFolder(null)} 
+              className="p-0 h-auto font-normal"
+            >
+              Root
+            </Button>
+            {folderNavStack.map((folder, index) => (
+              <div key={folder.id} className="flex items-center">
+                <span className="mx-2">/</span>
+                {index < folderNavStack.length - 1 ? (
+                  <Button 
+                    variant="link" 
+                    onClick={() => navigateToFolder(folder.id)} 
+                    className="p-0 h-auto font-normal"
+                  >
+                    {folder.name}
+                  </Button>
+                ) : (
+                  <span className="font-medium">{folder.name}</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {essays.length === 0 ? (
-        <div className="text-center text-muted-foreground py-12 border rounded-md">No essays added yet for {collegeName}</div>
+      {/* Folders grid */}
+      {folders.filter(folder => folder.parent_folder_id === currentFolderId).length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+          {folders
+            .filter(folder => folder.parent_folder_id === currentFolderId)
+            .map(folder => (
+              <Card 
+                key={folder.id} 
+                className="cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => navigateToFolder(folder.id)}
+              >
+                <CardHeader className="p-4 flex flex-row items-center gap-2">
+                  <div className="h-5 w-5 text-amber-500">📁</div>
+                  <div>
+                    <CardTitle className="text-base">{folder.name}</CardTitle>
+                    {folder.description && (
+                      <CardDescription className="text-xs line-clamp-1">
+                        {folder.description}
+                      </CardDescription>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardFooter className="p-2 border-t bg-muted/20 flex justify-end">
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingFolderId(folder.id);
+                        setNewFolder({
+                          name: folder.name,
+                          description: folder.description || "",
+                        });
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmDeleteFolder(folder.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            ))}
+        </div>
+      )}
+
+      {/* If in a folder and there are no essays, show empty message */}
+      {essays.length === 0 && folders.filter(folder => folder.parent_folder_id === currentFolderId).length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 border rounded-md">
+          {currentFolderId ? "This folder is empty" : "No essays added yet"}
+        </div>
       ) : (
         <div className="grid gap-6">
           {essays.map((essay, index) => (
@@ -955,7 +1424,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         handleSaveEssayContent(essay, essayContent, true)
                         // Do NOT set editingEssay to null here
                       }}>
-                        <Save className="h-4 w-4 mr-2" /> Save
+                        <Save className="h-4 w-4 mr-2" /> Save Changes
                       </Button>
                     ) : (
                       <>
@@ -969,6 +1438,20 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         >
                           <Edit className="h-4 w-4 mr-1" /> Edit Content
                         </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsMovingEssay(essay.id)}
+                        >
+                          <MoveRight className="h-4 w-4 mr-1" /> Move
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => duplicateEssay(essay.id)}
+                        >
+                          <Copy className="h-4 w-4 mr-1" /> Duplicate
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => getAiFeedback(essay)}>
                           <Sparkles className="h-4 w-4 mr-1" /> AI Feedback
                         </Button>
@@ -978,7 +1461,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         <Button variant="outline" size="sm" onClick={() => rephraseWithAi(essay)}>
                           <Sparkles className="h-4 w-4 mr-1" /> Rephrase
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setConfirmDeleteEssay(essay.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfirmDeleteEssay(essay.id)}
+                        >
                           <Trash2 className="h-4 w-4 mr-1" /> Delete
                         </Button>
                       </>
@@ -1542,6 +2029,188 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
           onClose={() => setShowAIAssistant(false)}
         />
       )}
+
+      {/* Add Folder Dialog */}
+      <Dialog open={isAddingFolder} onOpenChange={setIsAddingFolder}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New Folder</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="folder-name">Folder Name</Label>
+              <Input
+                id="folder-name"
+                value={newFolder.name}
+                onChange={(e) => setNewFolder({ ...newFolder, name: e.target.value })}
+                placeholder="e.g., Supplemental Essays"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="folder-description">Description (Optional)</Label>
+              <Textarea
+                id="folder-description"
+                value={newFolder.description}
+                onChange={(e) => setNewFolder({ ...newFolder, description: e.target.value })}
+                placeholder="A brief description of what this folder contains..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddingFolder(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addFolder} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
+                </>
+              ) : (
+                "Add Folder"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Folder Dialog */}
+      <Dialog
+        open={!!editingFolderId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingFolderId(null)
+            setNewFolder({
+              name: "",
+              description: "",
+            })
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Folder</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-folder-name">Folder Name</Label>
+              <Input
+                id="edit-folder-name"
+                value={newFolder.name}
+                onChange={(e) => setNewFolder({ ...newFolder, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-folder-description">Description (Optional)</Label>
+              <Textarea
+                id="edit-folder-description"
+                value={newFolder.description}
+                onChange={(e) => setNewFolder({ ...newFolder, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingFolderId(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (editingFolderId) {
+                  updateFolder(editingFolderId);
+                }
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Move Essay to Folder Dialog */}
+      <Dialog
+        open={!!isMovingEssay}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsMovingEssay(null)
+            setSelectedFolder(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Move Essay to Folder</DialogTitle>
+            <DialogDescription>
+              Choose a destination folder for this essay
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="mb-4">
+              <Label htmlFor="select-folder">Destination Folder</Label>
+              <Select
+                value={selectedFolder || "root"}
+                onValueChange={(value) => setSelectedFolder(value === "root" ? null : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="root">Root (No Folder)</SelectItem>
+                  {folders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMovingEssay(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (isMovingEssay) {
+                  moveEssayToFolder(isMovingEssay, selectedFolder);
+                }
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Moving...
+                </>
+              ) : (
+                "Move Essay"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog for Folder Deletion */}
+      <ConfirmationDialog
+        open={!!confirmDeleteFolder}
+        onOpenChange={(open) => !open && setConfirmDeleteFolder(null)}
+        title="Delete Folder"
+        description="Are you sure you want to delete this folder? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDeleteFolder) {
+            deleteFolder(confirmDeleteFolder);
+          }
+        }}
+        variant="destructive"
+      />
     </div>
   )
 }
