@@ -17,11 +17,9 @@ import type { Database } from "@/types/supabase"
 import { useToast } from "@/components/ui/use-toast"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { validateRequired } from "@/lib/validation"
-import { useSupabaseQuery } from "@/lib/hooks/use-supabase-query"
-import { useSupabaseMutation } from "@/lib/hooks/use-supabase-mutation"
+import { handleSupabaseError } from "@/lib/supabase"
 import AIAssistant from "@/components/ai/AIAssistant"
-// Import the safeSupabaseCall utility
-import { safeSupabaseCall } from "@/lib/safe-supabase"
+import { performDatabaseOperation } from "@/lib/utils"
 
 type CollegeAwardsProps = {
   collegeId: string
@@ -39,19 +37,20 @@ type Award = {
 }
 
 export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
+  const [awards, setAwards] = useState<Award[]>([])
+  const [generalAwards, setGeneralAwards] = useState<Award[]>([])
   const [isAddingAward, setIsAddingAward] = useState(false)
   const [isEditingAward, setIsEditingAward] = useState(false)
   const [editingAwardId, setEditingAwardId] = useState<string | null>(null)
   const [isImportingAwards, setIsImportingAwards] = useState(false)
   const [selectedAwards, setSelectedAwards] = useState<Record<string, boolean>>({})
+  const [isLoading, setIsLoading] = useState(true)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [confirmDeleteAward, setConfirmDeleteAward] = useState<string | null>(null)
   const [showAIAssistant, setShowAIAssistant] = useState(false)
-  const { user } = useAuth()
-  const { toast } = useToast()
-  const supabase = createClientComponentClient<Database>()
-
-  // Initialize with empty values to avoid undefined errors
+  const [collegeName, setCollegeName] = useState<string>("")
+  
+  // Initialize form state
   const [newAward, setNewAward] = useState<Partial<Award>>({
     title: "",
     grade_level: "",
@@ -60,195 +59,296 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
     description: "",
     issuing_organization: "",
   })
+  
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const supabase = createClientComponentClient<Database>()
 
-  // Use our custom hook for fetching college awards
-  const {
-    data: collegeAwards,
-    isLoading: isLoadingAwards,
-    refetch: refetchAwards,
-  } = useSupabaseQuery<Award[]>({
-    queryKey: ["college-awards", collegeId, user?.id ?? ""],
-    queryFn: async () => {
-      if (!user || !collegeId) return []
+  // Fetch data on component mount
+  useEffect(() => {
+    if (!user || !collegeId) return
 
-      return safeSupabaseCall(async () => {
-        const { data, error } = await supabase
-          .from("college_awards")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("college_id", collegeId)
-          .order("created_at", { ascending: false })
+    const fetchData = async () => {
+      setIsLoading(true)
 
-        if (error) throw error
-        return data || []
-      })
-    },
-    enabled: !!user && !!collegeId,
-  })
+      setTimeout(async () => {
+        try {
+          // Fetch college name
+          const { data: collegeData, error: collegeError } = await supabase
+            .from("colleges")
+            .select("name")
+            .eq("id", collegeId)
+            .single()
 
-  // Use our custom hook for fetching general awards
-  const { data: generalAwards, isLoading: isLoadingGeneralAwards } = useSupabaseQuery<Award[]>({
-    queryKey: ["general-awards", user?.id ?? ""],
-    queryFn: async () => {
-      if (!user) return []
+          if (collegeError) throw collegeError
+          if (collegeData) setCollegeName(collegeData.name)
+          
+          // Fetch college-specific awards
+          const { data: collegeAwardsData, error: collegeAwardsError } = await supabase
+            .from("college_awards")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("college_id", collegeId)
+            .order("created_at", { ascending: false })
 
-      return safeSupabaseCall(async () => {
-        const { data, error } = await supabase
-          .from("awards")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
+          if (collegeAwardsError) throw collegeAwardsError
 
-        if (error) throw error
-        return data || []
-      })
-    },
-    enabled: !!user,
-  })
+          // Fetch general awards for import
+          const { data: generalAwardsData, error: generalAwardsError } = await supabase
+            .from("awards")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+
+          if (generalAwardsError) throw generalAwardsError
+
+          setAwards(collegeAwardsData || [])
+          setGeneralAwards(generalAwardsData || [])
+        } catch (error) {
+          toast({
+            title: "Error loading awards",
+            description: handleSupabaseError(error, "There was a problem loading your awards."),
+            variant: "destructive",
+          })
+        } finally {
+          setIsLoading(false)
+        }
+      }, 0)
+    }
+
+    fetchData()
+  }, [user, collegeId, toast, supabase])
 
   // Add award mutation
-  const addAwardMutation = useSupabaseMutation<Partial<Award>, Award>({
-    mutationFn: async (award) => {
-      if (!user || !collegeId) throw new Error("User or college ID not available")
+  const addAward = async () => {
+    if (!user || !collegeId || !validateAwardForm()) return
 
-      const { data, error } = await supabase
-        .from("college_awards")
-        .insert([
-          {
-            user_id: user.id,
-            college_id: collegeId,
-            title: award.title,
-            grade_level: award.grade_level,
-            recognition_level: award.recognition_level,
-            date_display: award.date_display || null,
-            description: award.description || null,
-            issuing_organization: award.issuing_organization || null,
-          },
-        ])
-        .select()
-        .maybeSingle()
+    await performDatabaseOperation(
+      async () => {
+        const { data, error } = await supabase
+          .from("college_awards")
+          .insert([
+            {
+              user_id: user.id,
+              college_id: collegeId,
+              title: newAward.title,
+              grade_level: newAward.grade_level,
+              recognition_level: newAward.recognition_level,
+              date_display: newAward.date_display || null,
+              description: newAward.description || null,
+              issuing_organization: newAward.issuing_organization || null,
+            },
+          ])
+          .select()
 
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      setNewAward({
-        title: "",
-        grade_level: "",
-        recognition_level: "",
-        date_display: "",
-        description: "",
-        issuing_organization: "",
-      })
-      setIsAddingAward(false)
-      refetchAwards()
+        if (error) throw error
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data && data[0]) {
+          setAwards([data[0], ...awards])
+          setNewAward({
+            title: "",
+            grade_level: "",
+            recognition_level: "",
+            date_display: "",
+            description: "",
+            issuing_organization: "",
+          })
+          
+          // Use a timeout to ensure state updates don't conflict
+          setTimeout(() => {
+            setIsAddingAward(false)
+          }, 0)
 
-      toast({
-        title: "Award added",
-        description: "Your award has been added successfully.",
-      })
-    },
-  })
+          toast({
+            title: "Award added",
+            description: "Your award has been added successfully.",
+          })
+        }
+      },
+      (error) => {
+        toast({
+          title: "Error adding award",
+          description: handleSupabaseError(error, "There was a problem adding the award."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
 
   // Update award mutation
-  const updateAwardMutation = useSupabaseMutation<{ id: string; award: Partial<Award> }, any>({
-    mutationFn: async ({ id, award }) => {
-      if (!user || !collegeId) throw new Error("User or college ID not available")
+  const updateAward = async () => {
+    if (!user || !collegeId || !editingAwardId || !validateAwardForm()) return
 
-      const { error } = await supabase
-        .from("college_awards")
-        .update({
+    await performDatabaseOperation(
+      async () => {
+        const { error } = await supabase
+          .from("college_awards")
+          .update({
+            title: newAward.title,
+            grade_level: newAward.grade_level,
+            recognition_level: newAward.recognition_level,
+            date_display: newAward.date_display || null,
+            description: newAward.description || null,
+            issuing_organization: newAward.issuing_organization || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingAwardId)
+          .eq("college_id", collegeId)
+
+        if (error) throw error
+        return { success: true }
+      },
+      setIsLoading,
+      () => {
+        const updatedAwards = awards.map((award) => {
+          if (award.id === editingAwardId) {
+            return {
+              ...award,
+              title: newAward.title as string,
+              grade_level: newAward.grade_level as string,
+              recognition_level: newAward.recognition_level as string,
+              date_display: newAward.date_display || null,
+              description: newAward.description || null,
+              issuing_organization: newAward.issuing_organization || null,
+            }
+          }
+          return award
+        });
+        
+        setAwards(updatedAwards);
+        
+        // Reset form first
+        setNewAward({
+          title: "",
+          grade_level: "",
+          recognition_level: "",
+          date_display: "",
+          description: "",
+          issuing_organization: "",
+        })
+        
+        // Use a timeout to ensure state updates don't conflict
+        setTimeout(() => {
+          setIsEditingAward(false)
+          setEditingAwardId(null)
+        }, 0)
+
+        toast({
+          title: "Award updated",
+          description: "Your award has been updated successfully.",
+        })
+      },
+      (error) => {
+        toast({
+          title: "Error updating award",
+          description: handleSupabaseError(error, "There was a problem updating the award."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  // Delete award mutation
+  const deleteAward = async (awardId: string) => {
+    if (!user || !collegeId) return
+
+    await performDatabaseOperation(
+      async () => {
+        const { error } = await supabase
+          .from("college_awards")
+          .delete()
+          .eq("id", awardId)
+          .eq("college_id", collegeId)
+
+        if (error) throw error
+        return { success: true }
+      },
+      setIsLoading,
+      () => {
+        setAwards(awards.filter((award) => award.id !== awardId))
+        setConfirmDeleteAward(null)
+        toast({
+          title: "Award deleted",
+          description: "Your award has been deleted successfully.",
+        })
+      },
+      (error) => {
+        toast({
+          title: "Error deleting award",
+          description: handleSupabaseError(error, "There was a problem deleting the award."),
+          variant: "destructive",
+        })
+      },
+    )
+  }
+
+  // Import awards mutation
+  const importAwards = async () => {
+    if (!user || !collegeId) return
+
+    const selectedAwardIds = Object.entries(selectedAwards)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([id, _]) => id)
+
+    if (selectedAwardIds.length === 0) {
+      toast({
+        title: "No awards selected",
+        description: "Please select at least one award to import.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    await performDatabaseOperation(
+      async () => {
+        const awardsToImport = generalAwards.filter((award) => selectedAwardIds.includes(award.id))
+
+        const awardsData = awardsToImport.map((award) => ({
+          user_id: user.id,
+          college_id: collegeId,
           title: award.title,
           grade_level: award.grade_level,
           recognition_level: award.recognition_level,
-          date_display: award.date_display || null,
-          description: award.description || null,
-          issuing_organization: award.issuing_organization || null,
-          updated_at: new Date().toISOString(),
+          date_received: award.date_received,
+          date_display: award.date_display,
+          description: award.description,
+          issuing_organization: award.issuing_organization,
+        }))
+
+        const { data, error } = await supabase.from("college_awards").insert(awardsData).select()
+
+        if (error) throw error
+        return data
+      },
+      setIsLoading,
+      (data) => {
+        if (data) {
+          setAwards([...data, ...awards])
+          setSelectedAwards({})
+          
+          // Use a timeout to ensure state updates don't conflict
+          setTimeout(() => {
+            setIsImportingAwards(false)
+          }, 0)
+
+          toast({
+            title: "Awards imported",
+            description: `${data.length} award(s) have been imported successfully.`,
+          })
+        }
+      },
+      (error) => {
+        toast({
+          title: "Error importing awards",
+          description: handleSupabaseError(error, "There was a problem importing the awards."),
+          variant: "destructive",
         })
-        .eq("id", id)
-        .eq("college_id", collegeId)
-
-      if (error) throw error
-      return { success: true }
-    },
-    onSuccess: () => {
-      setIsEditingAward(false)
-      setEditingAwardId(null)
-      setNewAward({
-        title: "",
-        grade_level: "",
-        recognition_level: "",
-        date_display: "",
-        description: "",
-        issuing_organization: "",
-      })
-      refetchAwards()
-
-      toast({
-        title: "Award updated",
-        description: "Your award has been updated successfully.",
-      })
-    },
-  })
-
-  // Delete award mutation
-  const deleteAwardMutation = useSupabaseMutation<string, any>({
-    mutationFn: async (awardId) => {
-      if (!user || !collegeId) throw new Error("User or college ID not available")
-
-      const { error } = await supabase.from("college_awards").delete().eq("id", awardId).eq("college_id", collegeId)
-
-      if (error) throw error
-      return { success: true }
-    },
-    onSuccess: () => {
-      setConfirmDeleteAward(null)
-      refetchAwards()
-
-      toast({
-        title: "Award deleted",
-        description: "Your award has been deleted successfully.",
-      })
-    },
-  })
-
-  // Import awards mutation
-  const importAwardsMutation = useSupabaseMutation<string[], Award[]>({
-    mutationFn: async (selectedAwardIds) => {
-      if (!user || !collegeId) throw new Error("User or college ID not available")
-      if (!generalAwards) throw new Error("General awards not available")
-
-      const awardsToImport = generalAwards.filter((award) => selectedAwardIds.includes(award.id))
-
-      const awardsData = awardsToImport.map((award) => ({
-        user_id: user.id,
-        college_id: collegeId,
-        title: award.title,
-        grade_level: award.grade_level,
-        recognition_level: award.recognition_level,
-        date_received: award.date_received,
-        date_display: award.date_display,
-        description: award.description,
-        issuing_organization: award.issuing_organization,
-      }))
-
-      const { data, error } = await supabase.from("college_awards").insert(awardsData).select()
-
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      setSelectedAwards({})
-      setIsImportingAwards(false)
-      refetchAwards()
-
-      toast({
-        title: "Awards imported",
-        description: "Selected awards have been imported successfully.",
-      })
-    },
-  })
+      },
+    )
+  }
 
   // Validate award form
   const validateAwardForm = (): boolean => {
@@ -267,13 +367,8 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
     return Object.keys(errors).length === 0
   }
 
-  const addAward = async () => {
-    if (!validateAwardForm()) return
-    addAwardMutation.mutate(newAward)
-  }
-
   const startEditAward = (awardId: string) => {
-    const awardToEdit = collegeAwards?.find((a) => a.id === awardId)
+    const awardToEdit = awards.find((a) => a.id === awardId)
     if (awardToEdit) {
       setNewAward({
         title: awardToEdit.title,
@@ -286,32 +381,6 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
       setEditingAwardId(awardId)
       setIsEditingAward(true)
     }
-  }
-
-  const updateAward = async () => {
-    if (!editingAwardId || !validateAwardForm()) return
-    updateAwardMutation.mutate({ id: editingAwardId, award: newAward })
-  }
-
-  const deleteAward = async (awardId: string) => {
-    deleteAwardMutation.mutate(awardId)
-  }
-
-  const importAwards = async () => {
-    const selectedAwardIds = Object.entries(selectedAwards)
-      .filter(([_, isSelected]) => isSelected)
-      .map(([id, _]) => id)
-
-    if (selectedAwardIds.length === 0) {
-      toast({
-        title: "No awards selected",
-        description: "Please select at least one award to import.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    importAwardsMutation.mutate(selectedAwardIds)
   }
 
   const getRecognitionLevelBadge = (level: string) => {
@@ -334,21 +403,13 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
   // Cleanup function for mutations on component unmount
   useEffect(() => {
     return () => {
-      addAwardMutation.cleanup()
-      updateAwardMutation.cleanup()
-      deleteAwardMutation.cleanup()
-      importAwardsMutation.cleanup()
+      // Cleanup any active mutations
     }
   }, [])
 
-  const isLoading =
-    isLoadingAwards ||
-    addAwardMutation.isLoading ||
-    updateAwardMutation.isLoading ||
-    deleteAwardMutation.isLoading ||
-    importAwardsMutation.isLoading
+  const isLoadingOperations = isLoading
 
-  if (isLoadingAwards && !collegeAwards) {
+  if (isLoading && awards.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -364,7 +425,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">College-Specific Awards and Honors</h2>
+        <h2 className="text-xl font-semibold">{collegeName ? `${collegeName} Awards and Honors` : 'College Awards and Honors'}</h2>
         <div className="flex gap-2">
           <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
@@ -379,11 +440,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Honors & Awards</CardTitle>
-          <CardDescription>Awards you're highlighting for this specific college</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="rounded-md border overflow-hidden">
             <Table>
               <TableHeader>
@@ -397,14 +454,14 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!collegeAwards || collegeAwards.length === 0 ? (
+                {awards.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
                       No awards added yet
                     </TableCell>
                   </TableRow>
                 ) : (
-                  collegeAwards.map((award) => (
+                  awards.map((award) => (
                     <TableRow key={award.id}>
                       <TableCell>{award.title}</TableCell>
                       <TableCell>{award.issuing_organization || "—"}</TableCell>
@@ -539,8 +596,11 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={addAward} disabled={addAwardMutation.isLoading}>
-              {addAwardMutation.isLoading ? (
+            <Button 
+              onClick={addAward} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Adding...
@@ -653,8 +713,11 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={updateAward} disabled={updateAwardMutation.isLoading}>
-              {updateAwardMutation.isLoading ? (
+            <Button 
+              onClick={updateAward} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Saving...
@@ -685,12 +748,12 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
             <p className="text-sm text-muted-foreground mb-4">
               Select awards from your general honors to import for this college application.
             </p>
-            {!generalAwards || generalAwards.length === 0 ? (
+            {generalAwards.length === 0 ? (
               <div className="text-center py-6 border rounded-md">
                 <p className="text-muted-foreground">No general awards found to import.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
                 {generalAwards.map((award) => (
                   <div key={award.id} className="flex items-start space-x-3 p-3 border rounded-md">
                     <input
@@ -713,18 +776,21 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
             )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => setIsImportingAwards(false)}
-              disabled={importAwardsMutation.isLoading}
             >
               Cancel
             </Button>
             <Button
               onClick={importAwards}
-              disabled={importAwardsMutation.isLoading || !generalAwards || generalAwards.length === 0}
+              disabled={
+                generalAwards.length === 0 ||
+                Object.values(selectedAwards).filter(Boolean).length === 0 ||
+                isLoading
+              }
             >
-              {importAwardsMutation.isLoading ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Importing...
@@ -746,7 +812,7 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
         confirmText="Delete"
         onConfirm={() => {
           if (confirmDeleteAward) {
-            deleteAwardMutation.mutate(confirmDeleteAward)
+            deleteAward(confirmDeleteAward)
           }
         }}
         variant="destructive"

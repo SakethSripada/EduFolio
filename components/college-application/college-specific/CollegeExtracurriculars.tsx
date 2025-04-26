@@ -80,6 +80,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [confirmDeleteActivity, setConfirmDeleteActivity] = useState<string | null>(null)
   const [showAIAssistant, setShowAIAssistant] = useState(false)
+  const [collegeName, setCollegeName] = useState<string>("")
   const { user } = useAuth()
   const { toast } = useToast()
   const supabase = createClientComponentClient<Database>()
@@ -93,6 +94,16 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
 
       setTimeout(async () => {
         try {
+          // Fetch college name
+          const { data: collegeData, error: collegeError } = await supabase
+            .from("colleges")
+            .select("name")
+            .eq("id", collegeId)
+            .single()
+
+          if (collegeError) throw collegeError
+          if (collegeData) setCollegeName(collegeData.name)
+          
           // Fetch college-specific activities
           const { data: collegeActivitiesData, error: collegeActivitiesError } = await supabase
             .from("college_extracurricular_activities")
@@ -464,10 +475,10 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-semibold">College-Specific Extracurriculars</h2>
-        <div className="flex gap-2">
+        <h2 className="text-xl font-semibold">{collegeName ? `${collegeName} Extracurriculars` : 'College Extracurriculars'}</h2>
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="flex items-center gap-2" onClick={() => openAIAssistant()}>
             <Sparkles className="h-4 w-4" /> AI Assistance
           </Button>
@@ -756,16 +767,10 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
       </Dialog>
 
       {/* Import Activities Dialog */}
-      <Dialog open={isImportingActivities} onOpenChange={(open) => {
-        if (!open) {
-          // Only handle close events here
-          setIsImportingActivities(false)
-          setSelectedActivities({})
-        }
-      }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <Dialog open={isImportingActivities} onOpenChange={setIsImportingActivities}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Import Activities</DialogTitle>
+            <DialogTitle>Import Extracurricular Activities</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground mb-4">
@@ -776,7 +781,7 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
                 <p className="text-muted-foreground">No general activities found to import.</p>
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
+              <div className="rounded-md border overflow-hidden max-h-[400px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
