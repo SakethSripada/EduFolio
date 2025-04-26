@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
@@ -19,8 +19,8 @@ import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
 import AIAssistant from "@/components/ai/AIAssistant"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { debounce } from "@/lib/utils"
-import { useRef } from "react"
 import { NumericInput } from "@/components/ui/numeric-input"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 
 type AiAssistantType = "brainstorm" | "outline" | "feedback" | "grammar" | "improve"
 
@@ -953,6 +953,19 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       }
 
       setEssays(filteredEssays);
+      
+      // Collapse all essays in the new folder
+      if (filteredEssays.length > 0) {
+        const collapsedState = filteredEssays.reduce((acc, essay) => {
+          acc[essay.id] = true;
+          return acc;
+        }, {} as Record<string, boolean>);
+        
+        setCollapsedEssays(prevState => ({
+          ...prevState,
+          ...collapsedState
+        }));
+      }
     } catch (error) {
       toast({
         title: "Error loading essays",
@@ -1291,32 +1304,38 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       
       {/* Breadcrumb navigation */}
       {folderNavStack.length > 0 && (
-        <div className="flex items-center mb-4 overflow-x-auto">
-          <div className="flex items-center text-sm">
-            <Button 
-              variant="link" 
-              onClick={() => navigateToFolder(null)} 
-              className="p-0 h-auto font-normal"
-            >
-              Home
-            </Button>
-            {folderNavStack.map((folder, index) => (
-              <div key={folder.id} className="flex items-center">
-                <span className="mx-2">/</span>
-                {index < folderNavStack.length - 1 ? (
-                  <Button 
-                    variant="link" 
-                    onClick={() => navigateToFolder(folder.id)} 
-                    className="p-0 h-auto font-normal"
-                  >
-                    {folder.name}
-                  </Button>
-                ) : (
-                  <span className="font-medium">{folder.name}</span>
-                )}
-              </div>
-            ))}
-          </div>
+        <div className="flex items-center mb-4">
+          <Breadcrumb className="mb-4">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={() => navigateToFolder(null)} className="cursor-pointer">
+                  Home
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              {folderNavStack.map((folder, index) => (
+                <React.Fragment key={folder.id}>
+                  {index < folderNavStack.length - 1 ? (
+                    <>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink 
+                          onClick={() => navigateToFolder(folder.id)} 
+                          className="cursor-pointer"
+                        >
+                          {folder.name}
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                    </>
+                  ) : (
+                    <BreadcrumbItem>
+                      <span className="font-medium">{folder.name}</span>
+                    </BreadcrumbItem>
+                  )}
+                </React.Fragment>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
       )}
 
