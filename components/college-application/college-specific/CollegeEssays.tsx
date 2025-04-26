@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PlusCircle, Edit, Trash2, Copy, Loader2, Save, Sparkles, ChevronDown, ChevronUp, ExternalLink, MoveRight, Folder, ChevronRight } from "lucide-react"
+import { PlusCircle, Edit, Trash2, Save, Sparkles, Loader2, History, ChevronUp, ChevronDown, ExternalLink, FolderPlus, Folder, FolderOpen, MoveRight, ArrowLeft, Copy, ChevronRight } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
@@ -918,6 +918,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
 
   // Function to navigate to a folder
   const navigateToFolder = async (folderId: string | null) => {
+    setIsLoading(true);
     setCurrentFolderId(folderId);
     
     if (folderId) {
@@ -928,7 +929,10 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     }
     
     // Fetch essays for this folder
-    if (!user || !collegeId) return; // Added null check
+    if (!user || !collegeId) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
       const { data: essaysData, error: essaysError } = await supabase
@@ -955,6 +959,8 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         description: handleSupabaseError(error, "There was a problem loading essays for this folder."),
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -1326,7 +1332,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                 onClick={() => navigateToFolder(folder.id)}
               >
                 <CardHeader className="p-4 flex flex-row items-center gap-2">
-                  <div className="h-5 w-5 text-amber-500">📁</div>
+                  <FolderOpen className="h-5 w-5 text-amber-500" />
                   <div>
                     <CardTitle className="text-base">{folder.name}</CardTitle>
                     {folder.description && (

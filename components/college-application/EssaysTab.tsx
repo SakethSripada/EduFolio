@@ -1680,7 +1680,6 @@ export default function EssaysTab() {
                           className="gap-1"
                         >
                           <MoveRight className="h-4 w-4" />
-                          <span className="hidden sm:inline">Move</span>
                         </Button>
                         <Button 
                           variant="ghost" 
@@ -1689,7 +1688,6 @@ export default function EssaysTab() {
                           className="gap-1"
                         >
                           <Copy className="h-4 w-4" />
-                          <span className="hidden sm:inline">Duplicate</span>
                         </Button>
                         <Button 
                           variant="ghost" 
