@@ -1050,7 +1050,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
       setFolders(folders.filter(folder => folder.id !== folderId))
       setConfirmDeleteFolder(null)
       
-      // If we deleted the current folder, navigate back to root
+      // If we deleted the current folder, navigate back to Home
       if (currentFolderId === folderId) {
         navigateToFolder(null)
       }
@@ -1292,7 +1292,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
               onClick={() => navigateToFolder(null)} 
               className="p-0 h-auto font-normal"
             >
-              Root
+              Home
             </Button>
             {folderNavStack.map((folder, index) => (
               <div key={folder.id} className="flex items-center">
@@ -2242,10 +2242,10 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                   onClick={() => setSelectedFolder(null)}
                 >
                   <Folder className="h-4 w-4" />
-                  <span>Root (No Folder)</span>
+                  <span>Home</span>
                 </div>
                 
-                {/* Render root-level folders */}
+                {/* Render Home-level folders */}
                 {folders
                   .filter(folder => !folder.parent_folder_id)
                   .map(folder => (

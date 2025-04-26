@@ -1163,7 +1163,7 @@ export default function EssaysTab() {
         setFolders(folders.filter(folder => folder.id !== folderId))
         setConfirmDeleteFolder(null)
         
-        // If we deleted the current folder, navigate back to root
+        // If we deleted the current folder, navigate back to Home
         if (currentFolderId === folderId) {
           navigateToFolder(null)
         }
@@ -1564,7 +1564,7 @@ export default function EssaysTab() {
             <BreadcrumbList>
               <BreadcrumbItem>
                 <BreadcrumbLink onClick={() => navigateToFolder(null)} className="cursor-pointer">
-                  Root
+                  Home
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
@@ -1951,10 +1951,10 @@ export default function EssaysTab() {
                   onClick={() => setSelectedFolder(null)}
                 >
                   <Folder className="h-4 w-4" />
-                  <span>Root (No Folder)</span>
+                  <span>Home</span>
                 </div>
                 
-                {/* Render root-level folders */}
+                {/* Render Home-level folders */}
                 {folders
                   .filter(folder => !folder.parent_folder_id)
                   .map(folder => (
