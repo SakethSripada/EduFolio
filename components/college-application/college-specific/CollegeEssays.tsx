@@ -546,6 +546,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         target_word_count: essay.target_word_count,
         last_edited: essay.last_edited,
         status: essay.status,
+        folder_id: currentFolderId, // Add the current folder ID to imported essays
       }))
 
       const { data, error } = await supabase.from("college_essays").insert(essaysData).select()
