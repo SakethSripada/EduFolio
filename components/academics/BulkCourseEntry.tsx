@@ -273,7 +273,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Add Courses</DialogTitle>
           <DialogDescription>
@@ -281,16 +281,16 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* Course selection panel */}
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="common-courses">Common Courses</TabsTrigger>
                 <TabsTrigger value="custom-courses">Custom Courses</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="common-courses" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <TabsContent value="common-courses" className="flex-1 flex flex-col">
                 <div className="mb-2 flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -306,11 +306,11 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                   </div>
                 </div>
                 
-                <div className="flex flex-col min-h-0 flex-1 border rounded-md overflow-hidden">
+                <div className="flex flex-col border rounded-md">
                   <Tabs 
                     value={activeCategoryTab} 
                     onValueChange={setActiveCategoryTab}
-                    className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                    className="flex-1 flex flex-col"
                   >
                     <div className="border-b">
                       <ScrollArea className="w-full">
@@ -333,9 +333,9 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                       <TabsContent 
                         key={category} 
                         value={category} 
-                        className="flex-1 flex-col min-h-0 data-[state=active]:flex overflow-hidden"
+                        className="flex-1 flex-col data-[state=active]:flex"
                       >
-                        <ScrollArea className="flex-1 h-[350px]">
+                        <ScrollArea className="h-[350px]">
                           <div className="p-2 space-y-1">
                             {filteredCourses[category]?.map((course) => (
                               <div 
@@ -373,7 +373,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                 </div>
               </TabsContent>
               
-              <TabsContent value="custom-courses" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <TabsContent value="custom-courses" className="flex-1 flex flex-col">
                 <div className="flex items-end gap-2 mb-3">
                   <div className="flex-1">
                     <Label htmlFor="custom-name" className="text-xs mb-1">Course name</Label>
@@ -436,7 +436,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                   </Button>
                 </div>
                 
-                <div className="flex-1 border rounded-md overflow-hidden">
+                <div className="flex-1 border rounded-md">
                   <ScrollArea className="h-[350px]">
                     <div className="p-2 space-y-1">
                       {customCourses.length === 0 ? (
