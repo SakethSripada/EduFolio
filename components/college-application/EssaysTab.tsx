@@ -684,6 +684,11 @@ export default function EssaysTab() {
   const getAiFeedback = (essay: any) => {
     setSelectedEssay(essay);
     setAiAction("feedback");
+    
+    // Create the prompt for feedback
+    const feedbackPrompt = `Please provide feedback on this essay:\n\n${stripHTML(essay.content)}`;
+    
+    // Open AI assistant with the generated prompt
     setShowAIAssistant(true);
   }
 
@@ -691,6 +696,11 @@ export default function EssaysTab() {
   const checkGrammarWithAi = (essay: any) => {
     setSelectedEssay(essay);
     setAiAction("grammar");
+    
+    // Create the prompt for grammar checking
+    const grammarPrompt = `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(essay.content)}`;
+    
+    // Open AI assistant with the generated prompt
     setShowAIAssistant(true);
   }
 
@@ -698,6 +708,11 @@ export default function EssaysTab() {
   const rephraseWithAi = (essay: any) => {
     setSelectedEssay(essay);
     setAiAction("rephrase");
+    
+    // Create the prompt for rephrasing
+    const rephrasePrompt = `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(essay.content)}`;
+    
+    // Open AI assistant with the generated prompt
     setShowAIAssistant(true);
   }
 
@@ -2266,6 +2281,28 @@ export default function EssaysTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Assistant */}
+      {showAIAssistant && (
+        <AIAssistant
+          showOnLoad={true}
+          initialContext={{
+            type: "essay",
+            id: selectedEssay?.id,
+            title: selectedEssay?.title || "Essay",
+          }}
+          initialPrompt={
+            aiAction === "feedback" 
+              ? `Please provide feedback on this essay:\n\n${stripHTML(selectedEssay?.content || "")}`
+              : aiAction === "grammar" 
+              ? `Please check this essay for grammar, spelling, and punctuation errors and suggest corrections:\n\n${stripHTML(selectedEssay?.content || "")}`
+              : aiAction === "rephrase" 
+              ? `Please help me rephrase this essay to improve its flow and clarity while maintaining the original meaning:\n\n${stripHTML(selectedEssay?.content || "")}`
+              : undefined
+          }
+          onClose={() => setShowAIAssistant(false)}
+        />
+      )}
     </div>
   )
 }
