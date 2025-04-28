@@ -273,7 +273,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Add Courses</DialogTitle>
           <DialogDescription>
@@ -281,16 +281,16 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Course selection panel */}
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="common-courses">Common Courses</TabsTrigger>
                 <TabsTrigger value="custom-courses">Custom Courses</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="common-courses" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <TabsContent value="common-courses" className="flex-1 flex flex-col">
                 <div className="mb-2 flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -306,56 +306,54 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                   </div>
                 </div>
                 
-                <div className="flex flex-col min-h-0 flex-1 border rounded-md overflow-hidden">
+                <div className="flex flex-col border rounded-md">
                   <Tabs 
                     value={activeCategoryTab} 
                     onValueChange={setActiveCategoryTab}
-                    className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                    className="flex-1 flex flex-col"
                   >
-                    <div className="border-b">
-                      <ScrollArea className="w-full">
-                        <TabsList className="inline-flex h-10 py-1 px-1">
-                          {Object.keys(filteredCourses).map((category) => (
-                            <TabsTrigger
-                              key={category}
-                              value={category}
-                              className="py-1.5 px-3 whitespace-nowrap"
-                            >
-                              {category}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-                        <ScrollBar orientation="horizontal" />
-                      </ScrollArea>
+                    <div className="border-b p-1 overflow-x-auto">
+                      <TabsList className="flex flex-wrap gap-1">
+                        {Object.keys(filteredCourses).map((category) => (
+                          <TabsTrigger
+                            key={category}
+                            value={category}
+                            className="py-1 px-2 text-xs sm:text-sm h-auto"
+                          >
+                            {category}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
                     </div>
                     
                     {Object.keys(filteredCourses).map((category) => (
                       <TabsContent 
                         key={category} 
                         value={category} 
-                        className="flex-1 flex-col min-h-0 data-[state=active]:flex overflow-hidden"
+                        className="flex-1 flex-col data-[state=active]:flex"
                       >
-                        <ScrollArea className="flex-1 h-[350px]">
+                        <ScrollArea className="h-[350px]">
                           <div className="p-2 space-y-1">
                             {filteredCourses[category]?.map((course) => (
                               <div 
                                 key={course.name}
                                 className="flex items-center justify-between p-2 rounded-md hover:bg-muted"
                               >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
                                   <Checkbox
                                     checked={course.isSelected}
                                     onCheckedChange={() => toggleCourseSelection(course.name, category)}
                                     id={`course-${course.name}`}
+                                    className="flex-shrink-0"
                                   />
                                   <label 
                                     htmlFor={`course-${course.name}`}
-                                    className="text-sm font-medium cursor-pointer flex-1"
+                                    className="text-sm font-medium cursor-pointer truncate"
                                   >
                                     {course.name}
                                   </label>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                   <div className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
                                     {course.level}
                                   </div>
@@ -373,9 +371,9 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                 </div>
               </TabsContent>
               
-              <TabsContent value="custom-courses" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className="flex items-end gap-2 mb-3">
-                  <div className="flex-1">
+              <TabsContent value="custom-courses" className="flex-1 flex flex-col">
+                <div className="flex flex-col sm:flex-row items-end gap-2 mb-3">
+                  <div className="w-full sm:flex-1">
                     <Label htmlFor="custom-name" className="text-xs mb-1">Course name</Label>
                     <Input
                       id="custom-name"
@@ -385,7 +383,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                     />
                   </div>
                   
-                  <div className="w-24">
+                  <div className="w-full sm:w-24">
                     <Label htmlFor="custom-credits" className="text-xs mb-1">Credits</Label>
                     <Select
                       value={newCustomCourse.credits.toString()}
@@ -407,7 +405,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                     </Select>
                   </div>
                   
-                  <div className="w-32">
+                  <div className="w-full sm:w-32">
                     <Label htmlFor="custom-level" className="text-xs mb-1">Level</Label>
                     <Select
                       value={newCustomCourse.level}
@@ -430,13 +428,13 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                   <Button 
                     onClick={addCustomCourse} 
                     disabled={!newCustomCourse.name.trim()}
-                    className="flex-shrink-0"
+                    className="w-full sm:w-auto mt-2 sm:mt-0"
                   >
                     <Plus className="h-4 w-4 mr-1" /> Add
                   </Button>
                 </div>
                 
-                <div className="flex-1 border rounded-md overflow-hidden">
+                <div className="flex-1 border rounded-md">
                   <ScrollArea className="h-[350px]">
                     <div className="p-2 space-y-1">
                       {customCourses.length === 0 ? (
@@ -449,20 +447,21 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                             key={index}
                             className="flex items-center justify-between p-2 rounded-md hover:bg-muted"
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
                               <Checkbox
                                 checked={course.isSelected}
                                 onCheckedChange={() => toggleCustomCourseSelection(index)}
                                 id={`custom-course-${index}`}
+                                className="flex-shrink-0"
                               />
                               <label 
                                 htmlFor={`custom-course-${index}`}
-                                className="text-sm font-medium cursor-pointer flex-1"
+                                className="text-sm font-medium cursor-pointer truncate"
                               >
                                 {course.name}
                               </label>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                               <div className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
                                 {course.level}
                               </div>
@@ -472,7 +471,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                className="h-7 w-7" 
+                                className="h-7 w-7 flex-shrink-0" 
                                 onClick={() => removeCustomCourse(index)}
                               >
                                 <Trash className="h-3.5 w-3.5" />
@@ -489,7 +488,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
           </div>
           
           {/* Form details panel */}
-          <div className="w-full md:w-80 flex flex-col gap-3 p-2 border rounded-md">
+          <div className="w-full lg:w-80 flex flex-col gap-3 p-2 border rounded-md">
             <div className="space-y-2">
               <Label htmlFor="grade-level">Grade Level</Label>
               <Select 

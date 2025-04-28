@@ -2282,6 +2282,93 @@ export default function EssaysTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Add External Essay Dialog */}
+      <Dialog open={isAddingExternalEssay} onOpenChange={setIsAddingExternalEssay}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add External Essay Link</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <RequiredLabel htmlFor="ext-title">Essay Title</RequiredLabel>
+              <Input
+                id="ext-title"
+                value={externalEssay.title}
+                onChange={(e) => setExternalEssay({ ...externalEssay, title: e.target.value })}
+                placeholder="e.g., Why This College Essay"
+              />
+              {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-prompt">Essay Prompt (Optional)</Label>
+              <Textarea
+                id="ext-prompt"
+                value={externalEssay.prompt}
+                onChange={(e) => setExternalEssay({ ...externalEssay, prompt: e.target.value })}
+                placeholder="Enter the essay prompt or question..."
+                rows={2}
+              />
+            </div>
+            <div className="grid gap-2">
+              <RequiredLabel htmlFor="ext-link">External Link <span className="text-red-500">*</span></RequiredLabel>
+              <Input
+                id="ext-link"
+                type="url"
+                value={externalEssay.external_link}
+                onChange={(e) => setExternalEssay({ ...externalEssay, external_link: e.target.value })}
+                placeholder="e.g., https://docs.google.com/document/d/..."
+              />
+              {formErrors.external_link && <p className="text-xs text-destructive">{formErrors.external_link}</p>}
+              <p className="text-xs text-muted-foreground">
+                Add a link to where your essay is stored (Google Docs, Microsoft Word, etc.)
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ext-status">Status</Label>
+              <Select
+                value={externalEssay.status}
+                onValueChange={(value) => setExternalEssay({ ...externalEssay, status: value })}
+              >
+                <SelectTrigger id="ext-status">
+                  <SelectValue placeholder="Select a status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Reviewing">Reviewing</SelectItem>
+                  <SelectItem value="Complete">Complete</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="ext-isCommonApp"
+                  checked={externalEssay.is_common_app}
+                  onCheckedChange={(checked) => setExternalEssay({ ...externalEssay, is_common_app: !!checked })}
+                />
+                <Label htmlFor="ext-isCommonApp">This is a Common App essay</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddingExternalEssay(false)} className="mr-2">
+              Cancel
+            </Button>
+            <Button onClick={addExternalEssay} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
+                </>
+              ) : (
+                "Add External Essay"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* AI Assistant */}
       {showAIAssistant && (
         <AIAssistant
