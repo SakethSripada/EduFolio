@@ -546,6 +546,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
         target_word_count: essay.target_word_count,
         last_edited: essay.last_edited,
         status: essay.status,
+        folder_id: currentFolderId, // Add the current folder ID to imported essays
       }))
 
       const { data, error } = await supabase.from("college_essays").insert(essaysData).select()
@@ -700,6 +701,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const getAiFeedback = (essay: any) => {
     setSelectedEssay(essay);
     setAiAssistantType("feedback");
+    
+    // Create the prompt for feedback
+    const feedbackPrompt = getAIPromptForType("feedback", essay.prompt, essay.content, collegeName);
+    
+    // Open AI assistant with the generated prompt
     setShowAIAssistant(true);
   }
 
@@ -707,6 +713,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const checkGrammarWithAi = (essay: any) => {
     setSelectedEssay(essay);
     setAiAssistantType("grammar");
+    
+    // Create the prompt for grammar checking
+    const grammarPrompt = getAIPromptForType("grammar", essay.prompt, essay.content, collegeName);
+    
+    // Open AI assistant with the generated prompt
     setShowAIAssistant(true);
   }
 
@@ -714,6 +725,11 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   const rephraseWithAi = (essay: any) => {
     setSelectedEssay(essay);
     setAiAssistantType("improve");
+    
+    // Create the prompt for rephrasing
+    const rephrasePrompt = getAIPromptForType("improve", essay.prompt, essay.content, collegeName);
+    
+    // Open AI assistant with the generated prompt
     setShowAIAssistant(true);
   }
 
@@ -2147,7 +2163,9 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
             id: selectedEssay?.id,
             title: selectedEssay?.title || selectedEssay?.prompt,
           }}
-          initialPrompt={selectedEssay ? getAIPromptForType(aiAssistantType, selectedEssay.prompt, selectedEssay.content, collegeName, aiFeedbackFocus) : undefined}
+          initialPrompt={selectedEssay && aiAssistantType ? 
+            getAIPromptForType(aiAssistantType, selectedEssay.prompt, selectedEssay.content, collegeName, aiFeedbackFocus) 
+            : undefined}
           onClose={() => setShowAIAssistant(false)}
         />
       )}
