@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { EyeIcon, EyeOffIcon, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -27,6 +28,18 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const { signIn, signInWithGoogle } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Check if user came from signup page with pending verification
+    if (searchParams?.get('verified') === 'pending') {
+      toast({
+        title: "Verification Required",
+        description: "Please check your email and verify your account before logging in.",
+        duration: 6000,
+      })
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,11 +48,49 @@ export default function LoginPage() {
     setIsLoading(false)
 
     if (error) {
-      toast({
-        title: "Error signing in",
-        description: error.message,
-        variant: "destructive",
-      })
+      if (error.code === "email_not_confirmed") {
+        toast({
+          title: "Email not verified",
+          description: "Please check your email and click the verification link we sent you. Need a new link?",
+          action: (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={async () => {
+                try {
+                  setIsLoading(true)
+                  const supabase = createClientComponentClient()
+                  const { error } = await supabase.auth.resend({
+                    type: 'signup',
+                    email,
+                  })
+                  if (error) throw error
+                  toast({
+                    title: "Verification email sent",
+                    description: "We've sent a new verification email to your inbox.",
+                  })
+                } catch (err) {
+                  toast({
+                    title: "Error",
+                    description: "Could not resend verification email. Please try again later.",
+                    variant: "destructive",
+                  })
+                } finally {
+                  setIsLoading(false)
+                }
+              }}
+            >
+              Resend
+            </Button>
+          ),
+        })
+      } else {
+        toast({
+          title: "Error signing in",
+          description: error.message,
+          variant: "destructive",
+        })
+      }
     } else {
       router.push("/college-application")
     }

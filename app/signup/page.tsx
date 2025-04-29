@@ -49,12 +49,13 @@ export default function SignupPage() {
       }
 
       toast({
-        title: "Account created successfully",
-        description: "Please check your email to confirm your account.",
+        title: "Verification email sent",
+        description: "Please check your email to verify your account. You must verify your email before you can log in.",
+        duration: 6000,
       })
 
-      // Redirect to login page
-      router.push("/login")
+      // Redirect to login page with a message
+      router.push("/login?verified=pending")
     } catch (error) {
       toast({
         title: "Error creating account",
