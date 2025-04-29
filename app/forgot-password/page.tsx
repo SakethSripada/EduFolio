@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,7 @@ import { ArrowLeft, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { toast } from "@/components/ui/use-toast"
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -101,5 +101,21 @@ export default function ForgotPasswordPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="container max-w-md py-8 md:py-24 px-4 sm:px-0">
+        <Card className="w-full p-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </Card>
+      </div>
+    }>
+      <ForgotPasswordForm />
+    </Suspense>
   )
 }

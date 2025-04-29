@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
 
-export default function SignupPage() {
+function SignupForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
@@ -275,5 +275,21 @@ export default function SignupPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="container max-w-md py-8 md:py-24 px-4 sm:px-0">
+        <Card className="w-full p-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </Card>
+      </div>
+    }>
+      <SignupForm />
+    </Suspense>
   )
 }

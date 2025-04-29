@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
@@ -21,7 +21,7 @@ import { EyeIcon, EyeOffIcon, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-export default function LoginPage() {
+function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -243,5 +243,21 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="container max-w-md py-8 md:py-24 px-4 sm:px-0">
+        <Card className="w-full p-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </Card>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
