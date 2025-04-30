@@ -17,6 +17,7 @@ import { toast } from "@/components/ui/use-toast"
 import ResumeEditor from "@/components/resume/ResumeEditor"
 import ResumePreview from "@/components/resume/ResumePreview"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import React from "react"
 
 // These are needed to fix type errors in the DOCX export
 type TextRunOptions = {
@@ -25,7 +26,7 @@ type TextRunOptions = {
   break?: number;
 }
 
-export default function ResumeEditorPage({ params }: { params: { id: string } }) {
+export default function ResumeEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isLoading } = useAuth()
@@ -38,7 +39,7 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
   const supabase = createClientComponentClient()
   
   // Get resumeId directly from params
-  const resumeId = params.id
+  const resumeId = React.use(params).id
 
   // Redirect to login if not authenticated
   useEffect(() => {

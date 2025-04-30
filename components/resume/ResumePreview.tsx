@@ -115,7 +115,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     switch (sectionType) {
       case 'summary':
         return content.summary ? (
-          <div className="mb-4">
+          <div className="mb-4" key="summary-section">
             <h2 className={headingClass}>Professional Summary</h2>
             <p className="whitespace-pre-line">{content.summary}</p>
           </div>
