@@ -3,154 +3,10 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
 
 import { cn } from "@/lib/utils"
 
-// Shared module state for all modal components
-const modalState = {
-  openCount: 0,
-  hasAppliedFix: false,
-  scrollbarWidth: 0,
-  scrollY: 0,
-  bodyPaddingRight: '',
-  preventReopenMap: new Map<string, boolean>() // Track components that should avoid reopening
-};
-
-// Enhanced hook to prevent content shift when modals open
-const useDialogContentShiftFix = (open: boolean) => {
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    if (open) {
-      // Increment counter of open modals
-      modalState.openCount++;
-      
-      // Only apply the fix if this is the first modal being opened
-      if (modalState.openCount === 1 && !modalState.hasAppliedFix) {
-        // Save current scroll position and body styles
-        modalState.scrollY = window.scrollY;
-        modalState.bodyPaddingRight = document.body.style.paddingRight;
-        
-        // Get accurate scrollbar width
-        const widthWithScrollbar = document.body.offsetWidth;
-        document.body.style.overflow = 'hidden';
-        const widthWithoutScrollbar = document.body.offsetWidth;
-        modalState.scrollbarWidth = widthWithoutScrollbar - widthWithScrollbar;
-        
-        // Set padding right to compensate for scrollbar disappearance
-        if (modalState.scrollbarWidth > 0) {
-          document.body.style.paddingRight = `${modalState.scrollbarWidth}px`;
-        }
-        
-        // Prevent scroll but maintain layout
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${modalState.scrollY}px`;
-        document.body.style.left = '0';
-        document.body.style.right = '0';
-        document.body.style.width = '100%';
-        
-        modalState.hasAppliedFix = true;
-      }
-    }
-    else {
-      // Decrement counter when modal closes
-      if (modalState.openCount > 0) {
-        modalState.openCount--;
-      }
-      
-      // Only remove the fix if all modals are closed
-      if (modalState.openCount === 0 && modalState.hasAppliedFix) {
-        // Save the scroll position before clearing styles
-        const scrollY = modalState.scrollY;
-        
-        // First clear position-related styles
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
-        
-        // Then clear overflow and padding in a consistent order
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = modalState.bodyPaddingRight;
-        
-        // Restore scroll position after styles are cleared and in next tick
-        window.setTimeout(() => {
-          window.scrollTo(0, scrollY);
-        }, 0);
-        
-        modalState.hasAppliedFix = false;
-      }
-    }
-    
-    return () => {
-      // Clean up on unmount - treat as if modal closed
-      if (open) {
-        if (modalState.openCount > 0) {
-          modalState.openCount--;
-        }
-        
-        // Only remove the fix if all modals are closed
-        if (modalState.openCount === 0 && modalState.hasAppliedFix) {
-          // Save the scroll position before clearing styles
-          const scrollY = modalState.scrollY;
-          
-          // First clear position-related styles
-          document.body.style.position = '';
-          document.body.style.top = '';
-          document.body.style.left = '';
-          document.body.style.right = '';
-          document.body.style.width = '';
-          
-          // Then clear overflow and padding in a consistent order
-          document.body.style.overflow = '';
-          document.body.style.paddingRight = modalState.bodyPaddingRight;
-          
-          // Restore scroll position after styles are cleared and in next tick
-          window.setTimeout(() => {
-            window.scrollTo(0, scrollY);
-          }, 0);
-          
-          modalState.hasAppliedFix = false;
-        }
-      }
-    };
-  }, [open]);
-};
-
-// Enhanced Dialog with reopening prevention
-const Dialog = ({ open, onOpenChange, ...props }: DialogPrimitive.DialogProps) => {
-  // Generate a stable component ID for this dialog instance
-  const [dialogId] = React.useState(() => Math.random().toString(36).slice(2, 10));
-  
-  // Use our custom hook to prevent content shift
-  useDialogContentShiftFix(open || false);
-  
-  // Handle open state changes with reopening prevention
-  const handleOpenChange = React.useCallback((newOpenState: boolean) => {
-    if (onOpenChange) {
-      // If closing, set a flag to prevent immediate reopening
-      if (!newOpenState) {
-        modalState.preventReopenMap.set(dialogId, true);
-        
-        // Clear the prevention flag after a short delay
-        window.setTimeout(() => {
-          modalState.preventReopenMap.delete(dialogId);
-        }, 100);
-      }
-      
-      // If attempting to open but prevention is active, ignore it
-      if (newOpenState && modalState.preventReopenMap.get(dialogId)) {
-        return;
-      }
-      
-      onOpenChange(newOpenState);
-    }
-  }, [onOpenChange, dialogId]);
-  
-  return <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props} />;
-};
+const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
 
@@ -165,7 +21,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -176,28 +32,25 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
-  // We're not handling modal state here anymore as it's handled by the useDialogContentShiftFix hook
-  return (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  )
-})
+>(({ className, children, ...props }, ref) => (
+  <DialogPortal>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    </DialogPrimitive.Content>
+  </DialogPortal>
+))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({
