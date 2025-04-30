@@ -219,68 +219,62 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
   ).current;
 
   useEffect(() => {
-    if (!user || !collegeId) return
-
+    if (!user?.id || !collegeId) return;
+  
     const fetchData = async () => {
-      setIsLoading(true)
-
-      setTimeout(async () => {
-        try {
-          // Fetch college essays (existing code)
-          const { data: collegeEssaysData, error: collegeEssaysError } = await supabase
-            .from("college_essays")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("college_id", collegeId)
-            .order("created_at", { ascending: false })
-
-          if (collegeEssaysError) throw collegeEssaysError
-
-          // Fetch general essays for import (existing code)
-          const { data: generalEssaysData, error: generalEssaysError } = await supabase
-            .from("essays")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (generalEssaysError) throw generalEssaysError
-
-          // Fetch folders for this college
-          const { data: foldersData, error: foldersError } = await supabase
-            .from("essay_folders")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("college_id", collegeId)
-            .order("created_at", { ascending: false })
-
-          if (foldersError) throw foldersError
-
-          // Filter essays based on current folder
-          let filteredEssays = collegeEssaysData || [];
-          if (currentFolderId) {
-            filteredEssays = filteredEssays.filter(essay => essay.folder_id === currentFolderId);
-          } else {
-            filteredEssays = filteredEssays.filter(essay => !essay.folder_id);
-          }
-
-          setEssays(filteredEssays)
-          setGeneralEssays(generalEssaysData || [])
-          setFolders(foldersData || [])
-        } catch (error) {
-          console.error("Error loading essays:", error)
-          toast({
-            title: "Error loading essays",
-            description: handleSupabaseError(error, "There was a problem loading your essays."),
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
-        }
-      }, 0)
-    }
-
-    fetchData()
-  }, [user, collegeId, toast])
+      setIsLoading(true);
+  
+      try {
+        // Fetch college essays
+        const { data: collegeEssaysData, error: collegeEssaysError } = await supabase
+          .from("college_essays")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("college_id", collegeId)
+          .order("created_at", { ascending: false });
+        if (collegeEssaysError) throw collegeEssaysError;
+  
+        // Fetch general essays
+        const { data: generalEssaysData, error: generalEssaysError } = await supabase
+          .from("essays")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        if (generalEssaysError) throw generalEssaysError;
+  
+        // Fetch folders
+        const { data: foldersData, error: foldersError } = await supabase
+          .from("essay_folders")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("college_id", collegeId)
+          .order("created_at", { ascending: false });
+        if (foldersError) throw foldersError;
+  
+        // Filter by folder
+        const allEssays = collegeEssaysData || [];
+        const filtered = currentFolderId
+          ? allEssays.filter(e => e.folder_id === currentFolderId)
+          : allEssays.filter(e => !e.folder_id);
+  
+        setEssays(filtered);
+        setGeneralEssays(generalEssaysData || []);
+        setFolders(foldersData || []);
+      } catch (error) {
+        console.error("Error loading essays:", error);
+        toast({
+          title: "Error loading essays",
+          description: handleSupabaseError(error, "There was a problem loading your essays."),
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchData();
+  }, [user?.id, collegeId]);
+  
 
   // Initialize collapsed essays ONLY ONCE when essays are first loaded
   useEffect(() => {
