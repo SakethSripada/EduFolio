@@ -815,10 +815,12 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
         <div className="md:col-span-6 lg:col-span-7 flex justify-center">
           <div 
             ref={resumePreviewRef}
-            className="border rounded-md shadow-sm min-h-[1056px] w-full max-w-[816px] p-10 overflow-auto print:border-none print:shadow-none"
+            className="border rounded-md shadow-sm w-full max-w-[816px] p-10 overflow-auto print:border-none print:shadow-none"
             style={{ 
               backgroundColor: style.backgroundColor || '#ffffff',
-              color: style.textColor || (style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000')
+              color: style.textColor || (style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000'),
+              height: "1056px",
+              aspectRatio: "8.5/11"
             }}
           >
             <ResumePreview resume={resume} />

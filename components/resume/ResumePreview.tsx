@@ -57,6 +57,20 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     return style.backgroundColor === '#1f2937'
   }, [style.backgroundColor])
   
+  // Default text color for the document
+  const defaultTextColor = useMemo(() => {
+    return style.textColor || (isDarkBackground ? '#ffffff' : '#000000')
+  }, [style.textColor, isDarkBackground])
+  
+  // Muted text color for secondary elements
+  const mutedTextColor = useMemo(() => {
+    // If there's a text color set, create a slightly muted version
+    if (style.textColor) {
+      return style.textColor + '99'; // Add 60% opacity
+    }
+    return isDarkBackground ? '#cccccc' : '#666666'
+  }, [style.textColor, isDarkBackground])
+  
   // Generate class for headings based on style
   const headingClass = useMemo(() => {
     const colorClass: ColorMap = {
@@ -70,11 +84,27 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     
     // If background is dark, adjust the text color to be lighter
     const textColorClass = isDarkBackground 
-      ? `text-white border-b border-gray-500 mb-3`
-      : `${colorClass[style.primaryColor as string] || 'text-indigo-600'} border-b mb-3`
+      ? `border-b border-gray-500 mb-3`
+      : `border-b mb-3`
     
     return `text-lg font-bold pb-1 ${textColorClass}`
-  }, [style.primaryColor, isDarkBackground])
+  }, [isDarkBackground])
+  
+  // Get heading color
+  const headingColorStyle = useMemo(() => {
+    // If there's a primary color, use it for headings
+    const primaryColor = style.primaryColor || '#4f46e5'
+    
+    // If there's a text color setting, prioritize it over default styles
+    if (style.textColor) {
+      return { color: style.textColor }
+    }
+    
+    // Otherwise, use primary color with conditional dark background handling
+    return { 
+      color: isDarkBackground ? '#ffffff' : primaryColor 
+    }
+  }, [style.primaryColor, style.textColor, isDarkBackground])
   
   // Generate spacing class based on style
   const spacingClass = useMemo(() => {
@@ -118,27 +148,27 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'summary':
         return content.summary ? (
           <div className="mb-4" key="summary-section">
-            <h2 className={headingClass}>Professional Summary</h2>
-            <p className="whitespace-pre-line">{content.summary}</p>
+            <h2 className={headingClass} style={headingColorStyle}>Professional Summary</h2>
+            <p className="whitespace-pre-line" style={{ color: defaultTextColor }}>{content.summary}</p>
           </div>
         ) : null
       
       case 'experience':
         return experience.length > 0 ? (
           <div className="mb-4" key="experience-section">
-            <h2 className={headingClass}>Work Experience</h2>
+            <h2 className={headingClass} style={headingColorStyle}>Work Experience</h2>
             
             <div className="space-y-4">
               {experience.map((exp: any) => (
                 <div key={exp.id} className="mb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold">{exp.position}</h3>
-                      <p>{exp.company}{exp.location ? `, ${exp.location}` : ''}</p>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
+                      <p style={{ color: defaultTextColor }}>{exp.company}{exp.location ? `, ${exp.location}` : ''}</p>
                     </div>
                     
                     {settings.showDates !== false && exp.startDate && (
-                      <div className={`text-right text-xs ${textMutedClass}`}>
+                      <div className={`text-right text-xs`} style={{ color: mutedTextColor }}>
                         <span>
                           {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
                         </span>
@@ -147,7 +177,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   </div>
                   
                   {exp.description && (
-                    <p className="mt-2 whitespace-pre-line text-xs">{exp.description}</p>
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{exp.description}</p>
                   )}
                 </div>
               ))}
@@ -158,20 +188,20 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'education':
         return education.length > 0 ? (
           <div className="mb-4" key="education-section">
-            <h2 className={headingClass}>Education</h2>
+            <h2 className={headingClass} style={headingColorStyle}>Education</h2>
             
             <div className="space-y-4">
               {education.map((edu: any) => (
                 <div key={edu.id} className="mb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold">{edu.institution}</h3>
-                      <p>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
-                      {edu.location && <p className={`text-xs ${textMutedClass}`}>{edu.location}</p>}
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{edu.institution}</h3>
+                      <p style={{ color: defaultTextColor }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
+                      {edu.location && <p className={`text-xs`} style={{ color: mutedTextColor }}>{edu.location}</p>}
                     </div>
                     
                     {settings.showDates !== false && (
-                      <div className={`text-right text-xs ${textMutedClass}`}>
+                      <div className={`text-right text-xs`} style={{ color: mutedTextColor }}>
                         {edu.startDate && (
                           <span>
                             {edu.startDate} - {edu.isCurrent ? 'Present' : edu.endDate}
@@ -183,7 +213,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   </div>
                   
                   {edu.description && (
-                    <p className="mt-2 whitespace-pre-line text-xs">{edu.description}</p>
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{edu.description}</p>
                   )}
                 </div>
               ))}
@@ -194,13 +224,17 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'skills':
         return skills.length > 0 ? (
           <div className="mb-4" key="skills-section">
-            <h2 className={headingClass}>Skills</h2>
+            <h2 className={headingClass} style={headingColorStyle}>Skills</h2>
             
             <div className="flex flex-wrap gap-2">
               {skills.map((skill: any) => (
                 <span 
                   key={skill.id}
-                  className="px-2 py-1 bg-muted rounded text-xs"
+                  className="px-2 py-1 rounded text-xs"
+                  style={{ 
+                    color: defaultTextColor,
+                    backgroundColor: isDarkBackground ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+                  }}
                 >
                   {skill.name}
                 </span>
@@ -219,23 +253,25 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       className={`${fontSizeClass} ${spacingClass}`}
       style={{ 
         fontFamily: `"${style.fontFamily}", sans-serif` || '"Inter", sans-serif',
-        color: style.textColor || (isDarkBackground ? '#ffffff' : '#000000'),
+        color: defaultTextColor,
         '--primary-color': style.primaryColor || '#4f46e5'
       } as React.CSSProperties}
     >
       {/* Header / Personal Info */}
       <div className="text-center mb-6">
         {personalInfo.fullName && (
-          <h1 className="text-2xl font-bold" style={{ color: style.primaryColor || '#4f46e5' }}>{personalInfo.fullName}</h1>
+          <h1 className="text-2xl font-bold" style={{ 
+            color: style.textColor ? style.textColor : (style.primaryColor || '#4f46e5')
+          }}>{personalInfo.fullName}</h1>
         )}
         
         {personalInfo.title && (
-          <p className={`${textMutedClass} mt-1`}>{personalInfo.title}</p>
+          <p className={`mt-1`} style={{ color: mutedTextColor }}>{personalInfo.title}</p>
         )}
         
         {/* Contact Information */}
         {settings.showContact !== false && (
-          <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 mt-3 text-xs">
+          <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 mt-3 text-xs" style={{ color: defaultTextColor }}>
             {personalInfo.email && (
               <span>{personalInfo.email}</span>
             )}
