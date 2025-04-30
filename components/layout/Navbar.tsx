@@ -18,8 +18,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, User, Menu, X } from "lucide-react"
+import { LogOut, User, Menu, X, Settings } from "lucide-react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { useUserSettings } from "@/hooks/useUserSettings"
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -28,6 +29,7 @@ export default function Navbar() {
   const { theme } = useTheme()
   const { user, signOut, isLoading, refreshSession } = useAuth()
   const [userProfile, setUserProfile] = useState<any>(null)
+  const { settings, isLoading: isLoadingSettings } = useUserSettings()
   const supabase = createClientComponentClient()
 
   // Refresh session when the component mounts to ensure auth state is current
@@ -116,36 +118,42 @@ export default function Navbar() {
         <div suppressHydrationWarning className="hidden md:flex items-center space-x-6">
           {user && (
             <>
-              <Button
-                variant="ghost"
-                className={cn(
-                  "text-muted-foreground hover:text-primary transition-colors",
-                  pathname === "/college-application" && "text-primary font-medium",
-                )}
-                onClick={() => handleNavigation("/college-application")}
-              >
-                College Applications
-              </Button>
-              <Button
-                variant="ghost"
-                className={cn(
-                  "text-muted-foreground hover:text-primary transition-colors",
-                  pathname === "/portfolio" && "text-primary font-medium",
-                )}
-                onClick={() => handleNavigation("/portfolio")}
-              >
-                Portfolio
-              </Button>
-              <Button
-                variant="ghost"
-                className={cn(
-                  "text-muted-foreground hover:text-primary transition-colors",
-                  pathname === "/resume" && "text-primary font-medium",
-                )}
-                onClick={() => handleNavigation("/resume")}
-              >
-                Resume
-              </Button>
+              {settings.enabledTools.collegeApp && (
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "text-muted-foreground hover:text-primary transition-colors",
+                    pathname === "/college-application" && "text-primary font-medium",
+                  )}
+                  onClick={() => handleNavigation("/college-application")}
+                >
+                  College Applications
+                </Button>
+              )}
+              {settings.enabledTools.portfolio && (
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "text-muted-foreground hover:text-primary transition-colors",
+                    pathname === "/portfolio" && "text-primary font-medium",
+                  )}
+                  onClick={() => handleNavigation("/portfolio")}
+                >
+                  Portfolio
+                </Button>
+              )}
+              {settings.enabledTools.resume && (
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "text-muted-foreground hover:text-primary transition-colors",
+                    pathname === "/resume" && "text-primary font-medium",
+                  )}
+                  onClick={() => handleNavigation("/resume")}
+                >
+                  Resume
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 className={cn(
@@ -165,33 +173,46 @@ export default function Navbar() {
           <div className="absolute top-16 left-0 right-0 bg-background border-b shadow-lg p-4 md:hidden z-50">
             {user ? (
               <>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start mb-2"
-                  onClick={() => handleNavigation("/college-application")}
-                >
-                  College Applications
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start mb-2"
-                  onClick={() => handleNavigation("/portfolio")}
-                >
-                  Portfolio
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start mb-2"
-                  onClick={() => handleNavigation("/resume")}
-                >
-                  Resume
-                </Button>
+                {settings.enabledTools.collegeApp && (
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start mb-2"
+                    onClick={() => handleNavigation("/college-application")}
+                  >
+                    College Applications
+                  </Button>
+                )}
+                {settings.enabledTools.portfolio && (
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start mb-2"
+                    onClick={() => handleNavigation("/portfolio")}
+                  >
+                    Portfolio
+                  </Button>
+                )}
+                {settings.enabledTools.resume && (
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start mb-2"
+                    onClick={() => handleNavigation("/resume")}
+                  >
+                    Resume
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start mb-2"
                   onClick={() => handleNavigation("/profile")}
                 >
                   Profile
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start mb-2"
+                  onClick={() => handleNavigation("/settings")}
+                >
+                  Settings
                 </Button>
                 <Button 
                   variant="ghost" 
@@ -234,6 +255,11 @@ export default function Navbar() {
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleNavigation("/settings")} className="cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out

@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import Navbar from "@/components/layout/Navbar"
 import Footer from "@/components/layout/Footer"
 import { AuthProvider } from "@/components/auth/AuthProvider"
+import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider"
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -56,12 +57,14 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="flex flex-col min-h-screen">
-              <Navbar />
-              <main className="flex-grow">{children}</main>
-              <Footer />
-              <Toaster />
-            </div>
+            <OnboardingProvider>
+              <div className="flex flex-col min-h-screen">
+                <Navbar />
+                <main className="flex-grow">{children}</main>
+                <Footer />
+                <Toaster />
+              </div>
+            </OnboardingProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>
