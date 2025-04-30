@@ -19,6 +19,21 @@ import { PlusCircle, Download, Eye, MoreHorizontal, Pencil, Trash2, Check, X } f
 import { toast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
+function getColorClass(color: string | undefined): string {
+  if (!color) return "border-indigo-600 dark:border-indigo-400"
+  
+  const colorMap: Record<string, string> = {
+    "#4f46e5": "border-indigo-600 dark:border-indigo-400",
+    "#ef4444": "border-red-600 dark:border-red-400",
+    "#10b981": "border-emerald-600 dark:border-emerald-400",
+    "#6366f1": "border-violet-600 dark:border-violet-400",
+    "#f59e0b": "border-amber-600 dark:border-amber-400",
+    "#3b82f6": "border-blue-600 dark:border-blue-400"
+  }
+  
+  return colorMap[color] || "border-indigo-600 dark:border-indigo-400"
+}
+
 export default function ResumePage() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
@@ -189,6 +204,11 @@ export default function ResumePage() {
     }
   }
 
+  // Export resume
+  const exportResume = async (resumeId: string) => {
+    router.push(`/resume/${resumeId}?export=true`)
+  }
+
   if (isLoading) {
     return (
       <div className="container py-10">
@@ -311,16 +331,67 @@ export default function ResumePage() {
                     <div className="h-40 bg-muted/20 border rounded-md flex items-center justify-center cursor-pointer"
                          onClick={() => router.push(`/resume/${resume.id}`)}>
                       <div className="w-full max-w-[160px] h-32 bg-white dark:bg-gray-800 rounded shadow-sm mx-auto">
-                        {/* Preview thumbnail */}
-                        <div className="p-2">
-                          <div className="w-16 h-2 bg-muted mb-2 rounded"></div>
-                          <div className="w-24 h-2 bg-muted mb-4 rounded"></div>
-                          <div className="w-full h-1 bg-muted/50 mb-1 rounded"></div>
-                          <div className="w-full h-1 bg-muted/50 mb-1 rounded"></div>
-                          <div className="w-3/4 h-1 bg-muted/50 mb-3 rounded"></div>
-                          <div className="w-16 h-2 bg-muted mb-2 rounded"></div>
-                          <div className="w-full h-1 bg-muted/50 mb-1 rounded"></div>
-                          <div className="w-5/6 h-1 bg-muted/50 rounded"></div>
+                        {/* Preview thumbnail with actual resume content */}
+                        <div className="p-2 overflow-hidden text-[6px] max-h-full" style={{ fontFamily: resume.style?.fontFamily || 'Inter' }}>
+                          {resume.content?.personalInfo?.fullName && (
+                            <div className="text-center">
+                              <div className="font-bold text-[8px]">{resume.content.personalInfo.fullName}</div>
+                              {resume.content.personalInfo.title && (
+                                <div className="text-muted-foreground text-[5px]">{resume.content.personalInfo.title}</div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {resume.content?.summary && (
+                            <>
+                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
+                                Summary
+                              </div>
+                              <div className="truncate text-[5px]">{resume.content.summary}</div>
+                            </>
+                          )}
+                          
+                          {resume.content?.experience && resume.content.experience.length > 0 && (
+                            <>
+                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
+                                Experience
+                              </div>
+                              {resume.content.experience.slice(0, 1).map((exp: any) => (
+                                <div key={exp.id} className="text-[5px]">
+                                  <div className="font-semibold truncate">{exp.position}</div>
+                                  <div className="truncate">{exp.company}</div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          
+                          {resume.content?.education && resume.content.education.length > 0 && (
+                            <>
+                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
+                                Education
+                              </div>
+                              {resume.content.education.slice(0, 1).map((edu: any) => (
+                                <div key={edu.id} className="text-[5px]">
+                                  <div className="font-semibold truncate">{edu.institution}</div>
+                                  <div className="truncate">{edu.degree}</div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                          
+                          {resume.content?.skills && resume.content.skills.length > 0 && (
+                            <>
+                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
+                                Skills
+                              </div>
+                              <div className="flex flex-wrap gap-[2px]">
+                                {resume.content.skills.slice(0, 3).map((skill: any) => (
+                                  <span key={skill.id} className="px-1 bg-muted rounded text-[4px]">{skill.name}</span>
+                                ))}
+                                {resume.content.skills.length > 3 && <span className="text-[4px]">...</span>}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -329,7 +400,15 @@ export default function ResumePage() {
                     <Button size="sm" variant="ghost" onClick={() => router.push(`/resume/${resume.id}`)} className="gap-1">
                       <Eye className="h-4 w-4" /> Edit
                     </Button>
-                    <Button size="sm" variant="outline" className="gap-1">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        exportResume(resume.id)
+                      }}
+                    >
                       <Download className="h-4 w-4" /> Export
                     </Button>
                   </CardFooter>
