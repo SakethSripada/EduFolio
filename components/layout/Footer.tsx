@@ -13,17 +13,17 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Features</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link href="/college-application" className="text-muted-foreground hover:text-primary transition-colors">
                   College Applications
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link href="/resume" className="text-muted-foreground hover:text-primary transition-colors">
                   Resume Builder
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link href="/portfolio" className="text-muted-foreground hover:text-primary transition-colors">
                   Portfolio Creator
                 </Link>
               </li>
