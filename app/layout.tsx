@@ -8,43 +8,13 @@ import Footer from "@/components/layout/Footer"
 import { AuthProvider } from "@/components/auth/AuthProvider"
 import { Toaster } from "@/components/ui/toaster"
 
-// Load Google Fonts properly with Next.js
 const inter = Inter({ subsets: ["latin"] })
-
-// Script to prevent theme flashing
-const themeInitializerScript = `
-  (function() {
-    try {
-      // Try to get the theme from localStorage
-      const storedTheme = localStorage.getItem('theme');
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      
-      // Logic to determine which theme to use
-      if (storedTheme === 'dark' || (storedTheme === 'system' && systemPrefersDark) || (!storedTheme && systemPrefersDark)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    } catch (e) {
-      console.error('Error setting initial theme', e);
-    }
-  })();
-`;
 
 export const metadata: Metadata = {
   title: "EduFolio - Your Educational Journey, Beautifully Organized",
   description: "Manage your college applications, resume, professional experience, and portfolio with ease.",
   viewport: "width=device-width, initial-scale=1",
-  generator: 'v0.dev',
-  icons: {
-    icon: [
-      { url: '/EduFolioLogo.ico', sizes: '32x32' },
-      { url: '/EduFolioLogo.png', sizes: '192x192', type: 'image/png' },
-    ],
-    apple: [
-      { url: '/EduFolioLogo.png', sizes: '180x180', type: 'image/png' },
-    ],
-  },
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -54,18 +24,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="/EduFolioLogo.ico" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Lora:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
-        {/* Add script to prevent theme flash */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitializerScript }} />
-      </head>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className={inter.className}>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="flex flex-col min-h-screen app-container">
+            <div className="flex flex-col min-h-screen">
               <Navbar />
               <main className="flex-grow">{children}</main>
               <Footer />
@@ -77,6 +39,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-import './globals.css'
