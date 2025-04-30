@@ -18,6 +18,13 @@ import ResumeEditor from "@/components/resume/ResumeEditor"
 import ResumePreview from "@/components/resume/ResumePreview"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
+// These are needed to fix type errors in the DOCX export
+type TextRunOptions = {
+  text: string;
+  bold?: boolean;
+  break?: number;
+}
+
 export default function ResumeEditorPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -99,6 +106,10 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
       // Wait for resume data to be loaded
       const timer = setTimeout(() => {
         exportToPdf()
+        // Remove the export param from the URL to prevent repeated downloads
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('export')
+        window.history.replaceState({}, '', newUrl.toString())
       }, 1000)
       
       return () => clearTimeout(timer)
@@ -210,6 +221,16 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
       const education = content.education || []
       const skills = content.skills || []
       
+      // Helper function to create a text run with proper types
+      const createTextRun = (options: TextRunOptions) => {
+        const { text, bold, break: lineBreak } = options
+        return new TextRun({
+          text,
+          bold,
+          break: lineBreak
+        })
+      }
+      
       // Create document
       const doc = new Document({
         sections: [{
@@ -232,9 +253,19 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
-                new TextRun(personalInfo.email || ""),
-                personalInfo.phone ? new TextRun({ text: ` | ${personalInfo.phone}`, break: !personalInfo.email }) : new TextRun(""),
-                personalInfo.location ? new TextRun({ text: ` | ${personalInfo.location}`, break: !personalInfo.email && !personalInfo.phone }) : new TextRun(""),
+                createTextRun({ text: personalInfo.email || "" }),
+                personalInfo.phone ? 
+                  createTextRun({ 
+                    text: ` | ${personalInfo.phone}`, 
+                    break: !personalInfo.email ? 1 : 0 
+                  }) : 
+                  createTextRun({ text: "" }),
+                personalInfo.location ? 
+                  createTextRun({ 
+                    text: ` | ${personalInfo.location}`, 
+                    break: (!personalInfo.email && !personalInfo.phone) ? 1 : 0 
+                  }) : 
+                  createTextRun({ text: "" }),
               ]
             }),
             
@@ -444,7 +475,7 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-5 lg:col-span-4 space-y-6">
+        <div className="md:col-span-6 lg:col-span-5 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="content" className="flex items-center gap-1">
@@ -547,6 +578,47 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
                       <Input
                         value={style.primaryColor || "#4f46e5"}
                         onChange={(e) => updateStyle("primaryColor", e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="backgroundColor">Background Color</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        { name: "White", value: "#ffffff" },
+                        { name: "Light Gray", value: "#f5f5f5" },
+                        { name: "Cream", value: "#f9f5eb" },
+                        { name: "Light Blue", value: "#f0f4f8" },
+                        { name: "Light Green", value: "#f0f7f4" },
+                        { name: "Dark Mode", value: "#1f2937" }
+                      ].map(color => (
+                        <button
+                          key={color.value}
+                          type="button"
+                          className={`w-8 h-8 rounded-full border-2 ${style.backgroundColor === color.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white' : ''}`}
+                          style={{ backgroundColor: color.value }}
+                          onClick={() => updateStyle("backgroundColor", color.value)}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="backgroundColorInput">Custom Background</Label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        id="backgroundColorInput"
+                        value={style.backgroundColor || "#ffffff"}
+                        onChange={(e) => updateStyle("backgroundColor", e.target.value)}
+                        className="h-10 w-10 p-0 border-0"
+                      />
+                      <Input
+                        value={style.backgroundColor || "#ffffff"}
+                        onChange={(e) => updateStyle("backgroundColor", e.target.value)}
                         className="flex-1"
                       />
                     </div>
@@ -691,10 +763,14 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
           </Tabs>
         </div>
         
-        <div className="md:col-span-7 lg:col-span-8 flex justify-center">
+        <div className="md:col-span-6 lg:col-span-7 flex justify-center">
           <div 
             ref={resumePreviewRef}
-            className="bg-white dark:bg-gray-950 border rounded-md shadow-sm min-h-[1056px] w-full max-w-[816px] p-10 overflow-auto"
+            className="border rounded-md shadow-sm min-h-[1056px] w-full max-w-[816px] p-10 overflow-auto print:border-none print:shadow-none"
+            style={{ 
+              backgroundColor: style.backgroundColor || '#ffffff',
+              color: style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000'
+            }}
           >
             <ResumePreview resume={resume} />
           </div>

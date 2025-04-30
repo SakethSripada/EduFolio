@@ -15,9 +15,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { PlusCircle, Download, Eye, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react"
+import { PlusCircle, Download, Eye, MoreHorizontal, Pencil, Trash2, Check, X, Copy, FileText } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { ToastAction } from "@/components/ui/toast"
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 function getColorClass(color: string | undefined): string {
   if (!color) return "border-indigo-600 dark:border-indigo-400"
@@ -42,6 +51,8 @@ export default function ResumePage() {
   const [editingResumeId, setEditingResumeId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const editInputRef = useRef<HTMLInputElement>(null)
+  const [exportingResumeId, setExportingResumeId] = useState<string | null>(null)
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "docx" | null>(null)
   const supabase = createClientComponentClient()
 
   // Redirect to login if not authenticated
@@ -204,9 +215,334 @@ export default function ResumePage() {
     }
   }
 
+  // Make a copy of an existing resume
+  const duplicateResume = async (resumeId: string) => {
+    // Find the resume to duplicate
+    const resumeToCopy = resumes.find(r => r.id === resumeId)
+    if (!resumeToCopy || !user) return
+    
+    try {
+      // Create a new title with " (Copy)" appended
+      const newTitle = `${resumeToCopy.title} (Copy)`
+      
+      // Create a copy with the same content and style
+      const { data, error } = await supabase
+        .from("resumes")
+        .insert({
+          user_id: user.id,
+          title: newTitle,
+          content: resumeToCopy.content || {},
+          style: resumeToCopy.style || {
+            fontFamily: "Inter",
+            primaryColor: "#4f46e5",
+            fontSize: "medium",
+            spacing: "comfortable"
+          },
+          template: resumeToCopy.template || "standard",
+          settings: resumeToCopy.settings || {}
+        })
+        .select()
+
+      if (error) {
+        throw error
+      }
+      
+      toast({
+        title: "Resume Duplicated",
+        description: "A copy of your resume has been created",
+        duration: 3000
+      })
+      
+      // Refresh the list
+      fetchResumes()
+    } catch (error) {
+      console.error("Error duplicating resume:", error)
+      toast({
+        title: "Error",
+        description: "Failed to duplicate the resume",
+        variant: "destructive",
+        duration: 3000
+      })
+    }
+  }
+
   // Export resume
-  const exportResume = async (resumeId: string) => {
-    router.push(`/resume/${resumeId}?export=true`)
+  const exportResume = async (resumeId: string, format: "pdf" | "docx") => {
+    setExportingResumeId(resumeId)
+    setExportingFormat(format)
+    
+    try {
+      if (format === "pdf") {
+        // For PDF, use html2canvas and jsPDF
+        const { jsPDF } = await import('jspdf')
+        const html2canvas = (await import('html2canvas')).default
+        
+        // Create a hidden div for the resume to render
+        const resumeContainer = document.createElement('div')
+        resumeContainer.style.position = 'absolute'
+        resumeContainer.style.left = '-9999px'
+        resumeContainer.style.width = '816px' // Standard page width
+        resumeContainer.style.backgroundColor = 'white'
+        resumeContainer.style.padding = '40px'
+        document.body.appendChild(resumeContainer)
+        
+        // Find the resume to export
+        const resumeToExport = resumes.find(r => r.id === resumeId)
+        if (!resumeToExport) throw new Error("Resume not found")
+        
+        // Render the resume preview in the hidden div
+        // We're using a simple version since we can't use React components directly
+        resumeContainer.innerHTML = `
+          <div style="font-family: ${resumeToExport.style?.fontFamily || 'Arial'}; text-align: center; margin-bottom: 24px;">
+            <h1 style="font-size: 24px; font-weight: bold;">${resumeToExport.content?.personalInfo?.fullName || 'Resume'}</h1>
+            ${resumeToExport.content?.personalInfo?.title ? `<p style="color: #666;">${resumeToExport.content.personalInfo.title}</p>` : ''}
+            <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px;">
+              ${resumeToExport.content?.personalInfo?.email ? `<span>${resumeToExport.content.personalInfo.email}</span>` : ''}
+              ${resumeToExport.content?.personalInfo?.phone ? `<span>${resumeToExport.content.personalInfo.phone}</span>` : ''}
+              ${resumeToExport.content?.personalInfo?.location ? `<span>${resumeToExport.content.personalInfo.location}</span>` : ''}
+            </div>
+          </div>
+          ${resumeToExport.content?.summary ? `
+            <div style="margin-bottom: 16px;">
+              <h2 style="font-size: 18px; font-weight: bold; padding-bottom: 4px; border-bottom: 1px solid #ccc; margin-bottom: 12px;">Professional Summary</h2>
+              <p>${resumeToExport.content.summary}</p>
+            </div>
+          ` : ''}
+          ${resumeToExport.content?.experience?.length ? `
+            <div style="margin-bottom: 16px;">
+              <h2 style="font-size: 18px; font-weight: bold; padding-bottom: 4px; border-bottom: 1px solid #ccc; margin-bottom: 12px;">Work Experience</h2>
+              <div>
+                ${resumeToExport.content.experience.map((exp: any) => `
+                  <div style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between;">
+                      <div>
+                        <h3 style="font-weight: 600;">${exp.position}</h3>
+                        <p>${exp.company}${exp.location ? `, ${exp.location}` : ''}</p>
+                      </div>
+                      <div style="text-align: right; font-size: 12px; color: #666;">
+                        ${exp.startDate ? `${exp.startDate} - ${exp.isCurrent ? 'Present' : exp.endDate}` : ''}
+                      </div>
+                    </div>
+                    ${exp.description ? `<p style="margin-top: 8px; font-size: 12px;">${exp.description}</p>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${resumeToExport.content?.skills?.length ? `
+            <div style="margin-bottom: 16px;">
+              <h2 style="font-size: 18px; font-weight: bold; padding-bottom: 4px; border-bottom: 1px solid #ccc; margin-bottom: 12px;">Skills</h2>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                ${resumeToExport.content.skills.map((skill: any) => `
+                  <span style="padding: 4px 8px; background-color: #f1f1f1; border-radius: 4px; font-size: 12px;">${skill.name}</span>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        `
+        
+        // Wait for fonts to load
+        await document.fonts.ready
+        
+        // Convert to PDF
+        const canvas = await html2canvas(resumeContainer, {
+          scale: 2,
+          useCORS: true,
+          logging: false
+        } as any)
+        
+        document.body.removeChild(resumeContainer)
+        
+        const imgData = canvas.toDataURL('image/jpeg', 1.0)
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+        
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight)
+        pdf.save(`${resumeToExport.title || 'resume'}.pdf`)
+      } else if (format === "docx") {
+        // For DOCX, use docx library
+        const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx')
+        
+        // Find the resume to export
+        const resumeToExport = resumes.find(r => r.id === resumeId)
+        if (!resumeToExport) throw new Error("Resume not found")
+        
+        const content = resumeToExport.content || {}
+        const personalInfo = content.personalInfo || {}
+        const experience = content.experience || []
+        const education = content.education || []
+        const skills = content.skills || []
+        
+        // Create document
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: [
+              // Name
+              new Paragraph({
+                text: personalInfo.fullName || "Resume",
+                heading: HeadingLevel.HEADING_1,
+                alignment: AlignmentType.CENTER,
+              }),
+              
+              // Title
+              personalInfo.title ? new Paragraph({
+                text: personalInfo.title,
+                alignment: AlignmentType.CENTER,
+              }) : new Paragraph({}),
+              
+              // Contact info
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun(personalInfo.email || ""),
+                  personalInfo.phone ? new TextRun({ text: ` | ${personalInfo.phone}`, break: !personalInfo.email as any }) : new TextRun(""),
+                  personalInfo.location ? new TextRun({ text: ` | ${personalInfo.location}`, break: (!personalInfo.email && !personalInfo.phone) as any }) : new TextRun(""),
+                ]
+              }),
+              
+              // Summary
+              content.summary ? new Paragraph({
+                text: "Professional Summary",
+                heading: HeadingLevel.HEADING_2,
+                thematicBreak: true,
+                spacing: {
+                  before: 400,
+                  after: 200
+                }
+              }) : new Paragraph({}),
+              
+              content.summary ? new Paragraph({
+                text: content.summary
+              }) : new Paragraph({}),
+              
+              // Experience
+              experience.length > 0 ? new Paragraph({
+                text: "Work Experience",
+                heading: HeadingLevel.HEADING_2,
+                thematicBreak: true,
+                spacing: {
+                  before: 400,
+                  after: 200
+                }
+              }) : new Paragraph({}),
+              
+              // Experience items
+              ...experience.flatMap((exp: any) => [
+                new Paragraph({
+                  text: exp.position,
+                  heading: HeadingLevel.HEADING_3,
+                  spacing: {
+                    before: 300
+                  }
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: exp.company, bold: true }),
+                    exp.location ? new TextRun({ text: `, ${exp.location}` }) : new TextRun(""),
+                    exp.startDate ? new TextRun({ text: ` | ${exp.startDate} - ${exp.isCurrent ? 'Present' : exp.endDate}` }) : new TextRun("")
+                  ]
+                }),
+                exp.description ? new Paragraph({
+                  text: exp.description,
+                  spacing: {
+                    before: 100,
+                    after: 200
+                  }
+                }) : new Paragraph({})
+              ]),
+              
+              // Education
+              education.length > 0 ? new Paragraph({
+                text: "Education",
+                heading: HeadingLevel.HEADING_2,
+                thematicBreak: true,
+                spacing: {
+                  before: 400,
+                  after: 200
+                }
+              }) : new Paragraph({}),
+              
+              // Education items
+              ...education.flatMap((edu: any) => [
+                new Paragraph({
+                  text: edu.institution,
+                  heading: HeadingLevel.HEADING_3,
+                  spacing: {
+                    before: 300
+                  }
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: edu.degree, bold: true }),
+                    edu.fieldOfStudy ? new TextRun({ text: ` in ${edu.fieldOfStudy}` }) : new TextRun(""),
+                    edu.startDate ? new TextRun({ text: ` | ${edu.startDate} - ${edu.isCurrent ? 'Present' : edu.endDate}` }) : new TextRun("")
+                  ]
+                }),
+                edu.description ? new Paragraph({
+                  text: edu.description,
+                  spacing: {
+                    before: 100,
+                    after: 200
+                  }
+                }) : new Paragraph({})
+              ]),
+              
+              // Skills
+              skills.length > 0 ? new Paragraph({
+                text: "Skills",
+                heading: HeadingLevel.HEADING_2,
+                thematicBreak: true,
+                spacing: {
+                  before: 400,
+                  after: 200
+                }
+              }) : new Paragraph({}),
+              
+              // Skills items (comma-separated)
+              skills.length > 0 ? new Paragraph({
+                text: skills.map((skill: any) => skill.name).join(", "),
+              }) : new Paragraph({})
+            ]
+          }]
+        })
+        
+        // Generate and save document
+        Packer.toBlob(doc).then((blob: Blob) => {
+          const link = document.createElement('a')
+          const url = URL.createObjectURL(blob)
+          link.href = url
+          link.download = `${resumeToExport.title || 'resume'}.docx`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        })
+      }
+      
+      toast({
+        title: "Export Successful",
+        description: `Resume exported as ${format.toUpperCase()}`,
+        duration: 3000
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting your resume",
+        variant: "destructive",
+        duration: 3000
+      })
+    } finally {
+      setExportingResumeId(null)
+      setExportingFormat(null)
+    }
+  }
+
+  // Handle dialog close
+  const handleDialogClose = () => {
+    setExportingResumeId(null)
+    setExportingFormat(null)
   }
 
   if (isLoading) {
@@ -315,6 +651,12 @@ export default function ResumePage() {
                             >
                               <Pencil className="h-4 w-4" /> Rename
                             </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="cursor-pointer gap-2"
+                              onClick={() => duplicateResume(resume.id)}
+                            >
+                              <Copy className="h-4 w-4" /> Duplicate
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
                               className="text-destructive focus:text-destructive cursor-pointer gap-2"
@@ -330,7 +672,13 @@ export default function ResumePage() {
                   <div className="px-5 pb-5">
                     <div className="h-40 bg-muted/20 border rounded-md flex items-center justify-center cursor-pointer"
                          onClick={() => router.push(`/resume/${resume.id}`)}>
-                      <div className="w-full max-w-[160px] h-32 bg-white dark:bg-gray-800 rounded shadow-sm mx-auto">
+                      <div 
+                        className="w-full max-w-[160px] h-32 rounded shadow-sm mx-auto"
+                        style={{ 
+                          backgroundColor: resume.style?.backgroundColor || 'white',
+                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'inherit'
+                        }}
+                      >
                         {/* Preview thumbnail with actual resume content */}
                         <div className="p-2 overflow-hidden text-[6px] max-h-full" style={{ fontFamily: resume.style?.fontFamily || 'Inter' }}>
                           {resume.content?.personalInfo?.fullName && (
@@ -406,7 +754,7 @@ export default function ResumePage() {
                       className="gap-1"
                       onClick={(e) => {
                         e.stopPropagation()
-                        exportResume(resume.id)
+                        setExportingResumeId(resume.id)
                       }}
                     >
                       <Download className="h-4 w-4" /> Export
@@ -518,6 +866,56 @@ export default function ResumePage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!exportingResumeId} onOpenChange={(open) => {
+        if (!open) {
+          handleDialogClose()
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Export Resume</DialogTitle>
+            <DialogDescription>
+              Choose a format to export your resume
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Button 
+              variant="outline" 
+              className="flex flex-col items-center justify-center h-24 p-4"
+              onClick={() => exportingResumeId && exportResume(exportingResumeId, "pdf")}
+              disabled={!!exportingFormat}
+            >
+              <Download className="h-8 w-8 mb-2" />
+              <span>PDF</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="flex flex-col items-center justify-center h-24 p-4"
+              onClick={() => exportingResumeId && exportResume(exportingResumeId, "docx")}
+              disabled={!!exportingFormat}
+            >
+              <FileText className="h-8 w-8 mb-2" />
+              <span>DOCX</span>
+            </Button>
+          </div>
+          {exportingFormat && (
+            <div className="flex items-center justify-center py-2">
+              <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+              <span>Preparing {exportingFormat.toUpperCase()}...</span>
+            </div>
+          )}
+          <DialogFooter className="sm:justify-center">
+            <Button 
+              variant="ghost" 
+              onClick={handleDialogClose}
+              disabled={!!exportingFormat}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 } 

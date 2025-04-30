@@ -24,7 +24,8 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     fontFamily: 'Inter',
     primaryColor: '#4f46e5',
     fontSize: 'medium',
-    spacing: 'comfortable'
+    spacing: 'comfortable',
+    backgroundColor: '#ffffff'
   }
   const settings = resume?.settings || {
     showDates: true,
@@ -44,6 +45,16 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   // Skills
   const skills = content.skills || []
   
+  // Determine text color based on background
+  const textMutedClass = useMemo(() => {
+    return style.backgroundColor === '#1f2937' ? 'text-gray-300' : 'text-gray-600'
+  }, [style.backgroundColor])
+  
+  // Determine if we're using a dark background
+  const isDarkBackground = useMemo(() => {
+    return style.backgroundColor === '#1f2937'
+  }, [style.backgroundColor])
+  
   // Generate class for headings based on style
   const headingClass = useMemo(() => {
     const colorClass: ColorMap = {
@@ -55,8 +66,13 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       '#3b82f6': 'text-blue-600 dark:text-blue-400',
     }
     
-    return `text-lg font-bold pb-1 border-b mb-3 ${colorClass[style.primaryColor as string] || 'text-indigo-600 dark:text-indigo-400'}`
-  }, [style.primaryColor])
+    // If background is dark, adjust the text color to be lighter
+    const textColorClass = isDarkBackground 
+      ? `text-white border-b border-gray-500 mb-3`
+      : `${colorClass[style.primaryColor as string] || 'text-indigo-600'} border-b mb-3`
+    
+    return `text-lg font-bold pb-1 ${textColorClass}`
+  }, [style.primaryColor, isDarkBackground])
   
   // Generate spacing class based on style
   const spacingClass = useMemo(() => {
@@ -93,7 +109,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       return ['summary', 'experience', 'education', 'skills']
     }
   }, [settings.sectionOrder])
-
+  
   // Render section based on type
   const renderSection = (sectionType: string) => {
     switch (sectionType) {
@@ -120,7 +136,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                     </div>
                     
                     {settings.showDates !== false && exp.startDate && (
-                      <div className="text-right text-xs text-muted-foreground">
+                      <div className={`text-right text-xs ${textMutedClass}`}>
                         <span>
                           {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
                         </span>
@@ -149,11 +165,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                     <div>
                       <h3 className="font-semibold">{edu.institution}</h3>
                       <p>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
-                      {edu.location && <p className="text-xs text-muted-foreground">{edu.location}</p>}
+                      {edu.location && <p className={`text-xs ${textMutedClass}`}>{edu.location}</p>}
                     </div>
                     
                     {settings.showDates !== false && (
-                      <div className="text-right text-xs text-muted-foreground">
+                      <div className={`text-right text-xs ${textMutedClass}`}>
                         {edu.startDate && (
                           <span>
                             {edu.startDate} - {edu.isCurrent ? 'Present' : edu.endDate}
@@ -199,7 +215,10 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   return (
     <div 
       className={`${fontSizeClass} ${spacingClass}`}
-      style={{ fontFamily: style.fontFamily || 'Inter' }}
+      style={{ 
+        fontFamily: style.fontFamily || 'Inter',
+        color: isDarkBackground ? '#ffffff' : '#000000'
+      }}
     >
       {/* Header / Personal Info */}
       <div className="text-center mb-6">
@@ -208,7 +227,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         )}
         
         {personalInfo.title && (
-          <p className="text-muted-foreground mt-1">{personalInfo.title}</p>
+          <p className={`${textMutedClass} mt-1`}>{personalInfo.title}</p>
         )}
         
         {/* Contact Information */}
