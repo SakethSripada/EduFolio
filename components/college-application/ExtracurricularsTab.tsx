@@ -88,7 +88,7 @@ export default function ExtracurricularsTab() {
   const [aiAction, setAiAction] = useState<"improve" | "all" | null>(null)
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return;
 
     const fetchData = async () => {
       performDatabaseOperation(
@@ -97,25 +97,27 @@ export default function ExtracurricularsTab() {
             .from("extracurricular_activities")
             .select("*")
             .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (error) throw error
-          return data || []
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return data || [];
         },
         setIsLoading,
         (data) => setActivities(data),
         (error) => {
           toast({
             title: "Error loading extracurriculars",
-            description: handleSupabaseError(error, "There was a problem loading your extracurricular activities."),
+            description: handleSupabaseError(
+              error,
+              "There was a problem loading your extracurricular activities."
+            ),
             variant: "destructive",
-          })
-        },
-      )
-    }
+          });
+        }
+      );
+    };
 
-    fetchData()
-  }, [user, toast])
+    fetchData();
+  }, [user?.id]);
 
   // Validate activity form
   const validateActivityForm = (isEditing: boolean): boolean => {

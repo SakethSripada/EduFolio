@@ -87,58 +87,55 @@ export default function CollegeExtracurriculars({ collegeId }: CollegeExtracurri
 
   // Update the useEffect to use setTimeout for Supabase calls
   useEffect(() => {
-    if (!user || !collegeId) return
-
+    if (!user?.id || !collegeId) return;
+  
+    setIsLoading(true);
+  
     const fetchData = async () => {
-      setIsLoading(true)
-
-      setTimeout(async () => {
-        try {
-          // Fetch college name
-          const { data: collegeData, error: collegeError } = await supabase
-            .from("colleges")
-            .select("name")
-            .eq("id", collegeId)
-            .single()
-
-          if (collegeError) throw collegeError
-          if (collegeData) setCollegeName(collegeData.name)
-          
-          // Fetch college-specific activities
-          const { data: collegeActivitiesData, error: collegeActivitiesError } = await supabase
-            .from("college_extracurricular_activities")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("college_id", collegeId)
-            .order("created_at", { ascending: false })
-
-          if (collegeActivitiesError) throw collegeActivitiesError
-
-          // Fetch general activities for import
-          const { data: generalActivitiesData, error: generalActivitiesError } = await supabase
-            .from("extracurricular_activities")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (generalActivitiesError) throw generalActivitiesError
-
-          setActivities(collegeActivitiesData || [])
-          setGeneralActivities(generalActivitiesData || [])
-        } catch (error) {
-          toast({
-            title: "Error loading activities",
-            description: handleSupabaseError(error, "There was a problem loading your activities."),
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
-        }
-      }, 0)
-    }
-
-    fetchData()
-  }, [user, collegeId, toast])
+      try {
+        // Fetch college name
+        const { data: collegeData, error: collegeError } = await supabase
+          .from("colleges")
+          .select("name")
+          .eq("id", collegeId)
+          .single();
+        if (collegeError) throw collegeError;
+        if (collegeData) setCollegeName(collegeData.name);
+  
+        // Fetch college-specific activities
+        const { data: collegeActivitiesData, error: collegeActivitiesError } = await supabase
+          .from("college_extracurricular_activities")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("college_id", collegeId)
+          .order("created_at", { ascending: false });
+        if (collegeActivitiesError) throw collegeActivitiesError;
+  
+        // Fetch general activities for import
+        const { data: generalActivitiesData, error: generalActivitiesError } = await supabase
+          .from("extracurricular_activities")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        if (generalActivitiesError) throw generalActivitiesError;
+  
+        setActivities(collegeActivitiesData || []);
+        setGeneralActivities(generalActivitiesData || []);
+      } catch (error) {
+        console.error("Error loading activities:", error);
+        toast({
+          title: "Error loading activities",
+          description: handleSupabaseError(error, "There was a problem loading your activities."),
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchData();
+  }, [user?.id, collegeId]);
+  
 
   // Validate activity form
   const validateActivityForm = (isEditing: boolean): boolean => {

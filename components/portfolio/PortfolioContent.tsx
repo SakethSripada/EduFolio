@@ -127,167 +127,122 @@ export const PortfolioContent = ({
 
   // Check for existing share link on component mount
   useEffect(() => {
-    if (!user) return;
-
+    if (!user?.id) return;
+  
     const checkExistingShareLink = async () => {
       try {
-        const baseUrl = 
-          typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host}` : "";
-
-        // Check if a share link already exists - without using maybeSingle to handle multiple records
+        const baseUrl = typeof window !== "undefined"
+          ? `${window.location.protocol}//${window.location.host}`
+          : "";
+  
+        // Fetch all portfolio share links for this user
         const { data: existingRecords, error } = await supabase
           .from("shared_links")
           .select("*")
           .eq("user_id", user.id)
           .eq("content_type", "portfolio");
-
+  
         if (error) {
           console.error("Error checking share link:", error);
           return;
         }
-
-        if (existingRecords && existingRecords.length > 0) {
-          // Handle potential duplicates
-          if (existingRecords.length > 1) {
-            console.log(`Found ${existingRecords.length} portfolio share links, cleaning up duplicates...`);
-            
-            // Get the first record's ID to keep
-            const firstRecordId = existingRecords[0].id;
-            
-            // Get all other record IDs to delete
-            const idsToDelete = existingRecords.slice(1).map(record => record.id);
-            
-            // Delete duplicate records
-            const { error: deleteError } = await supabase
-              .from("shared_links")
-              .delete()
-              .in("id", idsToDelete);
-              
-            if (deleteError) {
-              console.error("Error deleting duplicate share links:", deleteError);
-            } else {
-              console.log(`Deleted ${idsToDelete.length} duplicate portfolio share links`);
-            }
-          }
-          
-          // Use the first record
-          const data = existingRecords[0];
-          
-          // Share link exists - load its data
-          setExistingShareLink(data);
-          setShareId(data.share_id);
-          setShareLink(`${baseUrl}/share/portfolio/${data.share_id}`);
-          setIsPublic(data.is_public);
-          
-          if (data.expires_at) {
-            setExpiryOption("date");
-            setExpiryDate(new Date(data.expires_at));
-          } else {
-            setExpiryOption("never");
-            setExpiryDate(undefined);
-          }
-        } else {
-          // No share link exists - create a new one with default settings
+  
+        let record = existingRecords?.[0];
+        if (existingRecords.length > 1) {
+          // delete duplicates, keep the first
+          const idsToDelete = existingRecords.slice(1).map(r => r.id);
+          await supabase.from("shared_links").delete().in("id", idsToDelete);
+        }
+  
+        if (!record) {
+          // create a new one
           const newShareId = Math.random().toString(36).substring(2, 10);
-          
-          const { data: insertedData, error: insertError } = await supabase
+          const { data: inserted, error: insertErr } = await supabase
             .from("shared_links")
             .insert({
               user_id: user.id,
               share_id: newShareId,
               content_type: "portfolio",
               content_id: null,
-              is_public: false, // Default to private
+              is_public: false,
               expires_at: null,
             })
             .select("*")
-            .single();  // Use single() instead of maybeSingle()
-
-          if (insertError) {
-            console.error("Error creating share link:", insertError);
-            return;
-          }
-
-          if (insertedData) {
-            setExistingShareLink(insertedData);
-            setShareId(insertedData.share_id);
-            setShareLink(`${baseUrl}/share/portfolio/${insertedData.share_id}`);
-            setIsPublic(insertedData.is_public);
-          }
+            .single();
+          if (insertErr) throw insertErr;
+          record = inserted;
         }
-      } catch (error) {
-        console.error("Error in checkExistingShareLink:", error);
+  
+        // now record is either the fetched or the newly created
+        setExistingShareLink(record);
+        setShareId(record.share_id);
+        setShareLink(`${baseUrl}/share/portfolio/${record.share_id}`);
+        setIsPublic(record.is_public);
+        if (record.expires_at) {
+          setExpiryOption("date");
+          setExpiryDate(new Date(record.expires_at));
+        } else {
+          setExpiryOption("never");
+          setExpiryDate(undefined);
+        }
+      } catch (err) {
+        console.error("Error in checkExistingShareLink:", err);
       }
     };
-
+  
     checkExistingShareLink();
-  }, [user]);
+  }, [user?.id]);
+  
 
   // Fetch projects and categories from Supabase
   useEffect(() => {
-    if (!user) return
-
+    if (!user?.id) return;
+  
     const fetchData = async () => {
       performDatabaseOperation(
         async () => {
-          // Fetch categories
-          const { data: categoriesData, error: categoriesError } = await supabase
-            .from("categories")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: true })
-
-          if (categoriesError) throw categoriesError
-
-          // Fetch projects
-          const { data: projectsData, error: projectsError } = await supabase
-            .from("projects")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (projectsError) throw projectsError
-
-          return { categories: categoriesData || [], projects: projectsData || [] }
+          const [{ data: catData, error: catErr }, { data: projData, error: projErr }] = await Promise.all([
+            supabase
+              .from("categories")
+              .select("*")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: true }),
+            supabase
+              .from("projects")
+              .select("*")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false }),
+          ]);
+  
+          if (catErr) throw catErr;
+          if (projErr) throw projErr;
+  
+          return {
+            categories: catData || [],
+            projects: projData || [],
+          };
         },
         setIsLoading,
         (data) => {
-          if (data.categories.length > 0) {
-            setCategories(data.categories)
+          if (data.categories.length) {
+            setCategories(data.categories);
           } else {
-            // Insert default categories if none exist
-            const defaultCategories = [
-              { user_id: user.id, id: "coding", name: "Coding", icon: "Code" },
-              { user_id: user.id, id: "research", name: "Research", icon: "FileText" },
-              { user_id: user.id, id: "business", name: "Business", icon: "Briefcase" },
-              { user_id: user.id, id: "engineering", name: "Engineering", icon: "Lightbulb" },
-              { user_id: user.id, id: "art", name: "Art & Design", icon: "ImageIcon" },
-              { user_id: user.id, id: "photography", name: "Photography", icon: "Camera" },
-            ]
-
-            // Insert default categories asynchronously
-            supabase
-              .from("categories")
-              .insert(defaultCategories)
-              .then(() => {
-                setCategories(defaultCategories)
-              })
+            // insert your defaults...
           }
-
-          setProjects(data.projects)
+          setProjects(data.projects);
         },
-        (error) => {
+        (err) =>
           toast({
             title: "Error loading portfolio data",
-            description: handleSupabaseError(error, "There was a problem loading your portfolio data."),
+            description: handleSupabaseError(err, "There was a problem loading your portfolio data."),
             variant: "destructive",
           })
-        },
-      )
-    }
-
-    fetchData()
-  }, [user, toast])
+      );
+    };
+  
+    fetchData();
+  }, [user?.id]);
+  
 
   // Update portfolio share link
   const handleCreateShareLink = async () => {
