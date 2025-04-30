@@ -74,7 +74,9 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
               fontFamily: "Inter",
               primaryColor: "#4f46e5",
               fontSize: "medium",
-              spacing: "comfortable"
+              spacing: "comfortable",
+              backgroundColor: "#ffffff",
+              textColor: "#000000"
             }
           }
           setResume(data)
@@ -515,6 +517,11 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                         <SelectItem value="Open Sans">Open Sans</SelectItem>
                         <SelectItem value="Merriweather">Merriweather</SelectItem>
                         <SelectItem value="Lora">Lora</SelectItem>
+                        <SelectItem value="Poppins">Poppins</SelectItem>
+                        <SelectItem value="Montserrat">Montserrat</SelectItem>
+                        <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+                        <SelectItem value="Raleway">Raleway</SelectItem>
+                        <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -567,7 +574,7 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="colorInput">Custom Color</Label>
+                    <Label htmlFor="colorInput">Custom Primary Color</Label>
                     <div className="flex gap-2">
                       <input
                         type="color"
@@ -579,6 +586,47 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                       <Input
                         value={style.primaryColor || "#4f46e5"}
                         onChange={(e) => updateStyle("primaryColor", e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="textColor">Text Color</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        { name: "Black", value: "#000000" },
+                        { name: "Dark Gray", value: "#333333" },
+                        { name: "Gray", value: "#666666" },
+                        { name: "Navy", value: "#0f172a" },
+                        { name: "Brown", value: "#422006" },
+                        { name: "White", value: "#ffffff" }
+                      ].map(color => (
+                        <button
+                          key={color.value}
+                          type="button"
+                          className={`w-8 h-8 rounded-full border-2 ${style.textColor === color.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white' : ''}`}
+                          style={{ backgroundColor: color.value }}
+                          onClick={() => updateStyle("textColor", color.value)}
+                          title={color.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="textColorInput">Custom Text Color</Label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        id="textColorInput"
+                        value={style.textColor || "#000000"}
+                        onChange={(e) => updateStyle("textColor", e.target.value)}
+                        className="h-10 w-10 p-0 border-0"
+                      />
+                      <Input
+                        value={style.textColor || "#000000"}
+                        onChange={(e) => updateStyle("textColor", e.target.value)}
                         className="flex-1"
                       />
                     </div>
@@ -770,7 +818,7 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
             className="border rounded-md shadow-sm min-h-[1056px] w-full max-w-[816px] p-10 overflow-auto print:border-none print:shadow-none"
             style={{ 
               backgroundColor: style.backgroundColor || '#ffffff',
-              color: style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000'
+              color: style.textColor || (style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000')
             }}
           >
             <ResumePreview resume={resume} />

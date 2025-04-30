@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import React from "react"
 
 type ResumePreviewProps = {
   resume: any
@@ -25,7 +26,8 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     primaryColor: '#4f46e5',
     fontSize: 'medium',
     spacing: 'comfortable',
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    textColor: '#000000'
   }
   const settings = resume?.settings || {
     showDates: true,
@@ -123,7 +125,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       
       case 'experience':
         return experience.length > 0 ? (
-          <div className="mb-4">
+          <div className="mb-4" key="experience-section">
             <h2 className={headingClass}>Work Experience</h2>
             
             <div className="space-y-4">
@@ -155,7 +157,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       
       case 'education':
         return education.length > 0 ? (
-          <div className="mb-4">
+          <div className="mb-4" key="education-section">
             <h2 className={headingClass}>Education</h2>
             
             <div className="space-y-4">
@@ -191,7 +193,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       
       case 'skills':
         return skills.length > 0 ? (
-          <div className="mb-4">
+          <div className="mb-4" key="skills-section">
             <h2 className={headingClass}>Skills</h2>
             
             <div className="flex flex-wrap gap-2">
@@ -216,14 +218,15 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     <div 
       className={`${fontSizeClass} ${spacingClass}`}
       style={{ 
-        fontFamily: style.fontFamily || 'Inter',
-        color: isDarkBackground ? '#ffffff' : '#000000'
-      }}
+        fontFamily: `"${style.fontFamily}", sans-serif` || '"Inter", sans-serif',
+        color: style.textColor || (isDarkBackground ? '#ffffff' : '#000000'),
+        '--primary-color': style.primaryColor || '#4f46e5'
+      } as React.CSSProperties}
     >
       {/* Header / Personal Info */}
       <div className="text-center mb-6">
         {personalInfo.fullName && (
-          <h1 className="text-2xl font-bold">{personalInfo.fullName}</h1>
+          <h1 className="text-2xl font-bold" style={{ color: style.primaryColor || '#4f46e5' }}>{personalInfo.fullName}</h1>
         )}
         
         {personalInfo.title && (
@@ -257,7 +260,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       </div>
       
       {/* Render sections in order */}
-      {sections.map(section => renderSection(section))}
+      {sections.map((section, index) => (
+        <React.Fragment key={`section-${section}-${index}`}>
+          {renderSection(section)}
+        </React.Fragment>
+      ))}
     </div>
   )
 } 
