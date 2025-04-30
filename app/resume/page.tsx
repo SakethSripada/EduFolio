@@ -53,6 +53,9 @@ export default function ResumePage() {
   const editInputRef = useRef<HTMLInputElement>(null)
   const [exportingResumeId, setExportingResumeId] = useState<string | null>(null)
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "docx" | null>(null)
+  const [isCreatingResume, setIsCreatingResume] = useState(false)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [loadingResumeId, setLoadingResumeId] = useState<string | null>(null)
   const supabase = createClientComponentClient()
 
   // Redirect to login if not authenticated
@@ -93,31 +96,44 @@ export default function ResumePage() {
   // Create a new resume
   const createNewResume = async () => {
     if (!user) return
+    
+    setIsCreatingResume(true)
+    
+    try {
+      const { data, error } = await supabase
+        .from("resumes")
+        .insert({
+          user_id: user.id,
+          title: "New Resume",
+          content: {},
+          style: {
+            fontFamily: "Inter",
+            primaryColor: "#4f46e5",
+            fontSize: "medium",
+            spacing: "comfortable"
+          },
+          template: "professional"
+        })
+        .select()
 
-    const { data, error } = await supabase
-      .from("resumes")
-      .insert({
-        user_id: user.id,
-        title: "New Resume",
-        content: {},
-        style: {
-          fontFamily: "Inter",
-          primaryColor: "#4f46e5",
-          fontSize: "medium",
-          spacing: "comfortable"
-        },
-        template: "standard"
-      })
-      .select()
-
-    if (!error && data) {
-      router.push(`/resume/${data[0].id}`)
-    } else {
+      if (!error && data) {
+        router.push(`/resume/${data[0].id}`)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create a new resume",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error("Error creating resume:", error)
       toast({
         title: "Error",
-        description: "Failed to create a new resume",
+        description: "An unexpected error occurred",
         variant: "destructive"
       })
+    } finally {
+      setIsCreatingResume(false)
     }
   }
 
@@ -191,27 +207,51 @@ export default function ResumePage() {
   // Create resume with specific template
   const createResumeWithTemplate = async (template: string) => {
     if (!user) return
+    
+    setIsCreatingResume(true)
+    
+    // Set the template and proper primary color
+    const templateLower = template.toLowerCase();
+    const primaryColor = templateLower === "professional" ? "#4f46e5" : 
+                         templateLower === "modern" ? "#8b5cf6" : 
+                         "#10b981"; // academic
+    
+    try {
+      const { data, error } = await supabase
+        .from("resumes")
+        .insert({
+          user_id: user.id,
+          title: `${template} Resume`,
+          content: {},
+          style: {
+            fontFamily: "Inter",
+            primaryColor: primaryColor,
+            fontSize: "medium",
+            spacing: "comfortable"
+          },
+          template: templateLower
+        })
+        .select()
 
-    const { data, error } = await supabase
-      .from("resumes")
-      .insert({
-        user_id: user.id,
-        title: `${template} Resume`,
-        content: {},
-        style: {
-          fontFamily: "Inter",
-          primaryColor: template === "Professional" ? "#4f46e5" : 
-                       template === "Modern" ? "#8b5cf6" : 
-                       "#10b981",
-          fontSize: "medium",
-          spacing: "comfortable"
-        },
-        template: template.toLowerCase()
+      if (!error && data) {
+        router.push(`/resume/${data[0].id}`)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create resume with template",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error("Error creating resume with template:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
       })
-      .select()
-
-    if (!error && data) {
-      router.push(`/resume/${data[0].id}`)
+    } finally {
+      setIsCreatingResume(false)
+      setShowTemplateModal(false)
     }
   }
 
@@ -564,9 +604,18 @@ export default function ResumePage() {
             Create and manage your professional resumes
           </p>
         </div>
-        <Button onClick={createNewResume} size="lg" className="gap-1">
-          <PlusCircle className="h-4 w-4" />
-          Create New Resume
+        <Button onClick={() => setShowTemplateModal(true)} size="lg" className="gap-1" disabled={isCreatingResume}>
+          {isCreatingResume ? (
+            <>
+              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+              Creating...
+            </>
+          ) : (
+            <>
+              <PlusCircle className="h-4 w-4" />
+              Create New Resume
+            </>
+          )}
         </Button>
       </div>
 
@@ -590,9 +639,18 @@ export default function ResumePage() {
               <p className="text-muted-foreground mb-6 text-center max-w-md">
                 Create your first professional resume and easily customize it for different job applications.
               </p>
-              <Button onClick={createNewResume} size="lg" className="gap-1">
-                <PlusCircle className="h-4 w-4" />
-                Create Your First Resume
+              <Button onClick={() => setShowTemplateModal(true)} size="lg" className="gap-1" disabled={isCreatingResume}>
+                {isCreatingResume ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="h-4 w-4" />
+                    Create Your First Resume
+                  </>
+                )}
               </Button>
             </div>
           ) : (
@@ -676,68 +734,127 @@ export default function ResumePage() {
                         className="w-full max-w-[160px] h-32 rounded shadow-sm mx-auto"
                         style={{ 
                           backgroundColor: resume.style?.backgroundColor || 'white',
-                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'inherit'
+                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'black'
                         }}
                       >
-                        {/* Preview thumbnail with actual resume content */}
-                        <div className="p-2 overflow-hidden text-[6px] max-h-full" style={{ fontFamily: resume.style?.fontFamily || 'Inter' }}>
-                          {resume.content?.personalInfo?.fullName && (
-                            <div className="text-center">
-                              <div className="font-bold text-[8px]">{resume.content.personalInfo.fullName}</div>
-                              {resume.content.personalInfo.title && (
-                                <div className="text-muted-foreground text-[5px]">{resume.content.personalInfo.title}</div>
+                        {/* Preview thumbnail with actual resume content based on template */}
+                        <div className="p-2 overflow-hidden text-[6px] max-h-full" style={{ 
+                          fontFamily: resume.style?.fontFamily || 'Inter',
+                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'black'
+                        }}>
+                          {resume.template?.toLowerCase() === 'modern' ? (
+                            <>
+                              {resume.content?.personalInfo?.fullName && (
+                                <div>
+                                  <div className="font-bold text-[8px]">{resume.content.personalInfo.fullName}</div>
+                                  {resume.content.personalInfo.title && (
+                                    <div className="text-[5px]" style={{ color: resume.style?.primaryColor || '#8b5cf6' }}>{resume.content.personalInfo.title}</div>
+                                  )}
+                                </div>
                               )}
-                            </div>
-                          )}
-                          
-                          {resume.content?.summary && (
-                            <>
-                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
-                                Summary
-                              </div>
-                              <div className="truncate text-[5px]">{resume.content.summary}</div>
+                              
+                              {resume.content?.experience && resume.content.experience.length > 0 && (
+                                <>
+                                  <div className="flex items-center mt-1">
+                                    <div className="h-1 w-1 rounded-full mr-0.5" style={{ backgroundColor: resume.style?.primaryColor || '#8b5cf6' }}></div>
+                                    <div className="font-semibold text-[6px]">Experience</div>
+                                  </div>
+                                  {resume.content.experience.slice(0, 1).map((exp: any) => (
+                                    <div key={exp.id} className="ml-1.5 text-[5px]">
+                                      <div className="font-semibold truncate">{exp.position}</div>
+                                      <div className="truncate" style={{ color: resume.style?.primaryColor || '#8b5cf6' }}>{exp.company}</div>
+                                    </div>
+                                  ))}
+                                </>
+                              )}
+                              
+                              {resume.content?.skills && resume.content.skills.length > 0 && (
+                                <>
+                                  <div className="flex items-center mt-1">
+                                    <div className="h-1 w-1 rounded-full mr-0.5" style={{ backgroundColor: resume.style?.primaryColor || '#8b5cf6' }}></div>
+                                    <div className="font-semibold text-[6px]">Skills</div>
+                                  </div>
+                                  <div className="ml-1.5 flex flex-wrap gap-[2px]">
+                                    {resume.content.skills.slice(0, 3).map((skill: any) => (
+                                      <span 
+                                        key={skill.id} 
+                                        className="px-0.5 rounded text-[4px] text-white"
+                                        style={{ backgroundColor: resume.style?.primaryColor || '#8b5cf6' }}
+                                      >
+                                        {skill.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
                             </>
-                          )}
-                          
-                          {resume.content?.experience && resume.content.experience.length > 0 && (
+                          ) : resume.template?.toLowerCase() === 'academic' ? (
                             <>
-                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
-                                Experience
-                              </div>
-                              {resume.content.experience.slice(0, 1).map((exp: any) => (
-                                <div key={exp.id} className="text-[5px]">
-                                  <div className="font-semibold truncate">{exp.position}</div>
-                                  <div className="truncate">{exp.company}</div>
+                              <div className="flex justify-between">
+                                <div>
+                                  {resume.content?.personalInfo?.fullName && (
+                                    <div className="font-bold text-[7px]">{resume.content.personalInfo.fullName}</div>
+                                  )}
+                                  {resume.content?.personalInfo?.title && (
+                                    <div className="text-[5px]" style={{ color: resume.style?.primaryColor || '#10b981' }}>{resume.content.personalInfo.title}</div>
+                                  )}
                                 </div>
-                              ))}
-                            </>
-                          )}
-                          
-                          {resume.content?.education && resume.content.education.length > 0 && (
-                            <>
-                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
-                                Education
-                              </div>
-                              {resume.content.education.slice(0, 1).map((edu: any) => (
-                                <div key={edu.id} className="text-[5px]">
-                                  <div className="font-semibold truncate">{edu.institution}</div>
-                                  <div className="truncate">{edu.degree}</div>
+                                <div className="text-[4px] text-right">
+                                  {resume.content?.personalInfo?.email && <div>{resume.content.personalInfo.email}</div>}
+                                  {resume.content?.personalInfo?.phone && <div>{resume.content.personalInfo.phone}</div>}
                                 </div>
-                              ))}
+                              </div>
+                              
+                              {resume.content?.education && resume.content.education.length > 0 && (
+                                <>
+                                  <div className="font-bold text-[6px] border-b-[1px] mt-1 pb-[1px]" style={{ borderColor: resume.style?.primaryColor || '#10b981' }}>
+                                    Education
+                                  </div>
+                                  <div className="border-l-[1px] pl-1 text-[5px]" style={{ borderColor: resume.style?.primaryColor || '#10b981' }}>
+                                    {resume.content.education.slice(0, 2).map((edu: any) => (
+                                      <div key={edu.id}>
+                                        <div className="font-semibold truncate">{edu.degree}</div>
+                                        <div className="truncate">{edu.institution}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
                             </>
-                          )}
-                          
-                          {resume.content?.skills && resume.content.skills.length > 0 && (
+                          ) : (
+                            // Professional/Standard template (default)
                             <>
-                              <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
-                                Skills
-                              </div>
-                              <div className="flex flex-wrap gap-[2px]">
-                                {resume.content.skills.slice(0, 3).map((skill: any) => (
-                                  <span key={skill.id} className="px-1 bg-muted rounded text-[4px]">{skill.name}</span>
-                                ))}
-                                {resume.content.skills.length > 3 && <span className="text-[4px]">...</span>}
-                              </div>
+                              {resume.content?.personalInfo?.fullName && (
+                                <div className="text-center">
+                                  <div className="font-bold text-[8px]">{resume.content.personalInfo.fullName}</div>
+                                  {resume.content.personalInfo.title && (
+                                    <div className="text-[5px] text-gray-600">{resume.content.personalInfo.title}</div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {resume.content?.summary && (
+                                <>
+                                  <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b`} style={{ borderColor: resume.style?.primaryColor || '#4f46e5' }}>
+                                    Summary
+                                  </div>
+                                  <div className="truncate text-[5px]">{resume.content.summary}</div>
+                                </>
+                              )}
+                              
+                              {resume.content?.experience && resume.content.experience.length > 0 && (
+                                <>
+                                  <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b`} style={{ borderColor: resume.style?.primaryColor || '#4f46e5' }}>
+                                    Experience
+                                  </div>
+                                  {resume.content.experience.slice(0, 1).map((exp: any) => (
+                                    <div key={exp.id} className="text-[5px]">
+                                      <div className="font-semibold truncate">{exp.position}</div>
+                                      <div className="truncate">{exp.company}</div>
+                                    </div>
+                                  ))}
+                                </>
+                              )}
                             </>
                           )}
                         </div>
@@ -745,8 +862,26 @@ export default function ResumePage() {
                     </div>
                   </div>
                   <CardFooter className="bg-muted/10 py-3 px-5 flex justify-between">
-                    <Button size="sm" variant="ghost" onClick={() => router.push(`/resume/${resume.id}`)} className="gap-1">
-                      <Eye className="h-4 w-4" /> Edit
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => {
+                        setLoadingResumeId(resume.id);
+                        router.push(`/resume/${resume.id}`);
+                      }} 
+                      className="gap-1"
+                      disabled={loadingResumeId === resume.id}
+                    >
+                      {loadingResumeId === resume.id ? (
+                        <>
+                          <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4" /> Edit
+                        </>
+                      )}
                     </Button>
                     <Button 
                       size="sm" 
@@ -776,26 +911,51 @@ export default function ResumePage() {
               <CardContent className="px-5 pb-5">
                 <div className="h-52 bg-muted/20 border rounded-md flex items-center justify-center">
                   <div className="w-full max-w-[180px] h-40 bg-white dark:bg-gray-800 rounded shadow-sm mx-auto p-3">
-                    <div className="border-b border-indigo-500 pb-2 mb-2">
-                      <div className="w-20 h-2.5 bg-indigo-500/80 mb-2 rounded"></div>
+                    <div className="text-center mb-2">
+                      <div className="font-bold text-[10px]">John Smith</div>
+                      <div className="text-[8px] text-gray-600 dark:text-gray-400">Software Engineer</div>
+                      <div className="flex justify-center gap-1 text-[6px] text-gray-500 mt-1">
+                        <span>john@example.com</span>
+                        <span>•</span>
+                        <span>(123) 456-7890</span>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <div className="w-full h-1 bg-gray-400/50 rounded"></div>
-                      <div className="w-full h-1 bg-gray-400/50 rounded"></div>
-                      <div className="w-3/4 h-1 bg-gray-400/50 rounded"></div>
+                    <div className="border-b border-indigo-500 pb-1 mb-1.5">
+                      <div className="text-[8px] font-semibold">Experience</div>
                     </div>
-                    <div className="border-b border-indigo-500 pb-1 pt-3 mb-2">
-                      <div className="w-20 h-2.5 bg-indigo-500/80 rounded"></div>
+                    <div className="space-y-1 mb-1.5">
+                      <div className="flex justify-between">
+                        <div className="text-[7px] font-semibold">Senior Developer</div>
+                        <div className="text-[6px] text-gray-500">2020-Present</div>
+                      </div>
+                      <div className="text-[6px]">Tech Company, Inc.</div>
+                      <div className="w-full h-[2px] bg-gray-200 rounded"></div>
+                      <div className="w-4/5 h-[2px] bg-gray-200 rounded"></div>
                     </div>
-                    <div className="space-y-2">
-                      <div className="w-full h-1 bg-gray-400/50 rounded"></div>
-                      <div className="w-full h-1 bg-gray-400/50 rounded"></div>
+                    <div className="border-b border-indigo-500 pb-1 mb-1.5">
+                      <div className="text-[8px] font-semibold">Education</div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex justify-between">
+                        <div className="text-[7px] font-semibold">Computer Science</div>
+                        <div className="text-[6px] text-gray-500">2015-2019</div>
+                      </div>
+                      <div className="text-[6px]">University Name</div>
                     </div>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/10 p-5 flex justify-center">
-                <Button onClick={() => createResumeWithTemplate("Professional")} className="w-full">Use Template</Button>
+                <Button onClick={() => createResumeWithTemplate("Professional")} className="w-full" disabled={isCreatingResume}>
+                  {isCreatingResume ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    "Use Template"
+                  )}
+                </Button>
               </CardFooter>
             </Card>
             
@@ -807,30 +967,44 @@ export default function ResumePage() {
               <CardContent className="px-5 pb-5">
                 <div className="h-52 bg-muted/20 border rounded-md flex items-center justify-center">
                   <div className="w-full max-w-[180px] h-40 bg-white dark:bg-gray-800 rounded shadow-sm mx-auto p-3 relative">
-                    <div className="absolute top-2 right-2 w-8 h-8 rounded-full bg-purple-500/70"></div>
-                    <div>
-                      <div className="w-20 h-2.5 bg-purple-500/80 mb-1 rounded"></div>
-                      <div className="w-16 h-1.5 bg-gray-500/70 mb-3 rounded"></div>
+                    <div className="mb-2">
+                      <div className="text-[10px] font-bold">John Smith</div>
+                      <div className="text-[7px] text-purple-600 dark:text-purple-400">Software Engineer</div>
                     </div>
-                    <div className="space-y-1.5">
-                      <div className="w-full flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500/70 mt-0.5"></div>
-                        <div className="w-full h-1 bg-gray-400/50 rounded my-auto"></div>
+                    <div className="space-y-1.5 mb-2">
+                      <div className="flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                        <div className="text-[7px] font-medium">Work Experience</div>
                       </div>
-                      <div className="w-full flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500/70 mt-0.5"></div>
-                        <div className="w-full h-1 bg-gray-400/50 rounded my-auto"></div>
+                      <div className="pl-3">
+                        <div className="text-[6px] font-semibold">Senior Developer | 2020-Present</div>
+                        <div className="text-[6px] text-purple-600 dark:text-purple-400">Tech Company, Inc.</div>
                       </div>
-                      <div className="w-full flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500/70 mt-0.5"></div>
-                        <div className="w-3/4 h-1 bg-gray-400/50 rounded my-auto"></div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                        <div className="text-[7px] font-medium">Skills</div>
+                      </div>
+                      <div className="pl-3 flex flex-wrap gap-1">
+                        <span className="text-[5px] bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-1 py-0.5 rounded">React</span>
+                        <span className="text-[5px] bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-1 py-0.5 rounded">Node.js</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/10 p-5 flex justify-center">
-                <Button onClick={() => createResumeWithTemplate("Modern")} className="w-full">Use Template</Button>
+                <Button onClick={() => createResumeWithTemplate("Modern")} className="w-full" disabled={isCreatingResume}>
+                  {isCreatingResume ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    "Use Template"
+                  )}
+                </Button>
               </CardFooter>
             </Card>
             
@@ -842,25 +1016,40 @@ export default function ResumePage() {
               <CardContent className="px-5 pb-5">
                 <div className="h-52 bg-muted/20 border rounded-md flex items-center justify-center">
                   <div className="w-full max-w-[180px] h-40 bg-white dark:bg-gray-800 rounded shadow-sm mx-auto p-3">
-                    <div className="flex justify-between mb-2">
-                      <div className="w-20 h-2.5 bg-emerald-600/70 rounded"></div>
-                      <div className="w-10 h-2.5 bg-emerald-600/70 rounded"></div>
+                    <div className="flex justify-between items-center mb-2">
+                      <div>
+                        <div className="text-[10px] font-bold">John Smith</div>
+                        <div className="text-[7px] text-emerald-700 dark:text-emerald-400">Ph.D. Candidate</div>
+                      </div>
+                      <div className="text-[6px] text-right">
+                        <div>john@example.com</div>
+                        <div>(123) 456-7890</div>
+                      </div>
                     </div>
-                    <div className="border-l-2 border-emerald-600/70 pl-2 mb-2">
-                      <div className="w-full h-1 bg-gray-400/50 mb-1 rounded"></div>
-                      <div className="w-full h-1 bg-gray-400/50 mb-1 rounded"></div>
-                      <div className="w-3/4 h-1 bg-gray-400/50 rounded"></div>
+                    <div className="border-b-2 border-emerald-600 pb-1 mb-1.5">
+                      <div className="text-[8px] font-semibold">Education</div>
                     </div>
-                    <div className="border-l-2 border-emerald-600/70 pl-2 mt-3">
-                      <div className="w-full h-1 bg-gray-400/50 mb-1 rounded"></div>
-                      <div className="w-full h-1 bg-gray-400/50 mb-1 rounded"></div>
-                      <div className="w-1/2 h-1 bg-gray-400/50 rounded"></div>
+                    <div className="border-l-2 border-emerald-600 pl-2 mb-2">
+                      <div className="text-[6px] font-medium">Ph.D. in Computer Science</div>
+                      <div className="flex justify-between">
+                        <div className="text-[6px]">University Name</div>
+                        <div className="text-[6px]">2020-Present</div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/10 p-5 flex justify-center">
-                <Button onClick={() => createResumeWithTemplate("Academic")} className="w-full">Use Template</Button>
+                <Button onClick={() => createResumeWithTemplate("Academic")} className="w-full" disabled={isCreatingResume}>
+                  {isCreatingResume ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    "Use Template"
+                  )}
+                </Button>
               </CardFooter>
             </Card>
           </div>
@@ -914,6 +1103,135 @@ export default function ResumePage() {
               Cancel
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template selection modal */}
+      <Dialog open={showTemplateModal} onOpenChange={setShowTemplateModal}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Choose a Template</DialogTitle>
+            <DialogDescription>
+              Select a template to start with. You can always change it later.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+            <Card className="overflow-hidden border hover:border-primary/50 transition-all hover:shadow-md cursor-pointer" onClick={() => createResumeWithTemplate("Professional")}>
+              <CardHeader className="p-4">
+                <CardTitle className="text-base">Professional</CardTitle>
+                <CardDescription className="text-xs">Traditional format</CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="bg-muted/20 border rounded-md flex items-center justify-center p-2">
+                  <div className="w-full h-32 bg-white dark:bg-gray-800 rounded shadow-sm p-3">
+                    <div className="text-center mb-2">
+                      <div className="font-bold text-[10px]">John Smith</div>
+                      <div className="text-[8px] text-gray-600 dark:text-gray-400">Software Engineer</div>
+                      <div className="flex justify-center gap-1 text-[6px] text-gray-500 mt-1">
+                        <span>john@example.com</span>
+                        <span>•</span>
+                        <span>(123) 456-7890</span>
+                      </div>
+                    </div>
+                    <div className="border-b border-indigo-500 pb-1 mb-1.5">
+                      <div className="text-[8px] font-semibold">Experience</div>
+                    </div>
+                    <div className="space-y-1 mb-1.5">
+                      <div className="flex justify-between">
+                        <div className="text-[7px] font-semibold">Senior Developer</div>
+                        <div className="text-[6px] text-gray-500">2020-Present</div>
+                      </div>
+                      <div className="text-[6px]">Tech Company, Inc.</div>
+                      <div className="w-full h-[2px] bg-gray-200 rounded"></div>
+                      <div className="w-4/5 h-[2px] bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="overflow-hidden border hover:border-primary/50 transition-all hover:shadow-md cursor-pointer" onClick={() => createResumeWithTemplate("Modern")}>
+              <CardHeader className="p-4">
+                <CardTitle className="text-base">Modern</CardTitle>
+                <CardDescription className="text-xs">Contemporary design</CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="bg-muted/20 border rounded-md flex items-center justify-center p-2">
+                  <div className="w-full h-32 bg-white dark:bg-gray-800 rounded shadow-sm p-3 relative">
+                    <div className="mb-2">
+                      <div className="text-[10px] font-bold">John Smith</div>
+                      <div className="text-[7px] text-purple-600 dark:text-purple-400">Software Engineer</div>
+                    </div>
+                    <div className="space-y-1.5 mb-2">
+                      <div className="flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                        <div className="text-[7px] font-medium">Work Experience</div>
+                      </div>
+                      <div className="pl-3">
+                        <div className="text-[6px] font-semibold">Senior Developer | 2020-Present</div>
+                        <div className="text-[6px] text-purple-600 dark:text-purple-400">Tech Company, Inc.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="overflow-hidden border hover:border-primary/50 transition-all hover:shadow-md cursor-pointer" onClick={() => createResumeWithTemplate("Academic")}>
+              <CardHeader className="p-4">
+                <CardTitle className="text-base">Academic</CardTitle>
+                <CardDescription className="text-xs">Educational focus</CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="bg-muted/20 border rounded-md flex items-center justify-center p-2">
+                  <div className="w-full h-32 bg-white dark:bg-gray-800 rounded shadow-sm p-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <div>
+                        <div className="text-[10px] font-bold">John Smith</div>
+                        <div className="text-[7px] text-emerald-700 dark:text-emerald-400">Ph.D. Candidate</div>
+                      </div>
+                      <div className="text-[6px] text-right">
+                        <div>john@example.com</div>
+                        <div>(123) 456-7890</div>
+                      </div>
+                    </div>
+                    <div className="border-b-2 border-emerald-600 pb-1 mb-1.5">
+                      <div className="text-[8px] font-semibold">Education</div>
+                    </div>
+                    <div className="border-l-2 border-emerald-600 pl-2 mb-2">
+                      <div className="text-[6px] font-semibold">Ph.D. in Computer Science</div>
+                      <div className="flex justify-between">
+                        <div className="text-[6px]">University Name</div>
+                        <div className="text-[6px]">2020-Present</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="flex items-center justify-center">
+            <Button 
+              variant="default" 
+              className="gap-1" 
+              onClick={() => createNewResume()}
+              disabled={isCreatingResume}
+            >
+              {isCreatingResume ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="h-4 w-4" />
+                  Start with blank resume
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </main>

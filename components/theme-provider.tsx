@@ -38,15 +38,30 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [mounted, setMounted] = useState(false)
 
-  // Make sure the component is mounted before rendering to avoid hydration mismatch
+  // Add script to head to set theme before any content renders
   useEffect(() => {
+    // Only inject once
+    if (!document.getElementById('theme-script')) {
+      const script = document.createElement('script')
+      script.id = 'theme-script'
+      script.innerHTML = themeScript
+      document.head.appendChild(script)
+    }
+    
     setMounted(true)
   }, [])
 
   // Use this approach to avoid layout shift during mounting
   if (!mounted) {
     // Return a placeholder with the same structure to avoid layout shift
-    return <div className="contents">{children}</div>
+    return (
+      <div 
+        className="contents"
+        suppressHydrationWarning
+      >
+        {children}
+      </div>
+    )
   }
 
   return (

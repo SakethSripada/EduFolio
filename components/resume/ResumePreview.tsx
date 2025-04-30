@@ -34,6 +34,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     showContact: true,
     sectionOrder: 'standard'
   }
+  const template = resume?.template || 'professional'
   
   // Personal info
   const personalInfo = content.personalInfo || {}
@@ -143,7 +144,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   }, [settings.sectionOrder])
   
   // Render section based on type
-  const renderSection = (sectionType: string) => {
+  const renderStandardSection = (sectionType: string) => {
     switch (sectionType) {
       case 'summary':
         return content.summary ? (
@@ -247,6 +248,338 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return null
     }
   }
+
+  // Modern template - with bullet points and a different layout
+  const renderModernSection = (sectionType: string) => {
+    const primaryColor = style.primaryColor || "#8b5cf6";
+    
+    switch (sectionType) {
+      case 'summary':
+        return content.summary ? (
+          <div className="mb-5" key="summary-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Professional Summary</h2>
+            </div>
+            <p className="whitespace-pre-line ml-6" style={{ color: defaultTextColor }}>{content.summary}</p>
+          </div>
+        ) : null
+      
+      case 'experience':
+        return experience.length > 0 ? (
+          <div className="mb-5" key="experience-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Work Experience</h2>
+            </div>
+            
+            <div className="space-y-4 ml-6">
+              {experience.map((exp: any) => (
+                <div key={exp.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
+                      <p style={{ color: primaryColor, fontWeight: 500 }}>{exp.company}{exp.location ? ` | ${exp.location}` : ''}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && exp.startDate && (
+                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                        <span>
+                          {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {exp.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{exp.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null
+      
+      case 'education':
+        return education.length > 0 ? (
+          <div className="mb-5" key="education-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Education</h2>
+            </div>
+            
+            <div className="space-y-4 ml-6">
+              {education.map((edu: any) => (
+                <div key={edu.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{edu.institution}</h3>
+                      <p style={{ color: primaryColor, fontWeight: 500 }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && (
+                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                        {edu.startDate && (
+                          <span>
+                            {edu.startDate} - {edu.isCurrent ? 'Present' : edu.endDate}
+                          </span>
+                        )}
+                        {edu.gpa && <div>GPA: {edu.gpa}</div>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {edu.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{edu.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null
+      
+      case 'skills':
+        return skills.length > 0 ? (
+          <div className="mb-5" key="skills-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Skills</h2>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 ml-6">
+              {skills.map((skill: any) => (
+                <span 
+                  key={skill.id}
+                  className="px-2 py-1 rounded text-xs"
+                  style={{ 
+                    color: '#fff',
+                    backgroundColor: primaryColor
+                  }}
+                >
+                  {skill.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null
+      
+      default:
+        return null
+    }
+  }
+
+  // Academic template - focuses on education and publications
+  const renderAcademicSection = (sectionType: string) => {
+    const primaryColor = style.primaryColor || "#10b981";
+    
+    switch (sectionType) {
+      case 'summary':
+        return content.summary ? (
+          <div className="mb-5" key="summary-section">
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Professional Summary</h2>
+            <p className="whitespace-pre-line" style={{ color: defaultTextColor }}>{content.summary}</p>
+          </div>
+        ) : null
+      
+      case 'experience':
+        return experience.length > 0 ? (
+          <div className="mb-5" key="experience-section">
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Work Experience</h2>
+            
+            <div className="space-y-4 border-l-2 pl-4" style={{ borderColor: primaryColor }}>
+              {experience.map((exp: any) => (
+                <div key={exp.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
+                      <p style={{ color: defaultTextColor }}>{exp.company}{exp.location ? `, ${exp.location}` : ''}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && exp.startDate && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        <span>
+                          {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {exp.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{exp.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null
+      
+      case 'education':
+        return education.length > 0 ? (
+          <div className="mb-5" key="education-section">
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Education</h2>
+            
+            <div className="space-y-4 border-l-2 pl-4" style={{ borderColor: primaryColor }}>
+              {education.map((edu: any) => (
+                <div key={edu.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{edu.institution}</h3>
+                      <p style={{ color: defaultTextColor }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
+                      {edu.location && <p className="text-xs" style={{ color: mutedTextColor }}>{edu.location}</p>}
+                    </div>
+                    
+                    {settings.showDates !== false && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        {edu.startDate && (
+                          <span>
+                            {edu.startDate} - {edu.isCurrent ? 'Present' : edu.endDate}
+                          </span>
+                        )}
+                        {edu.gpa && <div>GPA: {edu.gpa}</div>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {edu.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{edu.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null
+      
+      case 'skills':
+        return skills.length > 0 ? (
+          <div className="mb-5" key="skills-section">
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Skills</h2>
+            
+            <div className="border-l-2 pl-4" style={{ borderColor: primaryColor }}>
+              <div className="flex flex-wrap gap-2">
+                {skills.map((skill: any) => (
+                  <span 
+                    key={skill.id}
+                    className="px-2 py-1 rounded text-xs"
+                    style={{ 
+                      color: defaultTextColor,
+                      backgroundColor: isDarkBackground ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+                    }}
+                  >
+                    {skill.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null
+      
+      default:
+        return null
+    }
+  }
+
+  // Select the correct section renderer based on template
+  const renderSection = (sectionType: string) => {
+    switch (template.toLowerCase()) {
+      case 'modern':
+        return renderModernSection(sectionType);
+      case 'academic':
+        return renderAcademicSection(sectionType);
+      case 'professional':
+      case 'standard':
+      default:
+        return renderStandardSection(sectionType);
+    }
+  }
+
+  // Template-specific header styles
+  const renderHeader = () => {
+    switch (template.toLowerCase()) {
+      case 'modern':
+        return (
+          <div className="mb-6 relative">
+            {personalInfo.fullName && (
+              <>
+                <h1 className="text-2xl font-bold" style={{ 
+                  color: style.textColor || defaultTextColor 
+                }}>{personalInfo.fullName}</h1>
+                {personalInfo.title && (
+                  <p className="text-sm" style={{ color: style.primaryColor || "#8b5cf6" }}>{personalInfo.title}</p>
+                )}
+              </>
+            )}
+            
+            {/* Contact Information */}
+            {settings.showContact !== false && (
+              <div className="flex flex-wrap gap-2 mt-2 text-xs" style={{ color: defaultTextColor }}>
+                {personalInfo.email && <span>{personalInfo.email}</span>}
+                {personalInfo.phone && <span>{personalInfo.phone}</span>}
+                {personalInfo.location && <span>{personalInfo.location}</span>}
+                {personalInfo.website && <span>{personalInfo.website}</span>}
+                {personalInfo.linkedIn && <span>{personalInfo.linkedIn}</span>}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'academic':
+        return (
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              {personalInfo.fullName && (
+                <>
+                  <h1 className="text-2xl font-bold" style={{ 
+                    color: style.textColor || defaultTextColor 
+                  }}>{personalInfo.fullName}</h1>
+                  {personalInfo.title && (
+                    <p className="text-sm" style={{ color: style.primaryColor || "#10b981" }}>{personalInfo.title}</p>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {/* Contact Information */}
+            {settings.showContact !== false && (
+              <div className="text-right text-xs" style={{ color: defaultTextColor }}>
+                {personalInfo.email && <div>{personalInfo.email}</div>}
+                {personalInfo.phone && <div>{personalInfo.phone}</div>}
+                {personalInfo.location && <div>{personalInfo.location}</div>}
+                {personalInfo.website && <div>{personalInfo.website}</div>}
+                {personalInfo.linkedIn && <div>{personalInfo.linkedIn}</div>}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'professional':
+      case 'standard':
+      default:
+        return (
+          <div className="text-center mb-6">
+            {personalInfo.fullName && (
+              <h1 className="text-2xl font-bold" style={{ 
+                color: style.textColor ? style.textColor : (style.primaryColor || '#4f46e5')
+              }}>{personalInfo.fullName}</h1>
+            )}
+            
+            {personalInfo.title && (
+              <p className="mt-1" style={{ color: mutedTextColor }}>{personalInfo.title}</p>
+            )}
+            
+            {/* Contact Information */}
+            {settings.showContact !== false && (
+              <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 mt-3 text-xs" style={{ color: defaultTextColor }}>
+                {personalInfo.email && <span>{personalInfo.email}</span>}
+                {personalInfo.phone && <span>{personalInfo.phone}</span>}
+                {personalInfo.location && <span>{personalInfo.location}</span>}
+                {personalInfo.website && <span>{personalInfo.website}</span>}
+                {personalInfo.linkedIn && <span>{personalInfo.linkedIn}</span>}
+              </div>
+            )}
+          </div>
+        );
+    }
+  };
   
   return (
     <div 
@@ -258,42 +591,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       } as React.CSSProperties}
     >
       {/* Header / Personal Info */}
-      <div className="text-center mb-6">
-        {personalInfo.fullName && (
-          <h1 className="text-2xl font-bold" style={{ 
-            color: style.textColor ? style.textColor : (style.primaryColor || '#4f46e5')
-          }}>{personalInfo.fullName}</h1>
-        )}
-        
-        {personalInfo.title && (
-          <p className={`mt-1`} style={{ color: mutedTextColor }}>{personalInfo.title}</p>
-        )}
-        
-        {/* Contact Information */}
-        {settings.showContact !== false && (
-          <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 mt-3 text-xs" style={{ color: defaultTextColor }}>
-            {personalInfo.email && (
-              <span>{personalInfo.email}</span>
-            )}
-            
-            {personalInfo.phone && (
-              <span>{personalInfo.phone}</span>
-            )}
-            
-            {personalInfo.location && (
-              <span>{personalInfo.location}</span>
-            )}
-            
-            {personalInfo.website && (
-              <span>{personalInfo.website}</span>
-            )}
-            
-            {personalInfo.linkedIn && (
-              <span>{personalInfo.linkedIn}</span>
-            )}
-          </div>
-        )}
-      </div>
+      {renderHeader()}
       
       {/* Render sections in order */}
       {sections.map((section, index) => (
