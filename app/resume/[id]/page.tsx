@@ -19,6 +19,9 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [activeTab, setActiveTab] = useState("content")
   const supabase = createClientComponentClient()
+  
+  // Get resumeId directly from params
+  const resumeId = params.id
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -29,14 +32,14 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
 
   // Fetch resume data
   useEffect(() => {
-    if (user && params.id) {
+    if (user && resumeId) {
       const fetchResume = async () => {
         setLoading(true)
         
         const { data, error } = await supabase
           .from("resumes")
           .select("*")
-          .eq("id", params.id)
+          .eq("id", resumeId)
           .eq("user_id", user.id)
           .single()
         
@@ -57,7 +60,7 @@ export default function ResumeEditorPage({ params }: { params: { id: string } })
 
       fetchResume()
     }
-  }, [user, params.id, supabase, router])
+  }, [user, resumeId, supabase, router])
 
   // Auto-save when resume changes (debounced)
   useEffect(() => {
