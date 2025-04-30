@@ -734,11 +734,14 @@ export default function ResumePage() {
                         className="w-full max-w-[160px] h-32 rounded shadow-sm mx-auto"
                         style={{ 
                           backgroundColor: resume.style?.backgroundColor || 'white',
-                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'inherit'
+                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'black'
                         }}
                       >
                         {/* Preview thumbnail with actual resume content based on template */}
-                        <div className="p-2 overflow-hidden text-[6px] max-h-full" style={{ fontFamily: resume.style?.fontFamily || 'Inter' }}>
+                        <div className="p-2 overflow-hidden text-[6px] max-h-full" style={{ 
+                          fontFamily: resume.style?.fontFamily || 'Inter',
+                          color: resume.style?.backgroundColor === '#1f2937' ? 'white' : 'black'
+                        }}>
                           {resume.template?.toLowerCase() === 'modern' ? (
                             <>
                               {resume.content?.personalInfo?.fullName && (
@@ -825,14 +828,14 @@ export default function ResumePage() {
                                 <div className="text-center">
                                   <div className="font-bold text-[8px]">{resume.content.personalInfo.fullName}</div>
                                   {resume.content.personalInfo.title && (
-                                    <div className="text-muted-foreground text-[5px]">{resume.content.personalInfo.title}</div>
+                                    <div className="text-[5px] text-gray-600">{resume.content.personalInfo.title}</div>
                                   )}
                                 </div>
                               )}
                               
                               {resume.content?.summary && (
                                 <>
-                                  <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
+                                  <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b`} style={{ borderColor: resume.style?.primaryColor || '#4f46e5' }}>
                                     Summary
                                   </div>
                                   <div className="truncate text-[5px]">{resume.content.summary}</div>
@@ -841,7 +844,7 @@ export default function ResumePage() {
                               
                               {resume.content?.experience && resume.content.experience.length > 0 && (
                                 <>
-                                  <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b ${getColorClass(resume.style?.primaryColor)}`}>
+                                  <div className={`font-bold mt-1 pb-[2px] text-[7px] border-b`} style={{ borderColor: resume.style?.primaryColor || '#4f46e5' }}>
                                     Experience
                                   </div>
                                   {resume.content.experience.slice(0, 1).map((exp: any) => (
@@ -1167,7 +1170,7 @@ export default function ResumePage() {
                       </div>
                       <div className="pl-3">
                         <div className="text-[6px] font-semibold">Senior Developer | 2020-Present</div>
-                        <div className="text-[6px]">Tech Company, Inc.</div>
+                        <div className="text-[6px] text-purple-600 dark:text-purple-400">Tech Company, Inc.</div>
                       </div>
                     </div>
                   </div>
