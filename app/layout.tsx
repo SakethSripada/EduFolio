@@ -8,6 +8,7 @@ import Footer from "@/components/layout/Footer"
 import { AuthProvider } from "@/components/auth/AuthProvider"
 import { Toaster } from "@/components/ui/toaster"
 
+// Load Google Fonts properly with Next.js
 const inter = Inter({ subsets: ["latin"] })
 
 // Script to prevent theme flashing
@@ -55,6 +56,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/EduFolioLogo.ico" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Lora:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
         {/* Add script to prevent theme flash */}
         <script dangerouslySetInnerHTML={{ __html: themeInitializerScript }} />
       </head>

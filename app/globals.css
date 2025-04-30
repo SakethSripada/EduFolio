@@ -81,8 +81,11 @@
   
   /* Fix scrollbar layout shift issue */
   html {
-    scrollbar-gutter: stable;
+    scrollbar-gutter: stable both-edges;
     overflow-y: scroll; /* Always show scrollbar to prevent layout shift */
+    padding-left: calc(100vw - 100%); /* Prevent content shift when scrollbar appears */
+    width: 100vw;
+    box-sizing: border-box;
   }
   
   body {
@@ -90,6 +93,7 @@
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     position: relative; /* Needed for proper positioning when modal is open */
+    margin-right: 0 !important; /* Prevent content shift when modal opens */
   }
   
   /* Ensure app maintains width even when scrollbar appears/disappears */
@@ -98,7 +102,32 @@
     max-width: 100%;
   }
 
-  /* Removing outdated dialog/modal fix as it's now handled in the dialog component */
+  /* Fix for components that could cause layout shift */
+  [data-state="open"] {
+    /* Ensures consistent padding when modals are open */
+    padding-right: 0 !important;
+  }
+  
+  /* Prevent content shift when dialogs open */
+  [data-radix-popper-content-wrapper] {
+    position: fixed !important;
+  }
+  
+  /* Fix for dropdown menus and popups */
+  .fixed-position-no-shift {
+    position: fixed;
+    transform: none !important;
+    margin-right: 0 !important;
+  }
+
+  /* Fix for radix dialogs */
+  [role="dialog"] {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
 }
 
 @layer components {
