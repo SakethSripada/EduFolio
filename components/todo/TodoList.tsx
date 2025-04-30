@@ -92,8 +92,8 @@ export default function TodoList() {
 
   // Load todos from database on component mount
   useEffect(() => {
-    if (!user) return
-
+    if (!user?.id) return  // wait until we have a real user ID
+  
     const fetchTodos = async () => {
       await performDatabaseOperation(
         async () => {
@@ -102,7 +102,7 @@ export default function TodoList() {
             .select("*")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
-
+  
           if (error) throw error
           return data || []
         },
@@ -117,9 +117,10 @@ export default function TodoList() {
         },
       )
     }
-
+  
     fetchTodos()
-  }, [user, toast])
+  }, [user?.id])
+  
 
   // Validate todo form
   const validateTodoForm = (isEditing: boolean): boolean => {

@@ -66,58 +66,52 @@ export default function CollegeAwards({ collegeId }: CollegeAwardsProps) {
 
   // Fetch data on component mount
   useEffect(() => {
-    if (!user || !collegeId) return
-
-    const fetchData = async () => {
-      setIsLoading(true)
-
-      setTimeout(async () => {
-        try {
-          // Fetch college name
-          const { data: collegeData, error: collegeError } = await supabase
-            .from("colleges")
-            .select("name")
-            .eq("id", collegeId)
-            .single()
-
-          if (collegeError) throw collegeError
-          if (collegeData) setCollegeName(collegeData.name)
-          
-          // Fetch college-specific awards
-          const { data: collegeAwardsData, error: collegeAwardsError } = await supabase
-            .from("college_awards")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("college_id", collegeId)
-            .order("created_at", { ascending: false })
-
-          if (collegeAwardsError) throw collegeAwardsError
-
-          // Fetch general awards for import
-          const { data: generalAwardsData, error: generalAwardsError } = await supabase
-            .from("awards")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (generalAwardsError) throw generalAwardsError
-
-          setAwards(collegeAwardsData || [])
-          setGeneralAwards(generalAwardsData || [])
-        } catch (error) {
-          toast({
-            title: "Error loading awards",
-            description: handleSupabaseError(error, "There was a problem loading your awards."),
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
-        }
-      }, 0)
-    }
-
-    fetchData()
-  }, [user, collegeId, toast, supabase])
+    // Only run once we know who the user is and which college
+    if (!user?.id || !collegeId) return
+  
+    setIsLoading(true)
+    ;(async () => {
+      try {
+        // 1) College name
+        const { data: col, error: colErr } = await supabase
+          .from("colleges")
+          .select("name")
+          .eq("id", collegeId)
+          .single()
+        if (colErr) throw colErr
+        if (col) setCollegeName(col.name)
+  
+        // 2) College‐specific awards
+        const { data: ca, error: caErr } = await supabase
+          .from("college_awards")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("college_id", collegeId)
+          .order("created_at", { ascending: false })
+        if (caErr) throw caErr
+  
+        // 3) General awards for import
+        const { data: ga, error: gaErr } = await supabase
+          .from("awards")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+        if (gaErr) throw gaErr
+  
+        setAwards(ca || [])
+        setGeneralAwards(ga || [])
+      } catch (error) {
+        toast({
+          title: "Error loading awards",
+          description: handleSupabaseError(error, "There was a problem loading your awards."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    })()
+  }, [user?.id, collegeId])
+  
 
   // Add award mutation
   const addAward = async () => {

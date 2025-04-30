@@ -242,7 +242,7 @@ export default function EssaysTab() {
   }
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return;
 
     const fetchData = async () => {
       performDatabaseOperation(
@@ -252,9 +252,8 @@ export default function EssaysTab() {
             .from("essays")
             .select("*")
             .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (essaysError) throw essaysError
+            .order("created_at", { ascending: false });
+          if (essaysError) throw essaysError;
 
           // Fetch folders
           const { data: foldersData, error: foldersError } = await supabase
@@ -262,85 +261,75 @@ export default function EssaysTab() {
             .select("*")
             .eq("user_id", user.id)
             .is("college_id", null)
-            .order("created_at", { ascending: false })
+            .order("created_at", { ascending: false });
+          if (foldersError) throw foldersError;
 
-          if (foldersError) throw foldersError
-
-          // Fetch versions for each essay if essays exist
-          const versionsMap: Record<string, EssayVersion[]> = {}
-          if (essaysData && essaysData.length > 0) {
-            const versionsPromises = essaysData.map((essay) =>
+          // Fetch versions for each essay
+          const versionsMap: Record<string, EssayVersion[]> = {};
+          if (essaysData?.length) {
+            const promises = essaysData.map((essay) =>
               supabase
                 .from("essay_versions")
                 .select("*")
                 .eq("essay_id", essay.id)
                 .order("created_at", { ascending: false })
                 .limit(MAX_VERSIONS_PER_ESSAY)
-            )
-
-            const versionsResults = await Promise.all(versionsPromises)
-
-            // Process and clean up existing versions
-            for (let i = 0; i < versionsResults.length; i++) {
-              const result = versionsResults[i];
-              if (!result.error && result.data) {
-                const essayId = essaysData[i].id;
-                versionsMap[essayId] = result.data;
-                
-                // Check if we need to clean up old versions in the database
-                if (result.data.length >= MAX_VERSIONS_PER_ESSAY) {
-                  await cleanupExistingVersions(essayId, result.data);
+            );
+            const results = await Promise.all(promises);
+            results.forEach((res, i) => {
+              if (!res.error && res.data) {
+                versionsMap[essaysData[i].id] = res.data;
+                if (res.data.length >= MAX_VERSIONS_PER_ESSAY) {
+                  cleanupExistingVersions(essaysData[i].id, res.data);
                 }
               }
-            }
+            });
           }
 
-          return { 
-            essays: essaysData || [], 
+          return {
+            essays: essaysData || [],
+            folders: foldersData || [],
             versions: versionsMap,
-            folders: foldersData || []
-          }
+          };
         },
         setIsLoading,
         (data) => {
-          // Filter essays based on current folder
-          const filtered = currentFolderId ? 
-            data.essays.filter((essay: Essay) => essay.folder_id === currentFolderId) : 
-            data.essays.filter((essay: Essay) => !essay.folder_id);
-          
-          setEssays(filtered)
-          setFolders(data.folders)
-          setEssayVersions(data.versions)
-          
-          // Initialize the lastSavedContent and lastVersionTimestamp from loaded data
-          const initialSavedContent: Record<string, string> = {};
-          const initialVersionTimestamp: Record<string, number> = {};
-          
-          data.essays.forEach((essay: Essay) => {
-            initialSavedContent[essay.id] = essay.content;
-            
-            // Find the latest version timestamp for each essay
-            if (data.versions[essay.id]?.length > 0) {
-              const latestVersion = data.versions[essay.id][0]; // First is the latest due to ordering
-              initialVersionTimestamp[essay.id] = new Date(latestVersion.created_at).getTime();
-            }
+          // filter by folder
+          const filtered = currentFolderId
+            ? data.essays.filter((e: Essay) => e.folder_id === currentFolderId)
+            : data.essays.filter((e: Essay) => !e.folder_id);
+
+          setEssays(filtered);
+          setFolders(data.folders);
+          setEssayVersions(data.versions);
+
+          // initialize lastSavedContent & lastVersionTimestamp…
+          const saved: Record<string,string> = {};
+          const ts: Record<string,number> = {};
+          data.essays.forEach((e: Essay) => {
+            saved[e.id] = e.content;
+            const vers = data.versions[e.id];
+            if (vers?.length) ts[e.id] = new Date(vers[0].created_at).getTime();
           });
-          
-          setLastSavedContent(initialSavedContent);
-          setLastVersionTimestamp(initialVersionTimestamp);
+          setLastSavedContent(saved);
+          setLastVersionTimestamp(ts);
         },
         (error) => {
           toast({
             title: "Error loading essays and folders",
-            description: handleSupabaseError(error, "There was a problem loading your essays and folders."),
+            description: handleSupabaseError(
+              error,
+              "There was a problem loading your essays and folders."
+            ),
             variant: "destructive",
-          })
-        },
-      )
-    }
+          });
+        }
+      );
+    };
 
-    fetchData()
-  }, [user, toast, MAX_VERSIONS_PER_ESSAY, currentFolderId])
+    fetchData();
+  }, [user?.id, MAX_VERSIONS_PER_ESSAY, currentFolderId]);
+
 
   // New function to clean up versions in the database during initial load
   const cleanupExistingVersions = async (essayId: string, existingVersions: EssayVersion[]) => {
