@@ -410,8 +410,10 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
   if (loading || isLoading) {
     return (
       <div className="container py-10">
-        <div className="w-full h-screen flex items-center justify-center">
-          <div className="animate-pulse text-2xl">Loading...</div>
+        <div className="w-full h-screen flex flex-col items-center justify-center">
+          <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+          <div className="text-xl font-medium">Loading Resume Editor...</div>
+          <p className="text-muted-foreground mt-2">Please wait while we prepare your resume</p>
         </div>
       </div>
     )
@@ -449,30 +451,70 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
         </div>
         <div className="flex gap-2 items-center">
           {saveStatus === "saving" && (
-            <span className="text-xs text-muted-foreground">Saving...</span>
+            <span className="flex items-center text-xs text-muted-foreground">
+              <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+              Saving...
+            </span>
           )}
           {saveStatus === "saved" && (
-            <span className="text-xs text-green-600 dark:text-green-400">Saved</span>
+            <span className="flex items-center text-xs text-green-600 dark:text-green-400">
+              <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Saved
+            </span>
           )}
           {saveStatus === "error" && (
-            <span className="text-xs text-red-600 dark:text-red-400">Error saving</span>
+            <span className="flex items-center text-xs text-red-600 dark:text-red-400">
+              <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Error saving
+            </span>
           )}
-          <Button onClick={saveResume} variant="default">
-            <Save className="h-4 w-4 mr-1" /> Save
+          <Button onClick={saveResume} variant="default" disabled={saveStatus === "saving"}>
+            {saveStatus === "saving" ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-1" /> Save
+              </>
+            )}
           </Button>
           <Button 
             variant="outline" 
             onClick={exportToPdf} 
             disabled={exporting}
           >
-            <Download className="h-4 w-4 mr-1" /> Export PDF
+            {exporting ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-1" /> Export PDF
+              </>
+            )}
           </Button>
           <Button 
             variant="outline" 
             onClick={exportToDocx} 
             disabled={exporting}
           >
-            <FileText className="h-4 w-4 mr-1" /> Export DOCX
+            {exporting ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-1"></div>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4 mr-1" /> Export DOCX
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -710,13 +752,28 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                     <Label htmlFor="template">Template</Label>
                     <Select 
                       value={resume.template || "standard"} 
-                      onValueChange={(value) => updateResume("template", value)}
+                      onValueChange={(value) => {
+                        // Update the template
+                        const updatedResume = {
+                          ...resume,
+                          template: value,
+                          // Update the primary color based on the selected template
+                          style: {
+                            ...resume.style,
+                            primaryColor: value === "professional" ? "#4f46e5" : 
+                                          value === "modern" ? "#8b5cf6" : 
+                                          value === "academic" ? "#10b981" : 
+                                          resume.style.primaryColor
+                          }
+                        };
+                        setResume(updatedResume);
+                        setSaveStatus("idle");
+                      }}
                     >
                       <SelectTrigger id="template">
                         <SelectValue placeholder="Select template" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
                         <SelectItem value="professional">Professional</SelectItem>
                         <SelectItem value="modern">Modern</SelectItem>
                         <SelectItem value="academic">Academic</SelectItem>
