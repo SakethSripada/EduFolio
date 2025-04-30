@@ -75,58 +75,53 @@ export default function CollegeAcademics({ collegeId }: CollegeAcademicsProps) {
 
   // Update the useEffect to use setTimeout for Supabase calls
   useEffect(() => {
-    if (!user || !collegeId) return
-
-    const fetchData = async () => {
-      setIsLoading(true)
-
-      setTimeout(async () => {
-        try {
-          // Fetch college name
-          const { data: collegeData, error: collegeError } = await supabase
-            .from("colleges")
-            .select("name")
-            .eq("id", collegeId)
-            .single()
-
-          if (collegeError) throw collegeError
-          if (collegeData) setCollegeName(collegeData.name)
-
-          // Fetch college-specific courses
-          const { data: collegeCoursesData, error: collegeCoursesError } = await supabase
-            .from("college_courses")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("college_id", collegeId)
-            .order("created_at", { ascending: false })
-
-          if (collegeCoursesError) throw collegeCoursesError
-
-          // Fetch general courses for import
-          const { data: generalCoursesData, error: generalCoursesError } = await supabase
-            .from("courses")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (generalCoursesError) throw generalCoursesError
-
-          setCourses(collegeCoursesData || [])
-          setGeneralCourses(generalCoursesData || [])
-        } catch (error) {
-          toast({
-            title: "Error loading courses",
-            description: handleSupabaseError(error, "There was a problem loading your courses."),
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
-        }
-      }, 0)
-    }
-
-    fetchData()
-  }, [user, collegeId, toast])
+    // wait until we have a real user ID and a collegeId
+    if (!user?.id || !collegeId) return
+  
+    setIsLoading(true)
+    // immediately‐invoked async function instead of setTimeout
+    ;(async () => {
+      try {
+        // Fetch college name
+        const { data: collegeData, error: collegeError } = await supabase
+          .from("colleges")
+          .select("name")
+          .eq("id", collegeId)
+          .single()
+        if (collegeError) throw collegeError
+        if (collegeData) setCollegeName(collegeData.name)
+  
+        // Fetch college‐specific courses
+        const { data: collegeCoursesData, error: collegeCoursesError } = await supabase
+          .from("college_courses")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("college_id", collegeId)
+          .order("created_at", { ascending: false })
+        if (collegeCoursesError) throw collegeCoursesError
+  
+        // Fetch general courses for import
+        const { data: generalCoursesData, error: generalCoursesError } = await supabase
+          .from("courses")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+        if (generalCoursesError) throw generalCoursesError
+  
+        setCourses(collegeCoursesData || [])
+        setGeneralCourses(generalCoursesData || [])
+      } catch (error) {
+        toast({
+          title: "Error loading courses",
+          description: handleSupabaseError(error, "There was a problem loading your courses."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    })()
+  }, [user?.id, collegeId])
+  
 
   // Validate course form
   const validateCourseForm = (): boolean => {

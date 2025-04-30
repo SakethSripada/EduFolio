@@ -62,36 +62,37 @@ export default function AwardsTab() {
   const [confirmDeleteAward, setConfirmDeleteAward] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return;
 
     const fetchData = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
         const { data, error } = await supabase
           .from("awards")
           .select("*")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
+          .order("created_at", { ascending: false });
 
-        if (error) throw error
-
-        if (data) {
-          setAwards(data)
-        }
+        if (error) throw error;
+        setAwards(data || []);
       } catch (error) {
-        console.error("Error fetching awards:", error)
+        console.error("Error fetching awards:", error);
         toast({
           title: "Error loading awards",
-          description: handleSupabaseError(error, "There was a problem loading your awards."),
+          description: handleSupabaseError(
+            error,
+            "There was a problem loading your awards."
+          ),
           variant: "destructive",
-        })
+        });
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    fetchData()
-  }, [user, toast])
+    fetchData();
+  }, [user?.id]);
+
 
   // Validate award form
   const validateAwardForm = (isEditing: boolean): boolean => {

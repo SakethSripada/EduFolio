@@ -106,45 +106,35 @@ export default function CollegeListTab() {
   };
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return
 
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        // Fetch colleges
+        // 1) Load all colleges
         const { data: collegesData, error: collegesError } = await supabase
           .from("colleges")
           .select("*")
           .order("name", { ascending: true })
-
-        if (collegesError) {
-          throw collegesError
-        }
-
+        if (collegesError) throw collegesError
         setColleges(collegesData || [])
 
-        if (user) {
-          // Fetch user's colleges
-          const { data: userCollegesData, error: userCollegesError } = await supabase
-            .from("user_colleges")
-            .select(`
-              *,
-              college:colleges(*)
-            `)
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (userCollegesError) {
-            throw userCollegesError
-          }
-
-          setUserColleges(userCollegesData || [])
-        }
+        // 2) Load this user’s colleges
+        const { data: userCollegesData, error: userCollegesError } = await supabase
+          .from("user_colleges")
+          .select(`*, college:colleges(*)`)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+        if (userCollegesError) throw userCollegesError
+        setUserColleges(userCollegesData || [])
       } catch (error) {
         console.error("Error fetching data:", error)
         toast({
           title: "Error fetching data",
-          description: handleSupabaseError(error, "There was a problem loading your college list."),
+          description: handleSupabaseError(
+            error,
+            "There was a problem loading your college list."
+          ),
           variant: "destructive",
         })
       } finally {
@@ -153,7 +143,8 @@ export default function CollegeListTab() {
     }
 
     fetchData()
-  }, [user, toast])
+  }, [user?.id])
+
 
   // Validate college form
   const validateCollegeForm = (): boolean => {

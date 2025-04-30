@@ -117,7 +117,7 @@ export default function AcademicsTab() {
   const [aiAction, setAiAction] = useState<"courses" | "testscores" | "gpa" | null>(null)
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return;
 
     const fetchData = async () => {
       performDatabaseOperation(
@@ -127,34 +127,31 @@ export default function AcademicsTab() {
             .from("courses")
             .select("*")
             .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (coursesError) throw coursesError
+            .order("created_at", { ascending: false });
+          if (coursesError) throw coursesError;
 
           // Fetch test scores
           const { data: testScoresData, error: testScoresError } = await supabase
             .from("test_scores")
             .select("*")
             .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-
-          if (testScoresError) throw testScoresError
+            .order("created_at", { ascending: false });
+          if (testScoresError) throw testScoresError;
 
           // Fetch manual GPA settings
           const { data: gpaData, error: gpaError } = await supabase
             .from("manual_gpa")
             .select("*")
             .eq("user_id", user.id)
-            .maybeSingle()
+            .maybeSingle();
+          if (gpaError && gpaError.code !== "PGRST116") throw gpaError;
 
-          if (gpaError && gpaError.code !== "PGRST116") throw gpaError
-
-          return { coursesData, testScoresData, gpaData }
+          return { coursesData, testScoresData, gpaData };
         },
         setIsLoading,
         (data) => {
-          if (data.coursesData) setCourses(data.coursesData)
-          if (data.testScoresData) setTestScores(data.testScoresData)
+          if (data.coursesData) setCourses(data.coursesData);
+          if (data.testScoresData) setTestScores(data.testScoresData);
           if (data.gpaData) {
             setManualGPA({
               id: data.gpaData.id,
@@ -165,21 +162,24 @@ export default function AcademicsTab() {
               use_manual: data.gpaData.use_manual,
               created_at: data.gpaData.created_at,
               updated_at: data.gpaData.updated_at,
-            })
+            });
           }
         },
         (error) => {
           toast({
             title: "Error loading academics data",
-            description: handleSupabaseError(error, "There was a problem loading your academics data."),
+            description: handleSupabaseError(
+              error,
+              "There was a problem loading your academics data."
+            ),
             variant: "destructive",
-          })
-        },
-      )
-    }
+          });
+        }
+      );
+    };
 
-    fetchData()
-  }, [user, toast])
+    fetchData();
+  }, [user?.id]);
 
   // Validate course form
   const validateCourseForm = (): boolean => {

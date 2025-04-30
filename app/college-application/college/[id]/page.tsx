@@ -49,56 +49,50 @@ export default function CollegeApplicationPage() {
   const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
-    if (!user || !collegeId) return
-
+    if (!user?.id || !collegeId) return;
+  
     const fetchData = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
         // Fetch college details
         const { data: collegeData, error: collegeError } = await supabase
           .from("colleges")
           .select("*")
           .eq("id", collegeId)
-          .maybeSingle()
-
-        if (collegeError) throw collegeError
-        
-        console.log('College data:', collegeData, 'College ID:', collegeId)
-
-        if (!collegeData) {
-          throw new Error("College not found")
-        }
-
+          .maybeSingle();
+        if (collegeError) throw collegeError;
+        if (!collegeData) throw new Error("College not found");
+  
         // Fetch user's college relationship
         const { data: userCollegeData, error: userCollegeError } = await supabase
           .from("user_colleges")
           .select("*")
           .eq("user_id", user.id)
           .eq("college_id", collegeId)
-          .maybeSingle()
-
-        console.log('User college data:', userCollegeData, 'User ID:', user.id)
-        
-        if (userCollegeError && userCollegeError.code !== "PGRST116") throw userCollegeError
-
-        setCollege(collegeData)
-        setUserCollege(userCollegeData)
+          .maybeSingle();
+        if (userCollegeError && userCollegeError.code !== "PGRST116") throw userCollegeError;
+  
+        setCollege(collegeData);
+        setUserCollege(userCollegeData);
       } catch (error) {
-        console.error("Error fetching college data:", error)
+        console.error("Error fetching college data:", error);
         toast({
           title: "Error loading college",
-          description: handleSupabaseError(error, "There was a problem loading the college information."),
+          description: handleSupabaseError(
+            error,
+            "There was a problem loading the college information."
+          ),
           variant: "destructive",
-        })
-        // Navigate back to college list if college not found
-        router.push("/college-application")
+        });
+        router.push("/college-application");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
-
-    fetchData()
-  }, [user, collegeId, router, toast, supabase])
+    };
+  
+    fetchData();
+  }, [user?.id, collegeId]);
+  
 
   const getStatusBadge = () => {
     if (!userCollege) return null
