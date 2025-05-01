@@ -24,7 +24,6 @@ export async function ensureSharedLinksTable(): Promise<boolean> {
     
     // If table doesn't exist, create it
     if (!tables || tables.length === 0) {
-      console.log('shared_links table does not exist, creating it...');
       
       // Call the function we've created in Supabase
       const { error: createError } = await supabase.rpc('create_shared_links_table');
@@ -33,8 +32,6 @@ export async function ensureSharedLinksTable(): Promise<boolean> {
         console.error('Error creating shared_links table:', createError);
         return false;
       }
-      
-      console.log('Successfully created shared_links table');
     }
     
     return true;

@@ -34,7 +34,6 @@ export default function SharedCollegeApplicationPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("Fetching data for share ID:", shareId);
         // Verify the share link is valid.
         const { data: shareRecords, error: shareError } = await supabase
           .from("shared_links")
@@ -133,22 +132,15 @@ export default function SharedCollegeApplicationPage() {
         if (essaysResponse.error) console.error("Error fetching essays:", essaysResponse.error);
         if (userCollegesResponse.error) console.error("Error fetching user colleges:", userCollegesResponse.error);
 
-        // Log responses to debug what's coming back
-        console.log("Courses data:", academicsResponse);
-        console.log("User colleges data:", userCollegesResponse);
-
         // Only use the extracurricular_activities table
         const extracurriculars = extracurricularActivitiesResponse.data || [];
-        console.log("Filtered extracurriculars:", extracurriculars);
 
         // After getting user_colleges, fetch the college details for each
         const collegesData = [];
         if (userCollegesResponse.data && userCollegesResponse.data.length > 0) {
-          console.log("User colleges found:", userCollegesResponse.data.length);
           
           // Extract all college IDs
           const collegeIds = userCollegesResponse.data.map(uc => uc.college_id).filter(id => id);
-          console.log("College IDs to fetch:", collegeIds);
           
           if (collegeIds.length > 0) {
             // Fetch all colleges in one query
@@ -157,8 +149,6 @@ export default function SharedCollegeApplicationPage() {
               .select("*")
               .in("id", collegeIds);
               
-            console.log("Colleges details result:", collegesDetails?.length || 0, "colleges found");
-            
             if (collegesError) {
               console.error("Error fetching colleges details:", collegesError);
             } else if (collegesDetails && collegesDetails.length > 0) {
@@ -184,15 +174,11 @@ export default function SharedCollegeApplicationPage() {
                     application_status: userCollege.application_status || "",
                     notes: userCollege.notes || "",
                   });
-                } else {
-                  console.log("Could not find college details for ID:", userCollege.college_id);
                 }
               }
             }
           }
         }
-
-        console.log("Final colleges data prepared:", collegesData.length, "colleges");
 
         // Calculate GPA.
         let unweightedGPA = 0;
@@ -209,8 +195,6 @@ export default function SharedCollegeApplicationPage() {
           unweightedGPA = totalCredits > 0 ? unweightedGPA / totalCredits : 0;
           weightedGPA = totalCredits > 0 ? weightedGPA / totalCredits : 0;
         }
-
-        console.log("Calculated GPA from courses:", { unweightedGPA, weightedGPA, totalCredits });
 
         // Prepare the college data.
         const userColleges = userCollegesResponse.data || [];

@@ -119,7 +119,6 @@ export default function CollegeProfile({
         if (existingRecords && existingRecords.length > 0) {
           // Handle potential duplicates
           if (existingRecords.length > 1) {
-            console.log(`Found ${existingRecords.length} share links for college profile, cleaning up duplicates...`)
             
             // Get the first record's ID to keep
             const firstRecordId = existingRecords[0].id
@@ -135,8 +134,6 @@ export default function CollegeProfile({
               
             if (deleteError) {
               console.error("Error deleting duplicate share links:", deleteError)
-            } else {
-              console.log(`Deleted ${idsToDelete.length} duplicate share links`)
             }
           }
           

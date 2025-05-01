@@ -78,7 +78,7 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
           if (existingRecords && existingRecords.length > 0) {
             // Handle potential duplicates
             if (existingRecords.length > 1) {
-              console.log(`Found ${existingRecords.length} share links in modal, cleaning up duplicates...`);
+              // Removed console.log statement
               
               // Get the first record's ID to keep
               const firstRecordId = existingRecords[0].id;
@@ -95,7 +95,7 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
               if (deleteError) {
                 console.error("Error deleting duplicate share links:", deleteError);
               } else {
-                console.log(`Deleted ${idsToDelete.length} duplicate share links from modal`);
+                // Removed console.log statement
               }
             }
             

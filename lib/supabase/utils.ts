@@ -68,7 +68,6 @@ export async function createOrUpdateShareLink({
     
     // If we have existing records, update the first one and delete the others
     if (existingRecords && existingRecords.length > 0) {
-      console.log("Updating existing share link");
       
       // If there are multiple records, keep only the first one
       if (existingRecords.length > 1) {
@@ -88,8 +87,6 @@ export async function createOrUpdateShareLink({
           console.error("Error deleting duplicate share links:", deleteError);
           throw deleteError;
         }
-        
-        console.log(`Deleted ${idsToDelete.length} duplicate share links`);
       }
       
       // Update the remaining record
@@ -112,8 +109,6 @@ export async function createOrUpdateShareLink({
     } 
     // Otherwise create a new record
     else {
-      console.log("Creating new share link");
-      
       const { data: insertedData, error: insertError } = await supabase
         .from("shared_links")
         .insert(payload)

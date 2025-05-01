@@ -373,8 +373,6 @@ export default function EssaysTab() {
           console.error("Error cleaning up existing versions:", deleteError);
           return;
         }
-        
-        console.log(`Cleaned up ${idsToDelete.length} old versions during initial load for essay ${essayId}`);
       }
     } catch (error) {
       console.error("Error in cleanupExistingVersions:", error);
@@ -846,8 +844,6 @@ export default function EssaysTab() {
         const updatedVersions = { ...essayVersions };
         updatedVersions[essayId] = versionsToKeep;
         setEssayVersions(updatedVersions);
-        
-        console.log(`Cleaned up ${versionIdsToDelete.length} old versions for essay ${essayId}`);
       }
     } catch (error) {
       console.error("Error cleaning up old versions:", error);

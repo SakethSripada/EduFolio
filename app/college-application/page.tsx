@@ -83,7 +83,6 @@ export default function CollegeApplication() {
         
         // If there are multiple records, keep only the first one
         if (existingRecords.length > 1) {
-          console.log(`Found ${existingRecords.length} share links, cleaning up duplicates...`)
           
           // Get the first record's ID to keep
           const firstRecordId = existingRecords[0].id
@@ -99,8 +98,6 @@ export default function CollegeApplication() {
             
           if (deleteError) {
             console.error("Error deleting duplicate share links:", deleteError)
-          } else {
-            console.log(`Deleted ${idsToDelete.length} duplicate share links`)
           }
         }
         
@@ -190,9 +187,6 @@ export default function CollegeApplication() {
       }
       // Do not change the share_id if a record exists. Use it directly.
       const currentShareId = existingShareLink?.share_id || shareId
-      
-      // Log the settings being saved
-      console.log("Saving share settings:", shareSettings);
       
       const { success, error } = await createOrUpdateShareLink({
         userId: user.id,
