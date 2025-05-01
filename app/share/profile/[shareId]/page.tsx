@@ -24,8 +24,6 @@ export default function SharedProfilePage() {
 
   useEffect(() => {
     const fetchSharedProfile = async () => {
-      console.log("Fetching profile with share ID:", params.shareId);
-      
       try {
         // Step 1: Get the shared link data
         const { data: linkData, error: linkError } = await supabase
@@ -48,8 +46,6 @@ export default function SharedProfilePage() {
           setLoading(false);
           return;
         }
-        
-        console.log("Found shared link:", linkData);
         
         // Check if link is public
         if (!linkData.is_public) {
@@ -86,8 +82,6 @@ export default function SharedProfilePage() {
           return;
         }
         
-        console.log("Found profile:", profileData);
-        
         // Step 3: Process the data
         const userData = {
           fullName: typeof profileData.full_name === 'string' ? profileData.full_name : "User",
@@ -99,7 +93,6 @@ export default function SharedProfilePage() {
           avatarUrl: typeof profileData.avatar_url === 'string' ? profileData.avatar_url : "",
         };
         
-        console.log("Processed user data:", userData);
         setUserData(userData);
       } catch (error) {
         console.error("Unexpected error:", error);

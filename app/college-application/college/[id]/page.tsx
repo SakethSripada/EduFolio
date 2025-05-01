@@ -146,7 +146,6 @@ export default function CollegeApplicationPage() {
   }
 
   if ((!college || !userCollege) && user) {
-    console.log('Not found condition triggered - College:', college, 'UserCollege:', userCollege, 'User:', user)
     return (
       <ProtectedRoute>
         <div className="py-8 px-4 sm:px-6 lg:px-8">

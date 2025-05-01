@@ -6,11 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle, ChevronDown, FileText, Briefcase } from "lucide-react"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { format } from "date-fns"
 import React from "react"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 
 export default function SharedCollegeApplicationPage() {
   // Use useParams to get the dynamic id from the route.
@@ -33,7 +34,6 @@ export default function SharedCollegeApplicationPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("Fetching data for share ID:", shareId);
         // Verify the share link is valid.
         const { data: shareRecords, error: shareError } = await supabase
           .from("shared_links")
@@ -132,22 +132,15 @@ export default function SharedCollegeApplicationPage() {
         if (essaysResponse.error) console.error("Error fetching essays:", essaysResponse.error);
         if (userCollegesResponse.error) console.error("Error fetching user colleges:", userCollegesResponse.error);
 
-        // Log responses to debug what's coming back
-        console.log("Courses data:", academicsResponse);
-        console.log("User colleges data:", userCollegesResponse);
-
         // Only use the extracurricular_activities table
         const extracurriculars = extracurricularActivitiesResponse.data || [];
-        console.log("Filtered extracurriculars:", extracurriculars);
 
         // After getting user_colleges, fetch the college details for each
         const collegesData = [];
         if (userCollegesResponse.data && userCollegesResponse.data.length > 0) {
-          console.log("User colleges found:", userCollegesResponse.data.length);
           
           // Extract all college IDs
           const collegeIds = userCollegesResponse.data.map(uc => uc.college_id).filter(id => id);
-          console.log("College IDs to fetch:", collegeIds);
           
           if (collegeIds.length > 0) {
             // Fetch all colleges in one query
@@ -156,8 +149,6 @@ export default function SharedCollegeApplicationPage() {
               .select("*")
               .in("id", collegeIds);
               
-            console.log("Colleges details result:", collegesDetails?.length || 0, "colleges found");
-            
             if (collegesError) {
               console.error("Error fetching colleges details:", collegesError);
             } else if (collegesDetails && collegesDetails.length > 0) {
@@ -168,6 +159,7 @@ export default function SharedCollegeApplicationPage() {
                 if (collegeDetail) {
                   collegesData.push({
                     id: userCollege.id,
+                    college_id: collegeDetail.id,
                     name: collegeDetail.name || "Unknown College",
                     location: collegeDetail.location || "",
                     type: collegeDetail.type || "",
@@ -182,15 +174,11 @@ export default function SharedCollegeApplicationPage() {
                     application_status: userCollege.application_status || "",
                     notes: userCollege.notes || "",
                   });
-                } else {
-                  console.log("Could not find college details for ID:", userCollege.college_id);
                 }
               }
             }
           }
         }
-
-        console.log("Final colleges data prepared:", collegesData.length, "colleges");
 
         // Calculate GPA.
         let unweightedGPA = 0;
@@ -207,8 +195,6 @@ export default function SharedCollegeApplicationPage() {
           unweightedGPA = totalCredits > 0 ? unweightedGPA / totalCredits : 0;
           weightedGPA = totalCredits > 0 ? weightedGPA / totalCredits : 0;
         }
-
-        console.log("Calculated GPA from courses:", { unweightedGPA, weightedGPA, totalCredits });
 
         // Prepare the college data.
         const userColleges = userCollegesResponse.data || [];
@@ -684,40 +670,163 @@ export default function SharedCollegeApplicationPage() {
             {visibleSettings.showEssays && (
               <TabsContent value="essays">
                 <div>
-                  <h2 className="text-2xl font-semibold mb-4">Essays</h2>
-                  <div className="space-y-4">
+                  <h2 className="text-2xl font-semibold mb-6">Essays</h2>
+                  <div className="space-y-5">
                     {studentData.essays.length === 0 ? (
                       <div className="text-center p-8 border rounded-md">
                         <p className="text-muted-foreground">No essays added yet</p>
                       </div>
                     ) : (
-                      studentData.essays.map((essay: any) => (
-                        <Card key={essay.id}>
-                          <CardHeader>
-                            <CardTitle>{essay.title}</CardTitle>
-                            <CardDescription>
-                              {essay.word_count} words
-                              {essay.status && (
-                                <Badge className="ml-2" variant="outline">
-                                  {essay.status}
-                                </Badge>
-                              )}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="mb-4">
-                              <h4 className="text-sm font-medium text-muted-foreground mb-1">Prompt</h4>
-                              <p>{essay.prompt}</p>
-                            </div>
-                            <div className="border-t pt-4">
-                              <h4 className="text-sm font-medium text-muted-foreground mb-1">Essay Content</h4>
-                              <div className="prose prose-sm dark:prose-invert max-w-none">
-                                <p className="text-foreground dark:text-foreground whitespace-pre-wrap">{essay.content}</p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))
+                      <>
+                        {/* Group essays by college_id */}
+                        {(() => {
+                          // Create essay groups: null/undefined college_id for general essays,
+                          // and separate groups for each college-specific essay
+                          const essayGroups = studentData.essays.reduce((groups: Record<string, any[]>, essay: any) => {
+                            const collegeId = essay.college_id || 'general';
+                            if (!groups[collegeId]) {
+                              groups[collegeId] = [];
+                            }
+                            groups[collegeId].push(essay);
+                            return groups;
+                          }, {});
+                          
+                          const content = [];
+                          
+                          // First add general essays if they exist
+                          if (essayGroups.general && essayGroups.general.length > 0) {
+                            content.push(
+                              <Collapsible key="general-essays" className="mb-5" defaultOpen>
+                                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-primary/10 rounded-md hover:bg-primary/15 transition-colors">
+                                  <div className="flex items-center">
+                                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mr-3">
+                                      <FileText className="h-4 w-4 text-primary" />
+                                    </div>
+                                    <h3 className="text-lg font-medium">General Essays</h3>
+                                  </div>
+                                  <ChevronDown className="h-5 w-5 text-primary transition-transform duration-200 ease-in-out ui-open:rotate-180" />
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="pt-4 space-y-4 px-1">
+                                  {essayGroups.general.map((essay: any) => (
+                                    <Collapsible key={essay.id} className="mb-3">
+                                      <Card className="overflow-hidden border-l-4 border-l-primary/40 shadow-sm hover:shadow transition-shadow duration-200">
+                                        <CollapsibleTrigger className="w-full text-left">
+                                          <CardHeader className="pb-2 bg-muted/30">
+                                            <div className="flex justify-between items-start">
+                                              <CardTitle className="text-lg">{essay.title}</CardTitle>
+                                              <div className="flex items-center space-x-2">
+                                                <div className="text-sm px-2 py-1 rounded bg-muted">
+                                                  {essay.word_count} words
+                                                </div>
+                                                {essay.status && (
+                                                  <Badge variant="outline">
+                                                    {essay.status}
+                                                  </Badge>
+                                                )}
+                                                <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out ui-open:rotate-180" />
+                                              </div>
+                                            </div>
+                                          </CardHeader>
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                          <CardContent className="pt-4">
+                                            <div className="mb-4">
+                                              <h4 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h4>
+                                              <div className="p-3 bg-muted/20 rounded-md">
+                                                <p className="italic">{essay.prompt}</p>
+                                              </div>
+                                            </div>
+                                            <div className="border-t pt-4">
+                                              <h4 className="text-sm font-medium text-muted-foreground mb-2">Essay Content</h4>
+                                              <div className="prose prose-sm dark:prose-invert max-w-none p-3 bg-muted/10 rounded-md font-serif">
+                                                <p className="text-foreground dark:text-foreground whitespace-pre-wrap leading-relaxed">{essay.content}</p>
+                                              </div>
+                                            </div>
+                                          </CardContent>
+                                        </CollapsibleContent>
+                                      </Card>
+                                    </Collapsible>
+                                  ))}
+                                </CollapsibleContent>
+                              </Collapsible>
+                            );
+                          }
+                          
+                          // Add college-specific essays
+                          const collegeIds = Object.keys(essayGroups).filter(id => id !== 'general');
+                          if (collegeIds.length > 0) {
+                            // Find college names for each college ID
+                            collegeIds.forEach(collegeId => {
+                              if (collegeId === 'general') return;
+                              
+                              // Find college name from the colleges list
+                              let collegeName = "Unknown College";
+                              const college = studentData.colleges.find((c: any) => c.college_id === collegeId);
+                              if (college) {
+                                collegeName = college.name;
+                              }
+                              
+                              content.push(
+                                <Collapsible key={collegeId} className="mb-5">
+                                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-secondary/20 rounded-md hover:bg-secondary/30 transition-colors">
+                                    <div className="flex items-center">
+                                      <div className="h-8 w-8 rounded-full bg-secondary/20 flex items-center justify-center mr-3">
+                                        <Briefcase className="h-4 w-4 text-secondary-foreground" />
+                                      </div>
+                                      <h3 className="text-lg font-medium">Essays for {collegeName}</h3>
+                                    </div>
+                                    <ChevronDown className="h-5 w-5 text-secondary-foreground transition-transform duration-200 ease-in-out ui-open:rotate-180" />
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="pt-4 space-y-4 px-1">
+                                    {essayGroups[collegeId].map((essay: any) => (
+                                      <Collapsible key={essay.id} className="mb-3">
+                                        <Card className="overflow-hidden border-l-4 border-l-secondary/40 shadow-sm hover:shadow transition-shadow duration-200">
+                                          <CollapsibleTrigger className="w-full text-left">
+                                            <CardHeader className="pb-2 bg-muted/30">
+                                              <div className="flex justify-between items-start">
+                                                <CardTitle className="text-lg">{essay.title}</CardTitle>
+                                                <div className="flex items-center space-x-2">
+                                                  <div className="text-sm px-2 py-1 rounded bg-muted">
+                                                    {essay.word_count} words
+                                                  </div>
+                                                  {essay.status && (
+                                                    <Badge variant="outline">
+                                                      {essay.status}
+                                                    </Badge>
+                                                  )}
+                                                  <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out ui-open:rotate-180" />
+                                                </div>
+                                              </div>
+                                            </CardHeader>
+                                          </CollapsibleTrigger>
+                                          <CollapsibleContent>
+                                            <CardContent className="pt-4">
+                                              <div className="mb-4">
+                                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h4>
+                                                <div className="p-3 bg-muted/20 rounded-md">
+                                                  <p className="italic">{essay.prompt}</p>
+                                                </div>
+                                              </div>
+                                              <div className="border-t pt-4">
+                                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Essay Content</h4>
+                                                <div className="prose prose-sm dark:prose-invert max-w-none p-3 bg-muted/10 rounded-md font-serif">
+                                                  <p className="text-foreground dark:text-foreground whitespace-pre-wrap leading-relaxed">{essay.content}</p>
+                                                </div>
+                                              </div>
+                                            </CardContent>
+                                          </CollapsibleContent>
+                                        </Card>
+                                      </Collapsible>
+                                    ))}
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              );
+                            });
+                          }
+                          
+                          return content;
+                        })()}
+                      </>
                     )}
                   </div>
                 </div>
