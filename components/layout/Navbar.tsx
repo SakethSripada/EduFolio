@@ -58,6 +58,13 @@ export default function Navbar() {
     }
   }, [user, supabase, pathname])
 
+  // Debug effect to log settings
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && user && !isLoadingSettings) {
+      console.log('Navbar: Current tool settings:', settings.enabledTools)
+    }
+  }, [user, settings.enabledTools, isLoadingSettings])
+
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
   }
@@ -116,7 +123,7 @@ export default function Navbar() {
 
         {/* Desktop navigation */}
         <div suppressHydrationWarning className="hidden md:flex items-center space-x-6">
-          {user && (
+          {user && !isLoadingSettings && (
             <>
               {settings.enabledTools.collegeApp && (
                 <Button
@@ -173,54 +180,62 @@ export default function Navbar() {
           <div className="absolute top-16 left-0 right-0 bg-background border-b shadow-lg p-4 md:hidden z-50">
             {user ? (
               <>
-                {settings.enabledTools.collegeApp && (
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start mb-2"
-                    onClick={() => handleNavigation("/college-application")}
-                  >
-                    College Applications
-                  </Button>
+                {!isLoadingSettings ? (
+                  <>
+                    {settings.enabledTools.collegeApp && (
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start mb-2"
+                        onClick={() => handleNavigation("/college-application")}
+                      >
+                        College Applications
+                      </Button>
+                    )}
+                    {settings.enabledTools.portfolio && (
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start mb-2"
+                        onClick={() => handleNavigation("/portfolio")}
+                      >
+                        Portfolio
+                      </Button>
+                    )}
+                    {settings.enabledTools.resume && (
+                      <Button 
+                        variant="ghost" 
+                        className="w-full justify-start mb-2"
+                        onClick={() => handleNavigation("/resume")}
+                      >
+                        Resume
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start mb-2"
+                      onClick={() => handleNavigation("/profile")}
+                    >
+                      Profile
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start mb-2"
+                      onClick={() => handleNavigation("/settings")}
+                    >
+                      Settings
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start text-red-500"
+                      onClick={signOut}
+                    >
+                      Log Out
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex justify-center py-4">
+                    <div className="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+                  </div>
                 )}
-                {settings.enabledTools.portfolio && (
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start mb-2"
-                    onClick={() => handleNavigation("/portfolio")}
-                  >
-                    Portfolio
-                  </Button>
-                )}
-                {settings.enabledTools.resume && (
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start mb-2"
-                    onClick={() => handleNavigation("/resume")}
-                  >
-                    Resume
-                  </Button>
-                )}
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start mb-2"
-                  onClick={() => handleNavigation("/profile")}
-                >
-                  Profile
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start mb-2"
-                  onClick={() => handleNavigation("/settings")}
-                >
-                  Settings
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-red-500"
-                  onClick={signOut}
-                >
-                  Log Out
-                </Button>
               </>
             ) : (
               <Button 

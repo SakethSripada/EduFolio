@@ -18,19 +18,27 @@ export default function SettingsPage() {
   const handleToggleTool = async (toolName: keyof EnabledTools, checked: boolean) => {
     setIsSaving(true)
     try {
+      console.log(`Toggling tool ${toolName} to ${checked}`)
+      
       const success = await updateToolVisibility(toolName, checked)
+      
       if (success) {
+        console.log(`Successfully updated ${toolName} visibility to ${checked}`)
+        
         toast({
           title: "Settings updated",
           description: `${toolName} visibility has been ${checked ? 'enabled' : 'disabled'}.`,
         })
       } else {
+        console.error(`Failed to update ${toolName} visibility`)
         throw new Error("Failed to update settings")
       }
     } catch (error) {
+      console.error('Error in handleToggleTool:', error)
+      
       toast({
         title: "Error updating settings",
-        description: "There was a problem updating your settings.",
+        description: "There was a problem updating your settings. Please try again.",
         variant: "destructive",
       })
     } finally {

@@ -10,26 +10,54 @@ interface OnboardingProviderProps {
 }
 
 export function OnboardingProvider({ children }: OnboardingProviderProps) {
-  const [showWelcome, setShowWelcome] = useState(false)
-  const { settings, isLoading, refreshSettings } = useUserSettings()
+  // Start with null to indicate "not yet decided" state
+  const [showWelcome, setShowWelcome] = useState<boolean | null>(null)
+  const { settings, isLoading, refreshSettings, completeFirstLogin } = useUserSettings()
   const { user, isLoading: isLoadingAuth } = useAuth()
-
+  
   useEffect(() => {
-    // Only check if the user is logged in and settings are loaded
-    if (!isLoadingAuth && !isLoading && user && settings.isFirstLogin) {
-      setShowWelcome(true)
+    // Only update the showWelcome state when we have definitive information
+    if (!isLoadingAuth && !isLoading && user) {
+      // Set showWelcome based on database value
+      setShowWelcome(settings.isFirstLogin)
+      
+      // Debug logging
+      if (settings.isFirstLogin) {
+        console.log("First login detected, showing welcome flow")
+      } else {
+        console.log("Not first login, skipping welcome flow")
+      }
     }
-  }, [user, isLoading, isLoadingAuth, settings.isFirstLogin])
+  }, [user, settings.isFirstLogin, isLoading, isLoadingAuth])
 
-  const handleCompleteOnboarding = () => {
-    setShowWelcome(false)
-    refreshSettings() // Refresh settings to reflect changes
+  const handleCompleteOnboarding = async () => {
+    try {
+      console.log("Completing onboarding flow...")
+      
+      // Immediately hide the welcome flow to prevent any flashing
+      setShowWelcome(false)
+      
+      // Mark first login as completed in the database
+      const success = await completeFirstLogin()
+      
+      if (success) {
+        console.log("Successfully updated first login status in database")
+      } else {
+        console.error("Failed to update first login status in database")
+      }
+      
+      // Refresh settings to ensure we have the latest values
+      await refreshSettings()
+    } catch (error) {
+      console.error("Failed to complete onboarding:", error)
+    }
   }
 
   return (
     <>
       {children}
-      {showWelcome && <WelcomeFlow onComplete={handleCompleteOnboarding} />}
+      {/* Only render the welcome flow if showWelcome is explicitly true */}
+      {showWelcome === true && <WelcomeFlow onComplete={handleCompleteOnboarding} />}
     </>
   )
 } 

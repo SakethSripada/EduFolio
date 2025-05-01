@@ -59,12 +59,24 @@ export function WelcomeFlow({ onComplete }: WelcomeFlowProps) {
   }
 
   const handleComplete = async () => {
-    // Save tool settings and mark onboarding as complete
-    await updateSettings({
-      enabledTools: tools,
-      isFirstLogin: false
-    })
-    onComplete()
+    try {
+      // Save tool settings and mark onboarding as complete
+      const success = await updateSettings({
+        enabledTools: tools,
+        isFirstLogin: false
+      })
+      
+      if (!success) {
+        console.error("Failed to update settings during onboarding")
+      }
+      
+      // Call onComplete callback regardless to ensure user isn't blocked
+      onComplete()
+    } catch (error) {
+      console.error("Error completing onboarding:", error)
+      // Still call onComplete to ensure user isn't blocked if there's an error
+      onComplete()
+    }
   }
 
   const handleToolToggle = (toolName: keyof EnabledTools, checked: boolean) => {
