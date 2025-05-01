@@ -68,6 +68,12 @@ EduFolio is a comprehensive web application designed to help students organize a
 - Set expiration dates for shared links
 - Customize which sections are visible in shared views
 
+### 📄 Resume Builder
+- Fill out personal details, professional summary, work experience, education, skills, and projects
+- Choose from multiple templates and customize styles (fonts, colors, spacing)
+- Live resume preview component for seamless editing
+- Export resumes as PDF or DOCX with customizable formats
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
@@ -83,6 +89,8 @@ EduFolio is a comprehensive web application designed to help students organize a
 - **Data Visualization**: Recharts
 - **Icons**: Lucide React
 - **Notifications**: Sonner toast notifications
+- **PDF Generation**: jsPDF, html2canvas
+- **Word Document Generation**: docx
 
 ## 🔧 Installation
 
@@ -127,6 +135,11 @@ EduFolio uses a PostgreSQL database with the following main tables:
 - **colleges**: College information and application status
 - **college_essays**: Essays specifically for college applications
 - **shared_links**: Sharing settings and permissions
+- **resumes**: Resume metadata, templates, and styles
+- **resume_experience**: Work experience entries
+- **resume_education**: Education history entries
+- **resume_skills**: Skills entries
+- **resume_projects**: Project entries
 
 ## 🔒 Authentication and Security
 
@@ -145,6 +158,7 @@ EduFolio uses a PostgreSQL database with the following main tables:
 5. **College Research**: College search and application tracking
 6. **AI Assistance**: Smart recommendations and feedback system
 7. **Portfolio Sharing**: Controlled sharing with counselors and mentors
+8. **Resume Builder**: Create, edit, and export professional resumes in PDF and DOCX formats
 
 ## 🚀 Future Enhancements
 

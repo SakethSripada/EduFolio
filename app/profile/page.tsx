@@ -76,77 +76,83 @@ export default function ProfilePage() {
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<boolean>(false)
   const [confirmSignOut, setConfirmSignOut] = useState<boolean>(false)
 
-  useEffect(() => {
-    if (!user) return
+// At the top of your component:
+const hasFetchedProfile = useRef(false);
 
-    const fetchProfile = async () => {
-      setIsLoading(true)
+useEffect(() => {
+  if (!user || hasFetchedProfile.current) return;
+  hasFetchedProfile.current = true;
 
-      setTimeout(async () => {
-        try {
-          const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle()
+  const fetchProfile = async () => {
+    setIsLoading(true);
 
-          if (error) throw error
+    setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-          if (data) {
-            setProfile({
-              fullName: data.full_name || user.user_metadata?.full_name || "",
-              email: data.email || user.email || "",
-              bio: data.bio || "",
-              avatarUrl: data.avatar_url || user.user_metadata?.avatar_url || "",
-              gradYear: data.grad_year || "",
-              school: data.school || "",
-              interests: data.interests || "",
-              privacySettings: data.privacy_settings || {
-                publicProfile: false,
-                showEmail: false,
-              },
-            })
-          } else {
-            // If no profile exists, use auth metadata
-            setProfile({
-              fullName: user.user_metadata?.full_name || "",
-              email: user.email || "",
-              bio: "",
-              avatarUrl: user.user_metadata?.avatar_url || "",
-              gradYear: "",
-              school: "",
-              interests: "",
-              privacySettings: {
-                publicProfile: false,
-                showEmail: false,
-              },
-            })
+        if (error) throw error;
 
-            // Create a profile asynchronously
-            await supabase.from("profiles").insert({
-              user_id: user.id,
-              full_name: user.user_metadata?.full_name || "",
-              email: user.email || "",
-              avatar_url: user.user_metadata?.avatar_url || null,
-              created_at: new Date().toISOString(),
-              grad_year: "",
-              school: "",
-              interests: "",
-              privacy_settings: { publicProfile: false, showEmail: false },
-              updated_at: new Date().toISOString(),
-            })
-          }
-        } catch (error) {
-          console.error("Error loading profile:", error)
-          toast({
-            title: "Error loading profile",
-            description: "There was a problem loading your profile data.",
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
+        if (data) {
+          setProfile({
+            fullName: data.full_name || user.user_metadata?.full_name || "",
+            email: data.email || user.email || "",
+            bio: data.bio || "",
+            avatarUrl: data.avatar_url || user.user_metadata?.avatar_url || "",
+            gradYear: data.grad_year || "",
+            school: data.school || "",
+            interests: data.interests || "",
+            privacySettings: data.privacy_settings || {
+              publicProfile: false,
+              showEmail: false,
+            },
+          });
+        } else {
+          // initialize new profile...
+          setProfile({
+            fullName: user.user_metadata?.full_name || "",
+            email: user.email || "",
+            bio: "",
+            avatarUrl: user.user_metadata?.avatar_url || "",
+            gradYear: "",
+            school: "",
+            interests: "",
+            privacySettings: {
+              publicProfile: false,
+              showEmail: false,
+            },
+          });
+          await supabase.from("profiles").insert({
+            user_id: user.id,
+            full_name: user.user_metadata?.full_name || "",
+            email: user.email || "",
+            avatar_url: user.user_metadata?.avatar_url || null,
+            grad_year: "",
+            school: "",
+            interests: "",
+            privacy_settings: { publicProfile: false, showEmail: false },
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
         }
-      }, 0)
-    }
+      } catch (error) {
+        toast({
+          title: "Error loading profile",
+          description: "There was a problem loading your profile data.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }, 0);
+  };
 
-    fetchProfile()
-  }, [user])
+  fetchProfile();
+}, [user]);
+
 
   const updateProfile = async () => {
     if (!user) return
