@@ -61,15 +61,15 @@ export default function ResumeEditor({ resume, onUpdate }: ResumeEditorProps) {
   // State to track expanded sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     personalInfo: true,
-    education: true,
-    experience: true,
-    skills: true,
-    languages: true,
-    certifications: true,
-    publications: true,
-    volunteer: true,
-    awards: true,
-    references: true
+    education: false,
+    experience: false,
+    skills: false,
+    languages: false,
+    certifications: false,
+    publications: false,
+    volunteer: false,
+    awards: false,
+    references: false
   });
   
   // State to track the order of sections

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import React from "react"
 
 type ResumePreviewProps = {
@@ -67,6 +67,10 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   
   // Custom sections
   const customSections = content.customSections || []
+  
+  // State for pages
+  const [pages, setPages] = useState<React.ReactNode[]>([])
+  const contentRef = useRef<HTMLDivElement>(null)
   
   // Log sections for debugging
   console.log('Rendering with sections:', {
@@ -1665,15 +1669,55 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         '--primary-color': style.primaryColor || '#4f46e5'
       } as React.CSSProperties}
     >
-      {/* Header / Personal Info */}
-      {renderHeader()}
-      
-      {/* Render sections in order */}
-      {sections.map((section: string, index: number) => (
-        <React.Fragment key={`section-${section}-${index}`}>
-          {renderSection(section)}
-        </React.Fragment>
-      ))}
+      <div 
+        className="resume-pages" 
+        style={{
+          position: 'relative',
+        }}
+      >
+        {/* Page 1 - always contains the header and starts with the first sections */}
+        <div 
+          className="resume-page" 
+          style={{
+            minHeight: '1056px', /* 11 inches at 96 DPI */
+            width: '100%',
+            pageBreakAfter: 'always',
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header / Personal Info */}
+          {renderHeader()}
+          
+          {/* Render sections in order with overflow detection */}
+          <div ref={contentRef} className="resume-content">
+            {sections.map((section: string, index: number) => (
+              <React.Fragment key={`section-${section}-${index}`}>
+                {renderSection(section)}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+        
+        {/* Print-specific styles for page breaks */}
+        <style jsx global>{`
+          @media print {
+            .resume-page {
+              page-break-after: always;
+              break-after: page;
+            }
+            
+            .resume-content > div {
+              break-inside: avoid;
+            }
+            
+            @page {
+              size: letter;
+              margin: 0.5in;
+            }
+          }
+        `}</style>
+      </div>
     </div>
   )
 } 

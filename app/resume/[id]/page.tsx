@@ -573,538 +573,509 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-6 lg:col-span-5 space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="content" className="flex items-center gap-1">
-                Content
-              </TabsTrigger>
-              <TabsTrigger value="style" className="flex items-center gap-1">
-                <Palette className="h-4 w-4" /> Style
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-1">
-                <Settings className="h-4 w-4" /> Settings
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="content" className="space-y-4 pt-4 h-[calc(100vh-250px)] overflow-y-auto pr-2">
-              <ResumeEditor resume={resume} onUpdate={updateResume} />
-            </TabsContent>
-            
-            <TabsContent value="style" className="space-y-4 pt-4 h-[calc(100vh-250px)] overflow-y-auto pr-2">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Theme & Layout</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="fontFamily">Font Family</Label>
-                    <Select 
-                      value={style.fontFamily || "Inter"} 
-                      onValueChange={(value) => updateStyle("fontFamily", value)}
-                    >
-                      <SelectTrigger id="fontFamily">
-                        <SelectValue placeholder="Select font" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Inter">Inter (Modern Sans-Serif)</SelectItem>
-                        <SelectItem value="Merriweather">Merriweather (Elegant Serif)</SelectItem>
-                        <SelectItem value="Roboto">Roboto (Clean Sans-Serif)</SelectItem>
-                        <SelectItem value="Playfair Display">Playfair Display (Classic Serif)</SelectItem>
-                        <SelectItem value="Montserrat">Montserrat (Contemporary)</SelectItem>
-                        <SelectItem value="Lora">Lora (Modern Serif)</SelectItem>
-                        <SelectItem value="Source Sans Pro">Source Sans Pro (Professional)</SelectItem>
-                        <SelectItem value="Courier New">Courier New (Monospace)</SelectItem>
-                        <SelectItem value="Georgia">Georgia (Traditional)</SelectItem>
-                        <SelectItem value="Arial">Arial (Standard)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Section Header Style</Label>
-                    <Select 
-                      value={style.headerStyle || "underline"} 
-                      onValueChange={(value) => updateStyle("headerStyle", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Header style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="underline">Underlined</SelectItem>
-                        <SelectItem value="bold">Bold</SelectItem>
-                        <SelectItem value="colored">Colored</SelectItem>
-                        <SelectItem value="uppercase">Uppercase</SelectItem>
-                        <SelectItem value="minimal">Minimal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Section Layout</Label>
-                    <Select 
-                      value={style.sectionLayout || "standard"} 
-                      onValueChange={(value) => updateStyle("sectionLayout", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Section layout" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="boxed">Boxed Sections</SelectItem>
-                        <SelectItem value="bordered">Bordered Sections</SelectItem>
-                        <SelectItem value="left-border">Left Border</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Section Dividers</Label>
-                    <Select 
-                      value={style.sectionDivider || "none"} 
-                      onValueChange={(value) => updateStyle("sectionDivider", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Divider style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="line">Thin Line</SelectItem>
-                        <SelectItem value="spacer">Spacer</SelectItem>
-                        <SelectItem value="dot">Dotted Line</SelectItem>
-                        <SelectItem value="dash">Dashed Line</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="primaryColor">Primary Color</Label>
-                    <div className="grid grid-cols-6 gap-2">
-                      {[
-                        "#4f46e5", // Indigo
-                        "#3b82f6", // Blue
-                        "#0ea5e9", // Sky
-                        "#10b981", // Emerald 
-                        "#22c55e", // Green
-                        "#84cc16", // Lime
-                        "#eab308", // Yellow
-                        "#f59e0b", // Amber
-                        "#ef4444", // Red
-                        "#ec4899", // Pink
-                        "#8b5cf6", // Violet
-                        "#6366f1", // Indigo
-                        "#06b6d4", // Cyan
-                        "#14b8a6", // Teal
-                        "#f97316", // Orange
-                        "#64748b", // Slate
-                        "#334155", // Dark Slate
-                        "#000000", // Black
-                      ].map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          className={`h-8 w-full rounded-md ${style.primaryColor === color ? 'ring-2 ring-offset-2' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => updateStyle("primaryColor", color)}
-                          aria-label={`Color ${color}`}
-                        />
-                      ))}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-6 xl:col-span-5 space-y-6">
+          <div className="sticky top-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full grid grid-cols-3 mb-4">
+                <TabsTrigger value="content" className="flex items-center gap-1">
+                  <FileText className="h-4 w-4" /> Content
+                </TabsTrigger>
+                <TabsTrigger value="style" className="flex items-center gap-1">
+                  <Palette className="h-4 w-4" /> Style
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="flex items-center gap-1">
+                  <Settings className="h-4 w-4" /> Settings
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="h-[800px]">
+                <TabsContent value="content" className="h-full space-y-6 pt-4 overflow-y-auto pr-2">
+                  <ResumeEditor resume={resume} onUpdate={updateResume} />
+                </TabsContent>
+                
+                <TabsContent value="style" className="h-full space-y-6 pt-4 overflow-y-auto pr-2">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-medium">Theme & Layout</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                      <div className="space-y-3">
+                        <Label htmlFor="fontFamily" className="text-sm font-medium">Font Family</Label>
+                        <Select 
+                          value={style.fontFamily || "Inter"} 
+                          onValueChange={(value) => updateStyle("fontFamily", value)}
+                        >
+                          <SelectTrigger id="fontFamily" className="w-full">
+                            <SelectValue placeholder="Select font" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Inter">Inter (Modern Sans-Serif)</SelectItem>
+                            <SelectItem value="Merriweather">Merriweather (Elegant Serif)</SelectItem>
+                            <SelectItem value="Roboto">Roboto (Clean Sans-Serif)</SelectItem>
+                            <SelectItem value="Playfair Display">Playfair Display (Classic Serif)</SelectItem>
+                            <SelectItem value="Montserrat">Montserrat (Contemporary)</SelectItem>
+                            <SelectItem value="Lora">Lora (Modern Serif)</SelectItem>
+                            <SelectItem value="Source Sans Pro">Source Sans Pro (Professional)</SelectItem>
+                            <SelectItem value="Courier New">Courier New (Monospace)</SelectItem>
+                            <SelectItem value="Georgia">Georgia (Traditional)</SelectItem>
+                            <SelectItem value="Arial">Arial (Standard)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       
-                      <div className="col-span-6 flex items-center space-x-2 mt-2">
-                        <Label htmlFor="customColor" className="text-sm">Custom</Label>
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Section Header Style</Label>
+                        <Select 
+                          value={style.headerStyle || "underline"} 
+                          onValueChange={(value) => updateStyle("headerStyle", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Header style" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="underline">Underlined</SelectItem>
+                            <SelectItem value="bold">Bold</SelectItem>
+                            <SelectItem value="colored">Colored</SelectItem>
+                            <SelectItem value="uppercase">Uppercase</SelectItem>
+                            <SelectItem value="minimal">Minimal</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Section Layout</Label>
+                        <Select 
+                          value={style.sectionLayout || "standard"} 
+                          onValueChange={(value) => updateStyle("sectionLayout", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Section layout" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="boxed">Boxed Sections</SelectItem>
+                            <SelectItem value="bordered">Bordered Sections</SelectItem>
+                            <SelectItem value="left-border">Left Border</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Section Dividers</Label>
+                        <Select 
+                          value={style.sectionDivider || "none"} 
+                          onValueChange={(value) => updateStyle("sectionDivider", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Divider style" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="line">Thin Line</SelectItem>
+                            <SelectItem value="spacer">Spacer</SelectItem>
+                            <SelectItem value="dot">Dotted Line</SelectItem>
+                            <SelectItem value="dash">Dashed Line</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label htmlFor="primaryColor" className="text-sm font-medium">Primary Color</Label>
+                        <div className="grid grid-cols-6 gap-3">
+                          {[
+                            "#4f46e5", // Indigo
+                            "#3b82f6", // Blue
+                            "#0ea5e9", // Sky
+                            "#10b981", // Emerald 
+                            "#22c55e", // Green
+                            "#84cc16", // Lime
+                            "#eab308", // Yellow
+                            "#f59e0b", // Amber
+                            "#ef4444", // Red
+                            "#ec4899", // Pink
+                            "#8b5cf6", // Violet
+                            "#6366f1", // Indigo
+                            "#06b6d4", // Cyan
+                            "#14b8a6", // Teal
+                            "#f97316", // Orange
+                            "#64748b", // Slate
+                            "#334155", // Dark Slate
+                            "#000000", // Black
+                          ].map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              className={`h-9 w-full rounded-md ${style.primaryColor === color ? 'ring-2 ring-offset-2' : ''}`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => updateStyle("primaryColor", color)}
+                              aria-label={`Color ${color}`}
+                            />
+                          ))}
+                          
+                          <div className="col-span-6 flex items-center space-x-2 mt-2">
+                            <Label htmlFor="customColor" className="text-sm font-medium">Custom</Label>
+                            <Input 
+                              id="customColor" 
+                              type="color" 
+                              value={style.primaryColor || "#4f46e5"}
+                              onChange={(e) => updateStyle("primaryColor", e.target.value)}
+                              className="w-10 h-10 p-0 border-0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label htmlFor="fontSize" className="text-sm font-medium">Font Size: {style.fontSize || "medium"}</Label>
+                        <Select 
+                          value={style.fontSize || "medium"} 
+                          onValueChange={(value) => updateStyle("fontSize", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Font size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="small">Small</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="large">Large</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label htmlFor="spacing" className="text-sm font-medium">Section Spacing: {style.spacing || "comfortable"}</Label>
+                        <Select 
+                          value={style.spacing || "comfortable"} 
+                          onValueChange={(value) => updateStyle("spacing", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Spacing" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="compact">Compact</SelectItem>
+                            <SelectItem value="comfortable">Comfortable</SelectItem>
+                            <SelectItem value="spacious">Spacious</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label htmlFor="lineHeight" className="text-sm font-medium">Line Height: {style.lineHeight || "normal"}</Label>
+                        <Select 
+                          value={style.lineHeight || "normal"} 
+                          onValueChange={(value) => updateStyle("lineHeight", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Line height" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tight">Tight</SelectItem>
+                            <SelectItem value="normal">Normal</SelectItem>
+                            <SelectItem value="relaxed">Relaxed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-medium">Color & Background</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                      <div className="space-y-3">
+                        <Label htmlFor="backgroundColor" className="text-sm font-medium">Background Color</Label>
+                        <div className="grid grid-cols-4 gap-3">
+                          {[
+                            "#ffffff", // White
+                            "#f9fafb", // Gray 50
+                            "#f3f4f6", // Gray 100
+                            "#e5e7eb", // Gray 200
+                            "#d1d5db", // Gray 300
+                            "#f1f5f9", // Slate 100
+                            "#e2e8f0", // Slate 200
+                            "#f8fafc", // Slate 50
+                            "#1f2937", // Gray 800 (Dark)
+                          ].map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              className={`h-9 w-full rounded-md ${color === '#ffffff' ? 'border' : ''} ${style.backgroundColor === color ? 'ring-2 ring-offset-2' : ''}`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => updateStyle("backgroundColor", color)}
+                              aria-label={`Background color ${color}`}
+                            />
+                          ))}
+                          
+                          <div className="col-span-4 flex items-center space-x-2 mt-2">
+                            <Label htmlFor="customBgColor" className="text-sm font-medium">Custom</Label>
+                            <Input 
+                              id="customBgColor" 
+                              type="color" 
+                              value={style.backgroundColor || "#ffffff"}
+                              onChange={(e) => updateStyle("backgroundColor", e.target.value)}
+                              className="w-10 h-10 p-0 border-0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label htmlFor="textColor" className="text-sm font-medium">Text Color</Label>
+                        <div className="grid grid-cols-4 gap-3">
+                          {[
+                            "#000000", // Black
+                            "#1f2937", // Gray 800
+                            "#374151", // Gray 700
+                            "#4b5563", // Gray 600
+                            "#6b7280", // Gray 500
+                            "#ffffff", // White (for dark backgrounds)
+                          ].map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              className={`h-9 w-full rounded-md ${color === '#ffffff' ? 'border' : ''} ${style.textColor === color ? 'ring-2 ring-offset-2' : ''}`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => updateStyle("textColor", color)}
+                              aria-label={`Text color ${color}`}
+                            />
+                          ))}
+                          
+                          <div className="col-span-4 flex items-center space-x-2 mt-2">
+                            <Label htmlFor="customTextColor" className="text-sm font-medium">Custom</Label>
+                            <Input 
+                              id="customTextColor" 
+                              type="color" 
+                              value={style.textColor || "#000000"}
+                              onChange={(e) => updateStyle("textColor", e.target.value)}
+                              className="w-10 h-10 p-0 border-0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium cursor-pointer">Enable Background Pattern</Label>
+                          <Switch 
+                            checked={style.backgroundPattern === true}
+                            onCheckedChange={(checked) => updateStyle("backgroundPattern", checked)}
+                          />
+                        </div>
+                        
+                        {style.backgroundPattern && (
+                          <div className="pl-6 pt-2">
+                            <Label className="text-sm font-medium">Pattern Style</Label>
+                            <Select 
+                              value={style.patternStyle || "dots"}
+                              onValueChange={(value) => updateStyle("patternStyle", value)}
+                            >
+                              <SelectTrigger className="w-full mt-2">
+                                <SelectValue placeholder="Pattern style" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="dots">Dots</SelectItem>
+                                <SelectItem value="lines">Lines</SelectItem>
+                                <SelectItem value="grid">Grid</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-medium">Section Display Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Skills Display</Label>
+                        <Select 
+                          value={style.skillsDisplay || "tags"} 
+                          onValueChange={(value) => updateStyle("skillsDisplay", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Skills display" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tags">Tags</SelectItem>
+                            <SelectItem value="bullets">Bullet List</SelectItem>
+                            <SelectItem value="comma">Comma Separated</SelectItem>
+                            <SelectItem value="columns">Multi-Column</SelectItem>
+                            <SelectItem value="categories">Categorized</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Education Style</Label>
+                        <Select 
+                          value={style.educationStyle || "standard"} 
+                          onValueChange={(value) => updateStyle("educationStyle", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Education style" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="minimal">Minimal</SelectItem>
+                            <SelectItem value="detailed">Detailed</SelectItem>
+                            <SelectItem value="cards">Card Style</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="flex items-center justify-between py-2">
+                        <Label className="cursor-pointer text-sm font-medium">Enable Section Icons</Label>
+                        <Switch 
+                          checked={style.sectionIcons === true}
+                          onCheckedChange={(checked) => updateStyle("sectionIcons", checked)}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between py-2">
+                        <Label className="cursor-pointer text-sm font-medium">Highlight Company Names</Label>
+                        <Switch 
+                          checked={style.highlightCompany === true}
+                          onCheckedChange={(checked) => updateStyle("highlightCompany", checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between py-2">
+                        <Label className="cursor-pointer text-sm font-medium">Bold Section Titles</Label>
+                        <Switch 
+                          checked={style.boldSectionTitles === true}
+                          onCheckedChange={(checked) => updateStyle("boldSectionTitles", checked)}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between py-2">
+                        <Label className="cursor-pointer text-sm font-medium">Show Bullet Points</Label>
+                        <Switch 
+                          checked={style.showBullets !== false}
+                          onCheckedChange={(checked) => updateStyle("showBullets", checked)}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="settings" className="h-full space-y-6 pt-4 overflow-y-auto pr-2">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-medium">Resume Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                      <div className="space-y-3">
+                        <Label htmlFor="template" className="text-sm font-medium">Template</Label>
+                        <Select 
+                          value={resume.template || "standard"} 
+                          onValueChange={(value) => {
+                            // Update the template
+                            const updatedResume = {
+                              ...resume,
+                              template: value,
+                              // Update the primary color based on the selected template
+                              style: {
+                                ...resume.style,
+                                primaryColor: value === "professional" ? "#4f46e5" : 
+                                              value === "modern" ? "#8b5cf6" : 
+                                              value === "academic" ? "#10b981" : 
+                                              resume.style.primaryColor
+                              }
+                            };
+                            setResume(updatedResume);
+                            setSaveStatus("idle");
+                          }}
+                        >
+                          <SelectTrigger id="template" className="w-full">
+                            <SelectValue placeholder="Select template" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="professional">Professional</SelectItem>
+                            <SelectItem value="modern">Modern</SelectItem>
+                            <SelectItem value="academic">Academic</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Label htmlFor="resumeTitle" className="text-sm font-medium">Resume Title</Label>
                         <Input 
-                          id="customColor" 
-                          type="color" 
-                          value={style.primaryColor || "#4f46e5"}
-                          onChange={(e) => updateStyle("primaryColor", e.target.value)}
-                          className="w-8 h-8 p-0 border-0"
+                          id="resumeTitle" 
+                          placeholder="My Resume" 
+                          value={resume.title || ""}
+                          onChange={(e) => updateResume("title", e.target.value)}
+                          className="w-full"
                         />
                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="fontSize" className="text-sm">Font Size: {style.fontSize || "medium"}</Label>
-                    </div>
-                    <Select 
-                      value={style.fontSize || "medium"} 
-                      onValueChange={(value) => updateStyle("fontSize", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Font size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="small">Small</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="large">Large</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="spacing" className="text-sm">Section Spacing: {style.spacing || "comfortable"}</Label>
-                    </div>
-                    <Select 
-                      value={style.spacing || "comfortable"} 
-                      onValueChange={(value) => updateStyle("spacing", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Spacing" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="compact">Compact</SelectItem>
-                        <SelectItem value="comfortable">Comfortable</SelectItem>
-                        <SelectItem value="spacious">Spacious</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="lineHeight" className="text-sm">Line Height: {style.lineHeight || "normal"}</Label>
-                    </div>
-                    <Select 
-                      value={style.lineHeight || "normal"} 
-                      onValueChange={(value) => updateStyle("lineHeight", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Line height" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tight">Tight</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="relaxed">Relaxed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Colors & Background</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="backgroundColor">Background Color</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        className={`h-10 w-full rounded-md ${style.backgroundColor === "#ffffff" ? 'ring-2 ring-black/10 ring-offset-2' : ''}`}
-                        style={{ backgroundColor: "#ffffff" }}
-                        onClick={() => updateStyle("backgroundColor", "#ffffff")}
-                      >
-                        <span className="sr-only">White</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`h-10 w-full rounded-md ${style.backgroundColor === "#f8f9fa" ? 'ring-2 ring-black/10 ring-offset-2' : ''}`}
-                        style={{ backgroundColor: "#f8f9fa" }}
-                        onClick={() => updateStyle("backgroundColor", "#f8f9fa")}
-                      >
-                        <span className="sr-only">Light Gray</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`h-10 w-full rounded-md ${style.backgroundColor === "#1f2937" ? 'ring-2 ring-black/10 ring-offset-2' : ''}`}
-                        style={{ backgroundColor: "#1f2937" }}
-                        onClick={() => updateStyle("backgroundColor", "#1f2937")}
-                      >
-                        <span className="sr-only">Dark</span>
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Background Pattern</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col items-center">
-                        <button
-                          type="button"
-                          className={`h-16 w-full rounded-md mb-1 border ${style.backgroundPattern ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                          style={{ backgroundColor: style.backgroundColor || "#ffffff", backgroundImage: "radial-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
-                          onClick={() => updateStyle("backgroundPattern", true)}
+                      
+                      <div className="flex items-center justify-between py-2">
+                        <Label htmlFor="showDates" className="cursor-pointer text-sm font-medium">Show Dates</Label>
+                        <Switch 
+                          id="showDates" 
+                          checked={resume.content?.showDates !== false}
+                          onCheckedChange={(checked) => {
+                            const updatedContent = {
+                              ...resume.content,
+                              showDates: checked
+                            }
+                            updateResume("content", updatedContent)
+                          }}
                         />
-                        <span className="text-xs">Pattern</span>
                       </div>
-                      <div className="flex flex-col items-center">
-                        <button
-                          type="button" 
-                          className={`h-16 w-full rounded-md mb-1 border ${!style.backgroundPattern ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                          style={{ backgroundColor: style.backgroundColor || "#ffffff" }}
-                          onClick={() => updateStyle("backgroundPattern", false)}
+                      
+                      <div className="flex items-center justify-between py-2">
+                        <Label htmlFor="showContact" className="cursor-pointer text-sm font-medium">Show Contact Information</Label>
+                        <Switch 
+                          id="showContact" 
+                          checked={resume.content?.showContact !== false}
+                          onCheckedChange={(checked) => {
+                            const updatedContent = {
+                              ...resume.content,
+                              showContact: checked
+                            }
+                            updateResume("content", updatedContent)
+                          }}
                         />
-                        <span className="text-xs">None</span>
                       </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                   
-                  {style.backgroundPattern && (
-                    <div className="space-y-2">
-                      <Label>Pattern Style</Label>
-                      <Select
-                        value={style.patternStyle || "dots"}
-                        onValueChange={(value) => updateStyle("patternStyle", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pattern style" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="dots">Dots</SelectItem>
-                          <SelectItem value="lines">Lines</SelectItem>
-                          <SelectItem value="grid">Grid</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="textColor">Text Color</Label>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      <button
-                        type="button"
-                        className={`h-10 w-full rounded-md ${style.textColor === "#000000" ? 'ring-2 ring-black/10 ring-offset-2' : ''} border border-gray-300`}
-                        style={{ backgroundColor: "#ffffff" }}
-                        onClick={() => updateStyle("textColor", "#000000")}
-                      >
-                        <div className="h-full w-full flex items-center justify-center">
-                          <span className="text-black">Aa</span>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        className={`h-10 w-full rounded-md ${style.textColor === "#4b5563" ? 'ring-2 ring-black/10 ring-offset-2' : ''} border border-gray-300`}
-                        style={{ backgroundColor: "#ffffff" }}
-                        onClick={() => updateStyle("textColor", "#4b5563")}
-                      >
-                        <div className="h-full w-full flex items-center justify-center">
-                          <span className="text-[#4b5563]">Aa</span>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        className={`h-10 w-full rounded-md ${style.textColor === "#ffffff" ? 'ring-2 ring-black/10 ring-offset-2' : ''} border border-gray-300`}
-                        style={{ backgroundColor: "#1f2937" }}
-                        onClick={() => updateStyle("textColor", "#ffffff")}
-                      >
-                        <div className="h-full w-full flex items-center justify-center">
-                          <span className="text-white">Aa</span>
-                        </div>
-                      </button>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor="customTextColor" className="text-sm">Custom</Label>
-                      <Input 
-                        id="customTextColor" 
-                        type="color" 
-                        value={style.textColor || "#000000"}
-                        onChange={(e) => updateStyle("textColor", e.target.value)}
-                        className="w-8 h-8 p-0 border-0"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Section Styling</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Experience Item Style</Label>
-                    <Select 
-                      value={style.experienceStyle || "standard"} 
-                      onValueChange={(value) => updateStyle("experienceStyle", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Experience style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="compact">Compact</SelectItem>
-                        <SelectItem value="detailed">Detailed with Bullets</SelectItem>
-                        <SelectItem value="cards">Card Style</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Skills Display</Label>
-                    <Select 
-                      value={style.skillsDisplay || "tags"} 
-                      onValueChange={(value) => updateStyle("skillsDisplay", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Skills display" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tags">Tags</SelectItem>
-                        <SelectItem value="bullets">Bullet List</SelectItem>
-                        <SelectItem value="comma">Comma Separated</SelectItem>
-                        <SelectItem value="columns">Multi-Column</SelectItem>
-                        <SelectItem value="categories">Categorized</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Education Style</Label>
-                    <Select 
-                      value={style.educationStyle || "standard"} 
-                      onValueChange={(value) => updateStyle("educationStyle", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Education style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="minimal">Minimal</SelectItem>
-                        <SelectItem value="detailed">Detailed</SelectItem>
-                        <SelectItem value="cards">Card Style</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Label className="cursor-pointer">Enable Section Icons</Label>
-                    <Switch 
-                      checked={style.sectionIcons === true}
-                      onCheckedChange={(checked) => updateStyle("sectionIcons", checked)}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Label className="cursor-pointer">Highlight Company Names</Label>
-                    <Switch 
-                      checked={style.highlightCompany === true}
-                      onCheckedChange={(checked) => updateStyle("highlightCompany", checked)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="cursor-pointer">Bold Section Titles</Label>
-                    <Switch 
-                      checked={style.boldSectionTitles === true}
-                      onCheckedChange={(checked) => updateStyle("boldSectionTitles", checked)}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label className="cursor-pointer">Show Bullet Points</Label>
-                    <Switch 
-                      checked={style.showBullets !== false}
-                      onCheckedChange={(checked) => updateStyle("showBullets", checked)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="settings" className="space-y-4 pt-4 h-[calc(100vh-250px)] overflow-y-auto pr-2">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Resume Settings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="template">Template</Label>
-                    <Select 
-                      value={resume.template || "standard"} 
-                      onValueChange={(value) => {
-                        // Update the template
-                        const updatedResume = {
-                          ...resume,
-                          template: value,
-                          // Update the primary color based on the selected template
-                          style: {
-                            ...resume.style,
-                            primaryColor: value === "professional" ? "#4f46e5" : 
-                                          value === "modern" ? "#8b5cf6" : 
-                                          value === "academic" ? "#10b981" : 
-                                          resume.style.primaryColor
-                          }
-                        };
-                        setResume(updatedResume);
-                        setSaveStatus("idle");
-                      }}
-                    >
-                      <SelectTrigger id="template">
-                        <SelectValue placeholder="Select template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="professional">Professional</SelectItem>
-                        <SelectItem value="modern">Modern</SelectItem>
-                        <SelectItem value="academic">Academic</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="showDates" className="cursor-pointer">Show Dates</Label>
-                    <Switch 
-                      id="showDates" 
-                      checked={resume.content?.showDates !== false}
-                      onCheckedChange={(checked) => {
-                        const updatedContent = {
-                          ...resume.content,
-                          showDates: checked
-                        }
-                        updateResume("content", updatedContent)
-                      }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="showContact" className="cursor-pointer">Show Contact Information</Label>
-                    <Switch 
-                      id="showContact" 
-                      checked={resume.content?.showContact !== false}
-                      onCheckedChange={(checked) => {
-                        const updatedContent = {
-                          ...resume.content,
-                          showContact: checked
-                        }
-                        updateResume("content", updatedContent)
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Privacy Settings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="publicProfile" className="cursor-pointer">Public Profile</Label>
-                    <Switch 
-                      id="publicProfile" 
-                      checked={resume.content?.isPublic === true}
-                      onCheckedChange={(checked) => {
-                        const updatedContent = {
-                          ...resume.content,
-                          isPublic: checked
-                        }
-                        updateResume("content", updatedContent)
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    When enabled, your resume can be shared with others via a public link.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-medium">Privacy Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="publicProfile" className="cursor-pointer text-sm font-medium">Public Profile</Label>
+                        <Switch 
+                          id="publicProfile" 
+                          checked={resume.content?.isPublic === true}
+                          onCheckedChange={(checked) => {
+                            const updatedContent = {
+                              ...resume.content,
+                              isPublic: checked
+                            }
+                            updateResume("content", updatedContent)
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        When enabled, your resume can be shared with others via a public link.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
         </div>
         
-        <div className="md:col-span-6 lg:col-span-7 flex justify-center">
+        <div className="lg:col-span-6 xl:col-span-7 flex justify-center">
           <div 
             ref={resumePreviewRef}
             className="border rounded-md shadow-sm w-full max-w-[816px] p-10 overflow-auto print:border-none print:shadow-none"
