@@ -19,6 +19,21 @@ const config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)"],
+        serif: ["var(--font-serif)"],
+        mono: ["var(--font-mono)"],
+        inter: ["var(--font-inter)"],
+        merriweather: ["var(--font-merriweather)"],
+        roboto: ["var(--font-roboto)"],
+        "playfair-display": ["var(--font-playfair-display)"],
+        montserrat: ["var(--font-montserrat)"],
+        lora: ["var(--font-lora)"],
+        "source-sans-pro": ["var(--font-source-sans-pro)"],
+        "courier-new": ["Courier New", "monospace"],
+        georgia: ["Georgia", "serif"],
+        arial: ["Arial", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

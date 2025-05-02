@@ -541,7 +541,7 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
             <TabsContent value="style" className="space-y-4 pt-4 h-[calc(100vh-250px)] overflow-y-auto pr-2">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Font & Typography</CardTitle>
+                  <CardTitle className="text-lg font-medium">Theme & Layout</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
@@ -554,28 +554,114 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                         <SelectValue placeholder="Select font" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Inter">Inter</SelectItem>
-                        <SelectItem value="Roboto">Roboto</SelectItem>
-                        <SelectItem value="Open Sans">Open Sans</SelectItem>
-                        <SelectItem value="Merriweather">Merriweather</SelectItem>
-                        <SelectItem value="Lora">Lora</SelectItem>
-                        <SelectItem value="Poppins">Poppins</SelectItem>
-                        <SelectItem value="Montserrat">Montserrat</SelectItem>
-                        <SelectItem value="Playfair Display">Playfair Display</SelectItem>
-                        <SelectItem value="Raleway">Raleway</SelectItem>
-                        <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
+                        <SelectItem value="Inter">Inter (Modern Sans-Serif)</SelectItem>
+                        <SelectItem value="Merriweather">Merriweather (Elegant Serif)</SelectItem>
+                        <SelectItem value="Roboto">Roboto (Clean Sans-Serif)</SelectItem>
+                        <SelectItem value="Playfair Display">Playfair Display (Classic Serif)</SelectItem>
+                        <SelectItem value="Montserrat">Montserrat (Contemporary)</SelectItem>
+                        <SelectItem value="Lora">Lora (Modern Serif)</SelectItem>
+                        <SelectItem value="Source Sans Pro">Source Sans Pro (Professional)</SelectItem>
+                        <SelectItem value="Courier New">Courier New (Monospace)</SelectItem>
+                        <SelectItem value="Georgia">Georgia (Traditional)</SelectItem>
+                        <SelectItem value="Arial">Arial (Standard)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="fontSize">Font Size</Label>
+                    <Label>Section Header Style</Label>
+                    <Select 
+                      value={style.headerStyle || "underline"} 
+                      onValueChange={(value) => updateStyle("headerStyle", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Header style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="underline">Underlined</SelectItem>
+                        <SelectItem value="bold">Bold</SelectItem>
+                        <SelectItem value="colored">Colored</SelectItem>
+                        <SelectItem value="uppercase">Uppercase</SelectItem>
+                        <SelectItem value="minimal">Minimal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Section Dividers</Label>
+                    <Select 
+                      value={style.sectionDivider || "none"} 
+                      onValueChange={(value) => updateStyle("sectionDivider", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Divider style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="line">Thin Line</SelectItem>
+                        <SelectItem value="spacer">Spacer</SelectItem>
+                        <SelectItem value="dot">Dotted Line</SelectItem>
+                        <SelectItem value="dash">Dashed Line</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="primaryColor">Primary Color</Label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {[
+                        "#4f46e5", // Indigo
+                        "#3b82f6", // Blue
+                        "#0ea5e9", // Sky
+                        "#10b981", // Emerald 
+                        "#22c55e", // Green
+                        "#84cc16", // Lime
+                        "#eab308", // Yellow
+                        "#f59e0b", // Amber
+                        "#ef4444", // Red
+                        "#ec4899", // Pink
+                        "#8b5cf6", // Violet
+                        "#6366f1", // Indigo
+                        "#06b6d4", // Cyan
+                        "#14b8a6", // Teal
+                        "#f97316", // Orange
+                        "#64748b", // Slate
+                        "#334155", // Dark Slate
+                        "#000000", // Black
+                      ].map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          className={`h-8 w-full rounded-md ${style.primaryColor === color ? 'ring-2 ring-offset-2' : ''}`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => updateStyle("primaryColor", color)}
+                          aria-label={`Color ${color}`}
+                        />
+                      ))}
+                      
+                      <div className="col-span-6 flex items-center space-x-2 mt-2">
+                        <Label htmlFor="customColor" className="text-sm">Custom</Label>
+                        <Input 
+                          id="customColor" 
+                          type="color" 
+                          value={style.primaryColor || "#4f46e5"}
+                          onChange={(e) => updateStyle("primaryColor", e.target.value)}
+                          className="w-8 h-8 p-0 border-0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="fontSize" className="text-sm">Font Size: {style.fontSize || "medium"}</Label>
+                    </div>
                     <Select 
                       value={style.fontSize || "medium"} 
                       onValueChange={(value) => updateStyle("fontSize", value)}
                     >
-                      <SelectTrigger id="fontSize">
-                        <SelectValue placeholder="Select size" />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Font size" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="small">Small</SelectItem>
@@ -584,152 +670,17 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                       </SelectContent>
                     </Select>
                   </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Color Scheme</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="primaryColor">Primary Color</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      {[
-                        { name: "Indigo", value: "#4f46e5" },
-                        { name: "Red", value: "#ef4444" },
-                        { name: "Green", value: "#10b981" },
-                        { name: "Violet", value: "#6366f1" },
-                        { name: "Amber", value: "#f59e0b" },
-                        { name: "Blue", value: "#3b82f6" }
-                      ].map(color => (
-                        <button
-                          key={color.value}
-                          type="button"
-                          className={`w-8 h-8 rounded-full border-2 ${style.primaryColor === color.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white' : ''}`}
-                          style={{ backgroundColor: color.value }}
-                          onClick={() => updateStyle("primaryColor", color.value)}
-                          title={color.name}
-                        />
-                      ))}
-                    </div>
-                  </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="colorInput">Custom Primary Color</Label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        id="colorInput"
-                        value={style.primaryColor || "#4f46e5"}
-                        onChange={(e) => updateStyle("primaryColor", e.target.value)}
-                        className="h-10 w-10 p-0 border-0"
-                      />
-                      <Input
-                        value={style.primaryColor || "#4f46e5"}
-                        onChange={(e) => updateStyle("primaryColor", e.target.value)}
-                        className="flex-1"
-                      />
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="spacing" className="text-sm">Section Spacing: {style.spacing || "comfortable"}</Label>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="textColor">Text Color</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      {[
-                        { name: "Black", value: "#000000" },
-                        { name: "Dark Gray", value: "#333333" },
-                        { name: "Gray", value: "#666666" },
-                        { name: "Navy", value: "#0f172a" },
-                        { name: "Brown", value: "#422006" },
-                        { name: "White", value: "#ffffff" }
-                      ].map(color => (
-                        <button
-                          key={color.value}
-                          type="button"
-                          className={`w-8 h-8 rounded-full border-2 ${style.textColor === color.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white' : ''}`}
-                          style={{ backgroundColor: color.value }}
-                          onClick={() => updateStyle("textColor", color.value)}
-                          title={color.name}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="textColorInput">Custom Text Color</Label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        id="textColorInput"
-                        value={style.textColor || "#000000"}
-                        onChange={(e) => updateStyle("textColor", e.target.value)}
-                        className="h-10 w-10 p-0 border-0"
-                      />
-                      <Input
-                        value={style.textColor || "#000000"}
-                        onChange={(e) => updateStyle("textColor", e.target.value)}
-                        className="flex-1"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="backgroundColor">Background Color</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      {[
-                        { name: "White", value: "#ffffff" },
-                        { name: "Light Gray", value: "#f5f5f5" },
-                        { name: "Cream", value: "#f9f5eb" },
-                        { name: "Light Blue", value: "#f0f4f8" },
-                        { name: "Light Green", value: "#f0f7f4" },
-                        { name: "Dark Mode", value: "#1f2937" }
-                      ].map(color => (
-                        <button
-                          key={color.value}
-                          type="button"
-                          className={`w-8 h-8 rounded-full border-2 ${style.backgroundColor === color.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white' : ''}`}
-                          style={{ backgroundColor: color.value }}
-                          onClick={() => updateStyle("backgroundColor", color.value)}
-                          title={color.name}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="backgroundColorInput">Custom Background</Label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        id="backgroundColorInput"
-                        value={style.backgroundColor || "#ffffff"}
-                        onChange={(e) => updateStyle("backgroundColor", e.target.value)}
-                        className="h-10 w-10 p-0 border-0"
-                      />
-                      <Input
-                        value={style.backgroundColor || "#ffffff"}
-                        onChange={(e) => updateStyle("backgroundColor", e.target.value)}
-                        className="flex-1"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-medium">Layout</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="spacing">Content Spacing</Label>
                     <Select 
                       value={style.spacing || "comfortable"} 
                       onValueChange={(value) => updateStyle("spacing", value)}
                     >
-                      <SelectTrigger id="spacing">
-                        <SelectValue placeholder="Select spacing" />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Spacing" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="compact">Compact</SelectItem>
@@ -737,6 +688,214 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                         <SelectItem value="spacious">Spacious</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="lineHeight" className="text-sm">Line Height: {style.lineHeight || "normal"}</Label>
+                    </div>
+                    <Select 
+                      value={style.lineHeight || "normal"} 
+                      onValueChange={(value) => updateStyle("lineHeight", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Line height" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tight">Tight</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="relaxed">Relaxed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Colors & Background</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="backgroundColor">Background Color</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        className={`h-10 w-full rounded-md ${style.backgroundColor === "#ffffff" ? 'ring-2 ring-black/10 ring-offset-2' : ''}`}
+                        style={{ backgroundColor: "#ffffff" }}
+                        onClick={() => updateStyle("backgroundColor", "#ffffff")}
+                      >
+                        <span className="sr-only">White</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`h-10 w-full rounded-md ${style.backgroundColor === "#f8f9fa" ? 'ring-2 ring-black/10 ring-offset-2' : ''}`}
+                        style={{ backgroundColor: "#f8f9fa" }}
+                        onClick={() => updateStyle("backgroundColor", "#f8f9fa")}
+                      >
+                        <span className="sr-only">Light Gray</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`h-10 w-full rounded-md ${style.backgroundColor === "#1f2937" ? 'ring-2 ring-black/10 ring-offset-2' : ''}`}
+                        style={{ backgroundColor: "#1f2937" }}
+                        onClick={() => updateStyle("backgroundColor", "#1f2937")}
+                      >
+                        <span className="sr-only">Dark</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="textColor">Text Color</Label>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <button
+                        type="button"
+                        className={`h-10 w-full rounded-md ${style.textColor === "#000000" ? 'ring-2 ring-black/10 ring-offset-2' : ''} border border-gray-300`}
+                        style={{ backgroundColor: "#ffffff" }}
+                        onClick={() => updateStyle("textColor", "#000000")}
+                      >
+                        <div className="h-full w-full flex items-center justify-center">
+                          <span className="text-black">Aa</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className={`h-10 w-full rounded-md ${style.textColor === "#4b5563" ? 'ring-2 ring-black/10 ring-offset-2' : ''} border border-gray-300`}
+                        style={{ backgroundColor: "#ffffff" }}
+                        onClick={() => updateStyle("textColor", "#4b5563")}
+                      >
+                        <div className="h-full w-full flex items-center justify-center">
+                          <span className="text-[#4b5563]">Aa</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className={`h-10 w-full rounded-md ${style.textColor === "#ffffff" ? 'ring-2 ring-black/10 ring-offset-2' : ''} border border-gray-300`}
+                        style={{ backgroundColor: "#1f2937" }}
+                        onClick={() => updateStyle("textColor", "#ffffff")}
+                      >
+                        <div className="h-full w-full flex items-center justify-center">
+                          <span className="text-white">Aa</span>
+                        </div>
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor="customTextColor" className="text-sm">Custom</Label>
+                      <Input 
+                        id="customTextColor" 
+                        type="color" 
+                        value={style.textColor || "#000000"}
+                        onChange={(e) => updateStyle("textColor", e.target.value)}
+                        className="w-8 h-8 p-0 border-0"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label className="cursor-pointer">Enable Background Pattern</Label>
+                    <Switch 
+                      checked={style.backgroundPattern === true}
+                      onCheckedChange={(checked) => updateStyle("backgroundPattern", checked)}
+                    />
+                  </div>
+                  
+                  {style.backgroundPattern && (
+                    <div className="space-y-2">
+                      <Label>Pattern Style</Label>
+                      <Select 
+                        value={style.patternStyle || "dots"} 
+                        onValueChange={(value) => updateStyle("patternStyle", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pattern" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dots">Dots</SelectItem>
+                          <SelectItem value="lines">Lines</SelectItem>
+                          <SelectItem value="grid">Grid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg font-medium">Section Styling</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label>Section Layout</Label>
+                    <Select 
+                      value={style.sectionLayout || "standard"} 
+                      onValueChange={(value) => updateStyle("sectionLayout", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Section layout" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="boxed">Boxed Sections</SelectItem>
+                        <SelectItem value="bordered">Bordered Sections</SelectItem>
+                        <SelectItem value="left-border">Left Border</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Experience Item Style</Label>
+                    <Select 
+                      value={style.experienceStyle || "standard"} 
+                      onValueChange={(value) => updateStyle("experienceStyle", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Experience style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="compact">Compact</SelectItem>
+                        <SelectItem value="detailed">Detailed with Bullets</SelectItem>
+                        <SelectItem value="cards">Card Style</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Skills Display</Label>
+                    <Select 
+                      value={style.skillsDisplay || "tags"} 
+                      onValueChange={(value) => updateStyle("skillsDisplay", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Skills display" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tags">Tags</SelectItem>
+                        <SelectItem value="bullets">Bullet List</SelectItem>
+                        <SelectItem value="comma">Comma Separated</SelectItem>
+                        <SelectItem value="columns">Multi-Column</SelectItem>
+                        <SelectItem value="categories">Categorized</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label className="cursor-pointer">Enable Section Icons</Label>
+                    <Switch 
+                      checked={style.sectionIcons === true}
+                      onCheckedChange={(checked) => updateStyle("sectionIcons", checked)}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label className="cursor-pointer">Highlight Company Names</Label>
+                    <Switch 
+                      checked={style.highlightCompany === true}
+                      onCheckedChange={(checked) => updateStyle("highlightCompany", checked)}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -813,30 +972,119 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                   
                   <div className="space-y-2">
                     <Label>Section Order</Label>
-                    <RadioGroup
-                      value={resume.settings?.sectionOrder || "standard"}
-                      onValueChange={(value) => {
-                        const updatedSettings = {
-                          ...(resume.settings || {}),
-                          sectionOrder: value
-                        }
-                        updateResume("settings", updatedSettings)
-                      }}
-                      className="space-y-2"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="standard" id="standard" />
-                        <Label htmlFor="standard">Standard (Summary, Experience, Education, Skills)</Label>
+                    <div className="space-y-4">
+                      <div className="flex flex-col space-y-2 p-4 border rounded-md">
+                        <Label className="mb-2">Custom Section Order</Label>
+                        {resume.settings?.customSectionOrder ? (
+                          <div className="space-y-2">
+                            {resume.settings.customSectionOrder.map((section: string, index: number) => (
+                              <div key={section} className="flex items-center justify-between bg-muted/20 p-2 rounded-md">
+                                <div className="flex items-center">
+                                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 inline-flex items-center justify-center text-sm mr-2">
+                                    {index + 1}
+                                  </span>
+                                  <span className="capitalize">{section}</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                    disabled={index === 0}
+                                    onClick={() => {
+                                      const updatedOrder = [...resume.settings.customSectionOrder];
+                                      [updatedOrder[index], updatedOrder[index - 1]] = [updatedOrder[index - 1], updatedOrder[index]];
+                                      
+                                      const updatedSettings = {
+                                        ...(resume.settings || {}),
+                                        customSectionOrder: updatedOrder,
+                                        sectionOrder: 'custom'
+                                      };
+                                      updateResume("settings", updatedSettings);
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m18 15-6-6-6 6"/></svg>
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                    disabled={index === resume.settings.customSectionOrder.length - 1}
+                                    onClick={() => {
+                                      const updatedOrder = [...resume.settings.customSectionOrder];
+                                      [updatedOrder[index], updatedOrder[index + 1]] = [updatedOrder[index + 1], updatedOrder[index]];
+                                      
+                                      const updatedSettings = {
+                                        ...(resume.settings || {}),
+                                        customSectionOrder: updatedOrder,
+                                        sectionOrder: 'custom'
+                                      };
+                                      updateResume("settings", updatedSettings);
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m6 9 6 6 6-6"/></svg>
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => {
+                              // Initialize custom section order based on current template
+                              let defaultOrder = ['summary', 'experience', 'education', 'skills'];
+                              if (resume.settings?.sectionOrder === 'education-first') {
+                                defaultOrder = ['summary', 'education', 'experience', 'skills'];
+                              } else if (resume.settings?.sectionOrder === 'skills-first') {
+                                defaultOrder = ['summary', 'skills', 'experience', 'education'];
+                              }
+                              
+                              const updatedSettings = {
+                                ...(resume.settings || {}),
+                                customSectionOrder: defaultOrder,
+                                sectionOrder: 'custom'
+                              };
+                              updateResume("settings", updatedSettings);
+                            }}
+                            className="w-full"
+                            variant="outline"
+                          >
+                            Enable Custom Section Order
+                          </Button>
+                        )}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="education-first" id="education-first" />
-                        <Label htmlFor="education-first">Education First</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="skills-first" id="skills-first" />
-                        <Label htmlFor="skills-first">Skills First</Label>
-                      </div>
-                    </RadioGroup>
+                      
+                      <RadioGroup
+                        value={resume.settings?.sectionOrder || "standard"}
+                        onValueChange={(value) => {
+                          const updatedSettings = {
+                            ...(resume.settings || {}),
+                            sectionOrder: value
+                          };
+                          updateResume("settings", updatedSettings);
+                        }}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="standard" id="standard" />
+                          <Label htmlFor="standard">Standard (Summary, Experience, Education, Skills)</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="education-first" id="education-first" />
+                          <Label htmlFor="education-first">Education First</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="skills-first" id="skills-first" />
+                          <Label htmlFor="skills-first">Skills First</Label>
+                        </div>
+                        {resume.settings?.customSectionOrder && (
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="custom" id="custom" />
+                            <Label htmlFor="custom">Custom Order</Label>
+                          </div>
+                        )}
+                      </RadioGroup>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -876,8 +1124,18 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
             style={{ 
               backgroundColor: style.backgroundColor || '#ffffff',
               color: style.textColor || (style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000'),
+              fontFamily: style.fontFamily || 'Inter, sans-serif',
               height: "1056px",
-              aspectRatio: "8.5/11"
+              aspectRatio: "8.5/11",
+              ...(style.backgroundPattern && style.patternStyle ? {
+                backgroundImage: style.patternStyle === 'dots' 
+                  ? `radial-gradient(${style.primaryColor}10 1px, ${style.backgroundColor || '#ffffff'} 1px)`
+                  : style.patternStyle === 'lines'
+                  ? `linear-gradient(${style.primaryColor}10 1px, transparent 1px)`
+                  : `linear-gradient(${style.primaryColor}10 1px, transparent 1px), 
+                     linear-gradient(to right, ${style.primaryColor}10 1px, ${style.backgroundColor || '#ffffff'} 1px)`,
+                backgroundSize: style.patternStyle === 'lines' ? '100% 20px' : '20px 20px'
+              } : {})
             }}
           >
             <ResumePreview resume={resume} />

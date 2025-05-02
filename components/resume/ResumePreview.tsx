@@ -72,29 +72,59 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     return isDarkBackground ? '#cccccc' : '#666666'
   }, [style.textColor, isDarkBackground])
   
+  // Apply the lineHeight setting
+  const lineHeightClass = useMemo(() => {
+    const lineHeightOptions: Record<string, string> = {
+      'tight': 'leading-tight',
+      'normal': 'leading-normal',
+      'relaxed': 'leading-relaxed',
+    }
+    return lineHeightOptions[style.lineHeight as string] || 'leading-normal'
+  }, [style.lineHeight])
+  
   // Generate class for headings based on style
   const headingClass = useMemo(() => {
-    const colorClass: ColorMap = {
-      '#4f46e5': 'text-indigo-600 dark:text-indigo-400',
-      '#ef4444': 'text-red-600 dark:text-red-400',
-      '#10b981': 'text-emerald-600 dark:text-emerald-400',
-      '#6366f1': 'text-violet-600 dark:text-violet-400',
-      '#f59e0b': 'text-amber-600 dark:text-amber-400',
-      '#3b82f6': 'text-blue-600 dark:text-blue-400',
+    // Apply header style if defined
+    const headerStyle = style.headerStyle || 'underline';
+    
+    let styleClass = '';
+    
+    switch (headerStyle) {
+      case 'underline':
+        styleClass = isDarkBackground 
+          ? `border-b border-gray-500 mb-3`
+          : `border-b mb-3`;
+        break;
+      case 'bold':
+        styleClass = 'font-extrabold mb-3';
+        break;  
+      case 'colored':
+        styleClass = 'mb-3';
+        break;
+      case 'uppercase':
+        styleClass = 'uppercase tracking-wider mb-3';
+        break;
+      case 'minimal':
+        styleClass = 'mb-2'; 
+        break;
+      default:
+        styleClass = isDarkBackground 
+          ? `border-b border-gray-500 mb-3`
+          : `border-b mb-3`;
     }
     
-    // If background is dark, adjust the text color to be lighter
-    const textColorClass = isDarkBackground 
-      ? `border-b border-gray-500 mb-3`
-      : `border-b mb-3`
-    
-    return `text-lg font-bold pb-1 ${textColorClass}`
-  }, [isDarkBackground])
+    return `text-lg font-bold pb-1 ${styleClass}`
+  }, [isDarkBackground, style.headerStyle])
   
   // Get heading color
   const headingColorStyle = useMemo(() => {
     // If there's a primary color, use it for headings
     const primaryColor = style.primaryColor || '#4f46e5'
+    
+    // If header style is 'colored', always use primary color
+    if (style.headerStyle === 'colored') {
+      return { color: primaryColor };
+    }
     
     // If there's a text color setting, prioritize it over default styles
     if (style.textColor) {
@@ -105,7 +135,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     return { 
       color: isDarkBackground ? '#ffffff' : primaryColor 
     }
-  }, [style.primaryColor, style.textColor, isDarkBackground])
+  }, [style.primaryColor, style.textColor, isDarkBackground, style.headerStyle])
   
   // Generate spacing class based on style
   const spacingClass = useMemo(() => {
@@ -129,69 +159,425 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     return sizeOptions[style.fontSize as string] || 'text-sm'
   }, [style.fontSize])
   
+  // Generate background pattern styles
+  const backgroundPatternStyle = useMemo(() => {
+    if (!style.backgroundPattern) return {};
+    
+    const patternStyle = style.patternStyle || 'dots';
+    const primaryColor = style.primaryColor || '#4f46e5';
+    const backgroundColor = style.backgroundColor || '#ffffff';
+    
+    // Create a very subtle version of the primary color
+    const patternColor = isDarkBackground
+      ? 'rgba(255, 255, 255, 0.03)'
+      : `${primaryColor}10`; // 10% opacity
+    
+    switch (patternStyle) {
+      case 'dots':
+        return {
+          backgroundImage: `radial-gradient(${patternColor} 1px, ${backgroundColor} 1px)`,
+          backgroundSize: '20px 20px'
+        };
+      case 'lines':
+        return {
+          backgroundImage: `linear-gradient(${patternColor} 1px, transparent 1px)`,
+          backgroundSize: '100% 20px'
+        };
+      case 'grid':
+        return {
+          backgroundImage: `linear-gradient(${patternColor} 1px, transparent 1px), 
+                            linear-gradient(to right, ${patternColor} 1px, ${backgroundColor} 1px)`,
+          backgroundSize: '20px 20px'
+        };
+      default:
+        return {};
+    }
+  }, [style.backgroundPattern, style.patternStyle, style.primaryColor, style.backgroundColor, isDarkBackground]);
+  
+  // Get section divider styles
+  const getSectionDividerStyle = () => {
+    const dividerStyle = style.sectionDivider || 'none';
+    const primaryColor = style.primaryColor || '#4f46e5';
+    
+    switch (dividerStyle) {
+      case 'line':
+        return <div className="w-full h-px my-4" style={{ backgroundColor: `${primaryColor}40` }}></div>;
+      case 'spacer':
+        return <div className="h-6"></div>;
+      case 'dot':
+        return <div className="w-full h-px my-4 border-t border-dotted" style={{ borderColor: `${primaryColor}60` }}></div>;
+      case 'dash':
+        return <div className="w-full h-px my-4 border-t border-dashed" style={{ borderColor: `${primaryColor}60` }}></div>;
+      default:
+        return null;
+    }
+  };
+  
   // Determine section order based on settings
   const sections = useMemo(() => {
-    const sectionOrder = settings.sectionOrder || 'standard'
+    const sectionOrder = settings.sectionOrder || 'standard';
     
+    // If custom order is defined and selected, use it
+    if (sectionOrder === 'custom' && settings.customSectionOrder && settings.customSectionOrder.length > 0) {
+      return settings.customSectionOrder;
+    }
+    
+    // Otherwise use the predefined orders
     if (sectionOrder === 'education-first') {
-      return ['summary', 'education', 'experience', 'skills']
+      return ['summary', 'education', 'experience', 'skills'];
     } else if (sectionOrder === 'skills-first') {
-      return ['summary', 'skills', 'experience', 'education']
+      return ['summary', 'skills', 'experience', 'education'];
     } else {
       // Standard order
-      return ['summary', 'experience', 'education', 'skills']
+      return ['summary', 'experience', 'education', 'skills'];
     }
-  }, [settings.sectionOrder])
+  }, [settings.sectionOrder, settings.customSectionOrder]);
   
-  // Render section based on type
+  // Apply font family to document
+  const fontFamilyStyle = useMemo(() => {
+    return {
+      fontFamily: style.fontFamily || 'Inter, sans-serif'
+    };
+  }, [style.fontFamily]);
+  
+  // Apply section layout styles
+  const getSectionContainerClass = () => {
+    const sectionLayout = style.sectionLayout || 'standard';
+    
+    switch (sectionLayout) {
+      case 'boxed':
+        return 'p-4 bg-gray-50 rounded-md shadow-sm dark:bg-gray-800';
+      case 'bordered':
+        return 'p-4 border rounded-md';
+      case 'left-border':
+        return 'pl-4 border-l-2';
+      default:
+        return '';
+    }
+  };
+  
+  // Get section container style
+  const getSectionContainerStyle = () => {
+    const sectionLayout = style.sectionLayout || 'standard';
+    const primaryColor = style.primaryColor || '#4f46e5';
+    
+    if (sectionLayout === 'left-border') {
+      return { borderColor: primaryColor };
+    }
+    
+    if (sectionLayout === 'bordered') {
+      return { borderColor: `${primaryColor}30` };
+    }
+    
+    return {};
+  };
+  
+  // Render skills based on display style
+  const renderSkills = (skills: any[]) => {
+    const skillsDisplay = style.skillsDisplay || 'tags';
+    const primaryColor = style.primaryColor || '#4f46e5';
+    
+    switch (skillsDisplay) {
+      case 'bullets':
+        return (
+          <ul className="list-disc pl-5 space-y-1">
+            {skills.map((skill: any) => (
+              <li key={skill.id} style={{ color: defaultTextColor }}>
+                {skill.name}
+              </li>
+            ))}
+          </ul>
+        );
+      
+      case 'comma':
+        return (
+          <p style={{ color: defaultTextColor }}>
+            {skills.map((skill: any, index: number) => (
+              <React.Fragment key={skill.id}>
+                {skill.name}{index < skills.length - 1 ? ', ' : ''}
+              </React.Fragment>
+            ))}
+          </p>
+        );
+      
+      case 'columns':
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            {skills.map((skill: any) => (
+              <div key={skill.id} style={{ color: defaultTextColor }}>
+                {skill.name}
+              </div>
+            ))}
+          </div>
+        );
+      
+      case 'categories':
+        // Group skills by category
+        const categories: Record<string, any[]> = {};
+        skills.forEach((skill: any) => {
+          const category = skill.category || 'Other';
+          if (!categories[category]) {
+            categories[category] = [];
+          }
+          categories[category].push(skill);
+        });
+        
+        return (
+          <div className="space-y-3">
+            {Object.entries(categories).map(([category, categorySkills]) => (
+              <div key={category}>
+                <h3 className="text-sm font-medium mb-1" style={{ color: defaultTextColor }}>{category}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {categorySkills.map((skill: any) => (
+                    <span 
+                      key={skill.id}
+                      className="px-2 py-1 rounded text-xs"
+                      style={{ 
+                        color: isDarkBackground ? '#fff' : '#000',
+                        backgroundColor: isDarkBackground ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+                      }}
+                    >
+                      {skill.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      
+      default: // tags
+        return (
+          <div className="flex flex-wrap gap-2">
+            {skills.map((skill: any) => (
+              <span 
+                key={skill.id}
+                className="px-2 py-1 rounded text-xs"
+                style={{ 
+                  color: '#fff',
+                  backgroundColor: primaryColor
+                }}
+              >
+                {skill.name}
+              </span>
+            ))}
+          </div>
+        );
+    }
+  };
+  
+  // Render experience items based on style
+  const renderExperienceItems = (experience: any[]) => {
+    const experienceStyle = style.experienceStyle || 'standard';
+    const primaryColor = style.primaryColor || '#4f46e5';
+    const highlightCompany = style.highlightCompany === true;
+    
+    switch (experienceStyle) {
+      case 'compact':
+        return (
+          <div className="space-y-2">
+            {experience.map((exp: any) => (
+              <div key={exp.id} className="flex justify-between">
+                <div>
+                  <p className="font-semibold" style={{ color: defaultTextColor }}>{exp.position} at {exp.company}</p>
+                  {exp.description && (
+                    <p className="text-xs truncate max-w-xs" style={{ color: mutedTextColor }}>
+                      {exp.description.split('\n')[0]}
+                    </p>
+                  )}
+                </div>
+                {settings.showDates !== false && exp.startDate && (
+                  <div className="text-xs" style={{ color: mutedTextColor }}>
+                    {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      
+      case 'detailed':
+        return (
+          <div className="space-y-4">
+            {experience.map((exp: any) => (
+              <div key={exp.id} className="mb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
+                    <p style={{ 
+                      color: highlightCompany ? primaryColor : defaultTextColor,
+                      fontWeight: highlightCompany ? 500 : 'normal'
+                    }}>
+                      {exp.company}{exp.location ? `, ${exp.location}` : ''}
+                    </p>
+                  </div>
+                  
+                  {settings.showDates !== false && exp.startDate && (
+                    <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                      <span>
+                        {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {exp.description && (
+                  <div className="mt-2">
+                    {exp.description.split('\n').map((line: string, i: number) => (
+                      line.trim() && (
+                        <div key={i} className="flex text-xs mb-1">
+                          <span className="mr-2" style={{ color: primaryColor }}>•</span>
+                          <span style={{ color: defaultTextColor }}>{line}</span>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      
+      case 'cards':
+        return (
+          <div className="grid gap-3">
+            {experience.map((exp: any) => (
+              <div 
+                key={exp.id} 
+                className="p-3 rounded-md" 
+                style={{ 
+                  backgroundColor: isDarkBackground ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                  borderLeft: `3px solid ${primaryColor}`
+                }}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
+                    <p style={{ 
+                      color: highlightCompany ? primaryColor : defaultTextColor,
+                      fontWeight: highlightCompany ? 500 : 'normal'
+                    }}>
+                      {exp.company}{exp.location ? `, ${exp.location}` : ''}
+                    </p>
+                  </div>
+                  
+                  {settings.showDates !== false && exp.startDate && (
+                    <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                      <span>
+                        {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {exp.description && (
+                  <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>
+                    {exp.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      
+      default: // standard
+        return (
+          <div className="space-y-4">
+            {experience.map((exp: any) => (
+              <div key={exp.id} className="mb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
+                    <p style={{ 
+                      color: highlightCompany ? primaryColor : defaultTextColor,
+                      fontWeight: highlightCompany ? 500 : 'normal'
+                    }}>
+                      {exp.company}{exp.location ? `, ${exp.location}` : ''}
+                    </p>
+                  </div>
+                  
+                  {settings.showDates !== false && exp.startDate && (
+                    <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                      <span>
+                        {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {exp.description && (
+                  <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>
+                    {exp.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+    }
+  };
+
+  // Render standard section with new styling
   const renderStandardSection = (sectionType: string) => {
+    const sectionContainerClass = getSectionContainerClass();
+    const sectionContainerStyle = getSectionContainerStyle();
+    const sectionIcons = style.sectionIcons === true;
+    const primaryColor = style.primaryColor || '#4f46e5';
+    
+    const getSectionIcon = (type: string) => {
+      if (!sectionIcons) return null;
+      
+      switch (type) {
+        case 'summary':
+          return <span className="mr-2">📝</span>;
+        case 'experience':
+          return <span className="mr-2">💼</span>;
+        case 'education':
+          return <span className="mr-2">🎓</span>;
+        case 'skills':
+          return <span className="mr-2">⚡</span>;
+        default:
+          return null;
+      }
+    };
+    
     switch (sectionType) {
       case 'summary':
         return content.summary ? (
-          <div className="mb-4" key="summary-section">
-            <h2 className={headingClass} style={headingColorStyle}>Professional Summary</h2>
-            <p className="whitespace-pre-line" style={{ color: defaultTextColor }}>{content.summary}</p>
+          <div className={`mb-4 ${sectionContainerClass}`} key="summary-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('summary')}
+              Professional Summary
+            </h2>
+            <p className={`whitespace-pre-line ${lineHeightClass}`} style={{ color: defaultTextColor }}>{content.summary}</p>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
           </div>
-        ) : null
+        ) : null;
       
       case 'experience':
         return experience.length > 0 ? (
-          <div className="mb-4" key="experience-section">
-            <h2 className={headingClass} style={headingColorStyle}>Work Experience</h2>
+          <div className={`mb-4 ${sectionContainerClass}`} key="experience-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('experience')}
+              Work Experience
+            </h2>
             
-            <div className="space-y-4">
-              {experience.map((exp: any) => (
-                <div key={exp.id} className="mb-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
-                      <p style={{ color: defaultTextColor }}>{exp.company}{exp.location ? `, ${exp.location}` : ''}</p>
-                    </div>
-                    
-                    {settings.showDates !== false && exp.startDate && (
-                      <div className={`text-right text-xs`} style={{ color: mutedTextColor }}>
-                        <span>
-                          {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {exp.description && (
-                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{exp.description}</p>
-                  )}
-                </div>
-              ))}
+            <div className={`${lineHeightClass}`}>
+              {renderExperienceItems(experience)}
             </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
           </div>
-        ) : null
+        ) : null;
       
       case 'education':
         return education.length > 0 ? (
-          <div className="mb-4" key="education-section">
-            <h2 className={headingClass} style={headingColorStyle}>Education</h2>
+          <div className={`mb-4 ${sectionContainerClass}`} key="education-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('education')}
+              Education
+            </h2>
             
-            <div className="space-y-4">
+            <div className={`space-y-4 ${lineHeightClass}`}>
               {education.map((edu: any) => (
                 <div key={edu.id} className="mb-3">
                   <div className="flex justify-between items-start">
@@ -219,35 +605,27 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                 </div>
               ))}
             </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
           </div>
-        ) : null
+        ) : null;
       
       case 'skills':
         return skills.length > 0 ? (
-          <div className="mb-4" key="skills-section">
-            <h2 className={headingClass} style={headingColorStyle}>Skills</h2>
+          <div className={`mb-4 ${sectionContainerClass}`} key="skills-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('skills')}
+              Skills
+            </h2>
             
-            <div className="flex flex-wrap gap-2">
-              {skills.map((skill: any) => (
-                <span 
-                  key={skill.id}
-                  className="px-2 py-1 rounded text-xs"
-                  style={{ 
-                    color: defaultTextColor,
-                    backgroundColor: isDarkBackground ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
-                  }}
-                >
-                  {skill.name}
-                </span>
-              ))}
-            </div>
+            {renderSkills(skills)}
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
           </div>
-        ) : null
+        ) : null;
       
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   // Modern template - with bullet points and a different layout
   const renderModernSection = (sectionType: string) => {
