@@ -1521,7 +1521,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         onSave={() => {
                           // This will be called both on manual save button click
                           // and when auto-save timer fires
-                          handleSaveEssayContent(essay, essayContent, true)
+                          handleSaveEssayContent(essay, essayContent, false)
                         }}
                         onSaveAndExit={() => {
                           // This will be called when the "Save & Exit" button is clicked

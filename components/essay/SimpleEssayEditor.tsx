@@ -136,12 +136,8 @@ export default function SimpleEssayEditor({
     // Call the onSave callback
     onSave()
     
-    // Show success indicator and toast
+    // Show success indicator but no toast
     setSaveStatus('saved')
-    toast({
-      title: "Essay saved",
-      description: "Your changes have been saved successfully.",
-    })
     
     // Reset status after a delay
     resetSaveStatus()

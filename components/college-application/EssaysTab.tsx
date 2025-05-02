@@ -607,6 +607,7 @@ export default function EssaysTab() {
         ),
       )
 
+      // Only show toast for manual saves, not auto-saves
       if (showToast) {
         toast({
           title: "Essay updated",
@@ -617,11 +618,13 @@ export default function EssaysTab() {
       return Promise.resolve(); // Return resolved promise on success
     } catch (error) {
       console.error("Error updating essay:", error)
-      toast({
-        title: "Error updating essay",
-        description: handleSupabaseError(error, "There was a problem updating the essay."),
-        variant: "destructive",
-      })
+      if (showToast) {
+        toast({
+          title: "Error updating essay",
+          description: handleSupabaseError(error, "There was a problem updating the essay."),
+          variant: "destructive",
+        })
+      }
       
       return Promise.reject(error); // Return rejected promise on error
     }
@@ -1853,7 +1856,7 @@ export default function EssaysTab() {
                         onSave={() => {
                           // This will be called both on manual save button click
                           // and when auto-save timer fires
-                          handleSaveEssayContent(essay, essayContent, true)
+                          handleSaveEssayContent(essay, essayContent, false)
                         }}
                         onSaveAndExit={() => {
                           // This will be called when the "Save & Exit" button is clicked
