@@ -29,10 +29,9 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     backgroundColor: '#ffffff',
     textColor: '#000000'
   }
-  const settings = resume?.settings || {
+  const settings = content || {
     showDates: true,
-    showContact: true,
-    sectionOrder: 'standard'
+    showContact: true
   }
   const template = resume?.template || 'professional'
   
@@ -47,6 +46,16 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   
   // Skills
   const skills = content.skills || []
+  
+  // Custom sections
+  const customSections = content.customSections || []
+  
+  // Log sections for debugging
+  console.log('Rendering with sections:', {
+    customSections: customSections.map((s: any) => ({ id: s.id, title: s.title })),
+    customSectionOrder: content.customSectionOrder,
+    customSectionOrderEnabled: content.customSectionOrderEnabled
+  })
   
   // Determine text color based on background
   const textMutedClass = useMemo(() => {
@@ -215,23 +224,25 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   
   // Determine section order based on settings
   const sections = useMemo(() => {
-    const sectionOrder = settings.sectionOrder || 'standard';
+    // Log all sections for debugging
+    console.log('All custom sections:', customSections.map((s: any) => ({ id: s.id, title: s.title })));
     
-    // If custom order is defined and selected, use it
-    if (sectionOrder === 'custom' && settings.customSectionOrder && settings.customSectionOrder.length > 0) {
-      return settings.customSectionOrder;
+    // If custom order is defined in content, use it
+    if (content.customSectionOrder && content.customSectionOrder.length > 0) {
+      console.log('Using custom order:', content.customSectionOrder);
+      return content.customSectionOrder;
     }
     
     // Otherwise use the predefined orders
-    if (sectionOrder === 'education-first') {
+    if (content.sectionOrder === 'education-first') {
       return ['summary', 'education', 'experience', 'skills'];
-    } else if (sectionOrder === 'skills-first') {
+    } else if (content.sectionOrder === 'skills-first') {
       return ['summary', 'skills', 'experience', 'education'];
     } else {
       // Standard order
       return ['summary', 'experience', 'education', 'skills'];
     }
-  }, [settings.sectionOrder, settings.customSectionOrder]);
+  }, [content.sectionOrder, content.customSectionOrder, customSections]);
   
   // Apply font family to document
   const fontFamilyStyle = useMemo(() => {
@@ -856,18 +867,114 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     }
   }
 
+  // Render a custom section
+  const renderCustomSection = (sectionId: string) => {
+    // Find the custom section by ID
+    const section = customSections.find((s: any) => s.id === sectionId);
+    if (!section) {
+      console.log(`Could not find custom section with ID: ${sectionId}`);
+      return null;
+    }
+    
+    // For debugging
+    console.log(`Rendering custom section:`, { 
+      id: section.id, 
+      title: section.title,
+      itemsCount: section.items?.length || 0 
+    });
+    
+    const sectionContainerClass = getSectionContainerClass();
+    const sectionContainerStyle = getSectionContainerStyle();
+    const primaryColor = style.primaryColor || '#4f46e5';
+    
+    return (
+      <div className={`mb-4 ${sectionContainerClass}`} key={`custom-section-${sectionId}`} style={sectionContainerStyle}>
+        <h2 className={headingClass} style={headingColorStyle}>
+          {style.sectionIcons && <span className="mr-2">📄</span>}
+          {section.title || "Custom Section"}
+        </h2>
+        
+        {section.description && (
+          <p className="mb-3 text-sm" style={{ color: mutedTextColor }}>{section.description}</p>
+        )}
+        
+        <div className={`space-y-4 ${lineHeightClass}`}>
+          {section.items && section.items.map((item: any) => (
+            <div key={item.id} className="mb-3">
+              {/* Find and display title field if it exists */}
+              {item.fields && item.fields.find((f: any) => f.type === 'title' && f.value) && (
+                <h3 className="font-semibold" style={{ color: defaultTextColor }}>
+                  {item.fields.find((f: any) => f.type === 'title').value}
+                </h3>
+              )}
+              
+              {/* Display all non-title fields with values */}
+              <div className="space-y-1 mt-1">
+                {item.fields && item.fields
+                  .filter((f: any) => f.type !== 'title' && f.value)
+                  .map((field: any) => (
+                    <div key={field.id} className="flex items-start">
+                      {field.type === 'date' && (
+                        <p className="text-xs" style={{ color: mutedTextColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                      
+                      {field.type === 'text' && (
+                        <p className="text-sm" style={{ color: defaultTextColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                      
+                      {field.type === 'textarea' && (
+                        <p className="text-xs whitespace-pre-line" style={{ color: defaultTextColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                      
+                      {field.type === 'url' && field.value && (
+                        <p className="text-xs" style={{ color: primaryColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+      </div>
+    );
+  };
+
   // Select the correct section renderer based on template
   const renderSection = (sectionType: string) => {
-    switch (template.toLowerCase()) {
-      case 'modern':
-        return renderModernSection(sectionType);
-      case 'academic':
-        return renderAcademicSection(sectionType);
-      case 'professional':
-      case 'standard':
-      default:
-        return renderStandardSection(sectionType);
+    // Skip custom sections
+    if (sectionType.startsWith('custom-')) {
+      return null;
     }
+    
+    // Handle standard sections
+    switch (sectionType) {
+      case 'summary':
+      case 'experience':
+      case 'education':
+      case 'skills':
+      case 'personalInfo':
+        // Render standard section based on template
+        switch (template.toLowerCase()) {
+          case 'modern':
+            return renderModernSection(sectionType);
+          case 'academic':
+            return renderAcademicSection(sectionType);
+          default:
+            return renderStandardSection(sectionType);
+        }
+    }
+    
+    console.log(`Section not found: ${sectionType}`);
+    return null;
   }
 
   // Template-specific header styles
@@ -972,7 +1079,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       {renderHeader()}
       
       {/* Render sections in order */}
-      {sections.map((section, index) => (
+      {sections.map((section: string, index: number) => (
         <React.Fragment key={`section-${section}-${index}`}>
           {renderSection(section)}
         </React.Fragment>

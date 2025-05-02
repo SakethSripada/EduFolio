@@ -12,15 +12,25 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { PlusCircle, Trash2, Pencil, ChevronDown, ChevronUp } from "lucide-react"
+import { 
+  PlusCircle, 
+  Trash2, 
+  ChevronDown, 
+  ChevronUp, 
+  GripVertical,
+  AlignJustify
+} from "lucide-react"
 
 type ResumeEditorProps = {
   resume: any
   onUpdate: (key: string, value: any) => void
 }
 
-// Section types for better type safety
-type SectionType = 'personalInfo' | 'education' | 'experience' | 'skills';
+// Standard section types for better type safety
+type StandardSectionType = 'personalInfo' | 'education' | 'experience' | 'skills';
+
+// All section types including custom sections
+type SectionType = StandardSectionType | string;
 
 export default function ResumeEditor({ resume, onUpdate }: ResumeEditorProps) {
   // Get content or initialize empty object if it doesn't exist
@@ -41,22 +51,107 @@ export default function ResumeEditor({ resume, onUpdate }: ResumeEditorProps) {
   const experience = content.experience || []
   const education = content.education || []
   const skills = content.skills || []
-  const projects = content.projects || []
   
   // State to track expanded sections
-  const [expandedSections, setExpandedSections] = useState<Record<SectionType, boolean>>({
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     personalInfo: true,
     education: true,
     experience: true,
     skills: true
   });
-
+  
+  // State to track the order of sections
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
+    // Check if there's a custom order in content
+    if (content.customSectionOrder && content.customSectionOrder.length > 0) {
+      return content.customSectionOrder.filter((id: string) => !id.startsWith('custom-'));
+    }
+    
+    // Default order
+    return ['personalInfo', 'summary', 'experience', 'education', 'skills'];
+  });
+  
+  // Function to get human-readable section title
+  const getSectionTitle = (sectionId: string): string => {
+    // Get the human-readable title
+    if (sectionId === 'personalInfo') return 'Personal Information';
+    if (sectionId === 'experience') return 'Work Experience';
+    if (sectionId === 'education') return 'Education';
+    if (sectionId === 'skills') return 'Skills';
+    if (sectionId === 'summary') return 'Summary';
+    
+    // Fallback for any unknown section
+    return "Section";
+  };
+  
   // Toggle section expansion
-  const toggleSectionExpansion = (section: SectionType) => {
+  const toggleSectionExpansion = (section: string) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+  
+  // Function to update the section order and save to content
+  const updateSectionOrder = (newOrder: string[]) => {
+    setSectionOrder(newOrder);
+    
+    // Save to content
+    onUpdate("content", {
+      ...content,
+      customSectionOrder: newOrder,
+      customSectionOrderEnabled: true
+    });
+  };
+  
+  // Move section up in order
+  const moveSectionUp = (sectionId: string) => {
+    const currentIndex = sectionOrder.indexOf(sectionId);
+    if (currentIndex > 0) {
+      const newOrder = [...sectionOrder];
+      const temp = newOrder[currentIndex - 1];
+      newOrder[currentIndex - 1] = newOrder[currentIndex];
+      newOrder[currentIndex] = temp;
+      updateSectionOrder(newOrder);
+    }
+  };
+  
+  // Move section down in order
+  const moveSectionDown = (sectionId: string) => {
+    const currentIndex = sectionOrder.indexOf(sectionId);
+    if (currentIndex < sectionOrder.length - 1) {
+      const newOrder = [...sectionOrder];
+      const temp = newOrder[currentIndex + 1];
+      newOrder[currentIndex + 1] = newOrder[currentIndex];
+      newOrder[currentIndex] = temp;
+      updateSectionOrder(newOrder);
+    }
+  };
+  
+  // Remove a section from the section order (but don't delete the content)
+  const removeSectionFromOrder = (sectionId: string) => {
+    // Don't allow removing personalInfo as it's required
+    if (sectionId === 'personalInfo') return;
+    
+    const newOrder = sectionOrder.filter(id => id !== sectionId);
+    updateSectionOrder(newOrder);
+  };
+
+  // Add a section back to the section order
+  const addSectionToOrder = (sectionId: string) => {
+    // Check if it's already in the order
+    if (sectionOrder.includes(sectionId)) return;
+    
+    const newOrder = [...sectionOrder, sectionId];
+    updateSectionOrder(newOrder);
+  };
+
+  // Get sections not currently in the order that can be added
+  const getAvailableSections = () => {
+    const standardSections = ['summary', 'experience', 'education', 'skills'];
+    const allSections = [...standardSections, ...sectionOrder];
+    
+    return allSections.filter(id => !sectionOrder.includes(id));
   };
   
   // Handle updating personal info
@@ -683,6 +778,97 @@ export default function ResumeEditor({ resume, onUpdate }: ResumeEditorProps) {
             )}
           </CardContent>
         )}
+      </Card>
+      
+      {/* Section Reordering */}
+      <Card className="border shadow-sm">
+        <CardHeader className="bg-muted/30 pb-3">
+          <CardTitle className="text-lg font-medium flex items-center">
+            <AlignJustify className="h-5 w-5 mr-2" />
+            Section Order
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground mb-4">
+              Reorder sections to customize how they appear in your resume.
+            </p>
+            
+            <div className="space-y-2">
+              {sectionOrder.map((sectionId, index) => {
+                let sectionTitle = getSectionTitle(sectionId);
+                
+                return (
+                  <div 
+                    key={sectionId} 
+                    className="flex items-center justify-between p-3 bg-background border rounded-md"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <GripVertical className="h-5 w-5 text-muted-foreground" />
+                      <span>{index + 1}. {sectionTitle}</span>
+                    </div>
+                    <div className="flex space-x-1">
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => moveSectionUp(sectionId)}
+                        disabled={index === 0}
+                        className="h-8 w-8"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => moveSectionDown(sectionId)}
+                        disabled={index === sectionOrder.length - 1}
+                        className="h-8 w-8"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      {sectionId !== 'personalInfo' && (
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => removeSectionFromOrder(sectionId)}
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Add available sections back */}
+            {getAvailableSections().length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">Available Sections</h4>
+                <div className="space-y-2">
+                  {getAvailableSections().map(sectionId => (
+                    <div 
+                      key={`available-${sectionId}`} 
+                      className="flex items-center justify-between p-3 bg-muted/20 border-dashed border rounded-md"
+                    >
+                      <span>{getSectionTitle(sectionId)}</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => addSectionToOrder(sectionId)}
+                        className="h-8"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

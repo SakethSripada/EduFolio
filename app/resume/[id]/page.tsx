@@ -79,6 +79,60 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
               textColor: "#000000"
             }
           }
+          
+          // Initialize content if not present
+          if (!data.content) {
+            data.content = {};
+          }
+          
+          // Ensure customSections array exists
+          if (!data.content.customSections) {
+            data.content.customSections = [];
+          }
+          
+          // Fix titles for custom sections
+          if (data.content.customSections) {
+            data.content.customSections = data.content.customSections.map((section: any) => {
+              // Check if title is missing or looks like a UUID
+              const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+              if (!section.title || section.title === section.id || uuidPattern.test(section.title) || section.title.includes('-')) {
+                section.title = "Custom Section";
+              }
+              
+              // Ensure items array exists
+              if (!section.items) {
+                section.items = [];
+              } else {
+                // Ensure each item has fields array
+                section.items = section.items.map((item: any) => {
+                  if (!item.fields) {
+                    item.fields = [];
+                  }
+                  return item;
+                });
+              }
+              
+              console.log("Processed custom section:", { id: section.id, title: section.title });
+              return section;
+            });
+          }
+          
+          // Initialize custom section order if needed
+          if (!data.content.customSectionOrder || data.content.customSectionOrder.length === 0) {
+            const standardSections = ['personalInfo', 'summary', 'experience', 'education', 'skills'];
+            data.content.customSectionOrder = [...standardSections];
+          } else {
+            // Filter out any custom sections from the order
+            data.content.customSectionOrder = data.content.customSectionOrder.filter(
+              (id: string) => !id.startsWith('custom-')
+            );
+          }
+          
+          // Remove the customSections array
+          if (data.content.customSections) {
+            delete data.content.customSections;
+          }
+          
           setResume(data)
         } else {
           router.push("/resume")
@@ -588,6 +642,24 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                   </div>
                   
                   <div className="space-y-2">
+                    <Label>Section Layout</Label>
+                    <Select 
+                      value={style.sectionLayout || "standard"} 
+                      onValueChange={(value) => updateStyle("sectionLayout", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Section layout" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="boxed">Boxed Sections</SelectItem>
+                        <SelectItem value="bordered">Bordered Sections</SelectItem>
+                        <SelectItem value="left-border">Left Border</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
                     <Label>Section Dividers</Label>
                     <Select 
                       value={style.sectionDivider || "none"} 
@@ -747,6 +819,49 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                   </div>
                   
                   <div className="space-y-2">
+                    <Label>Background Pattern</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col items-center">
+                        <button
+                          type="button"
+                          className={`h-16 w-full rounded-md mb-1 border ${style.backgroundPattern ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          style={{ backgroundColor: style.backgroundColor || "#ffffff", backgroundImage: "radial-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+                          onClick={() => updateStyle("backgroundPattern", true)}
+                        />
+                        <span className="text-xs">Pattern</span>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <button
+                          type="button" 
+                          className={`h-16 w-full rounded-md mb-1 border ${!style.backgroundPattern ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          style={{ backgroundColor: style.backgroundColor || "#ffffff" }}
+                          onClick={() => updateStyle("backgroundPattern", false)}
+                        />
+                        <span className="text-xs">None</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {style.backgroundPattern && (
+                    <div className="space-y-2">
+                      <Label>Pattern Style</Label>
+                      <Select
+                        value={style.patternStyle || "dots"}
+                        onValueChange={(value) => updateStyle("patternStyle", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pattern style" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dots">Dots</SelectItem>
+                          <SelectItem value="lines">Lines</SelectItem>
+                          <SelectItem value="grid">Grid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
                     <Label htmlFor="textColor">Text Color</Label>
                     <div className="grid grid-cols-3 gap-2 mb-2">
                       <button
@@ -792,33 +907,6 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                       />
                     </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Label className="cursor-pointer">Enable Background Pattern</Label>
-                    <Switch 
-                      checked={style.backgroundPattern === true}
-                      onCheckedChange={(checked) => updateStyle("backgroundPattern", checked)}
-                    />
-                  </div>
-                  
-                  {style.backgroundPattern && (
-                    <div className="space-y-2">
-                      <Label>Pattern Style</Label>
-                      <Select 
-                        value={style.patternStyle || "dots"} 
-                        onValueChange={(value) => updateStyle("patternStyle", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pattern" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="dots">Dots</SelectItem>
-                          <SelectItem value="lines">Lines</SelectItem>
-                          <SelectItem value="grid">Grid</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
               
@@ -827,24 +915,6 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                   <CardTitle className="text-lg font-medium">Section Styling</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Section Layout</Label>
-                    <Select 
-                      value={style.sectionLayout || "standard"} 
-                      onValueChange={(value) => updateStyle("sectionLayout", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Section layout" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="boxed">Boxed Sections</SelectItem>
-                        <SelectItem value="bordered">Bordered Sections</SelectItem>
-                        <SelectItem value="left-border">Left Border</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
                   <div className="space-y-2">
                     <Label>Experience Item Style</Label>
                     <Select 
@@ -881,6 +951,24 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label>Education Style</Label>
+                    <Select 
+                      value={style.educationStyle || "standard"} 
+                      onValueChange={(value) => updateStyle("educationStyle", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Education style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="minimal">Minimal</SelectItem>
+                        <SelectItem value="detailed">Detailed</SelectItem>
+                        <SelectItem value="cards">Card Style</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   
                   <div className="flex items-center justify-between">
                     <Label className="cursor-pointer">Enable Section Icons</Label>
@@ -895,6 +983,22 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                     <Switch 
                       checked={style.highlightCompany === true}
                       onCheckedChange={(checked) => updateStyle("highlightCompany", checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="cursor-pointer">Bold Section Titles</Label>
+                    <Switch 
+                      checked={style.boldSectionTitles === true}
+                      onCheckedChange={(checked) => updateStyle("boldSectionTitles", checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label className="cursor-pointer">Show Bullet Points</Label>
+                    <Switch 
+                      checked={style.showBullets !== false}
+                      onCheckedChange={(checked) => updateStyle("showBullets", checked)}
                     />
                   </div>
                 </CardContent>
@@ -944,13 +1048,13 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                     <Label htmlFor="showDates" className="cursor-pointer">Show Dates</Label>
                     <Switch 
                       id="showDates" 
-                      checked={resume.settings?.showDates !== false}
+                      checked={resume.content?.showDates !== false}
                       onCheckedChange={(checked) => {
-                        const updatedSettings = {
-                          ...(resume.settings || {}),
+                        const updatedContent = {
+                          ...resume.content,
                           showDates: checked
                         }
-                        updateResume("settings", updatedSettings)
+                        updateResume("content", updatedContent)
                       }}
                     />
                   </div>
@@ -959,132 +1063,15 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                     <Label htmlFor="showContact" className="cursor-pointer">Show Contact Information</Label>
                     <Switch 
                       id="showContact" 
-                      checked={resume.settings?.showContact !== false}
+                      checked={resume.content?.showContact !== false}
                       onCheckedChange={(checked) => {
-                        const updatedSettings = {
-                          ...(resume.settings || {}),
+                        const updatedContent = {
+                          ...resume.content,
                           showContact: checked
                         }
-                        updateResume("settings", updatedSettings)
+                        updateResume("content", updatedContent)
                       }}
                     />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Section Order</Label>
-                    <div className="space-y-4">
-                      <div className="flex flex-col space-y-2 p-4 border rounded-md">
-                        <Label className="mb-2">Custom Section Order</Label>
-                        {resume.settings?.customSectionOrder ? (
-                          <div className="space-y-2">
-                            {resume.settings.customSectionOrder.map((section: string, index: number) => (
-                              <div key={section} className="flex items-center justify-between bg-muted/20 p-2 rounded-md">
-                                <div className="flex items-center">
-                                  <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 inline-flex items-center justify-center text-sm mr-2">
-                                    {index + 1}
-                                  </span>
-                                  <span className="capitalize">{section}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8"
-                                    disabled={index === 0}
-                                    onClick={() => {
-                                      const updatedOrder = [...resume.settings.customSectionOrder];
-                                      [updatedOrder[index], updatedOrder[index - 1]] = [updatedOrder[index - 1], updatedOrder[index]];
-                                      
-                                      const updatedSettings = {
-                                        ...(resume.settings || {}),
-                                        customSectionOrder: updatedOrder,
-                                        sectionOrder: 'custom'
-                                      };
-                                      updateResume("settings", updatedSettings);
-                                    }}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m18 15-6-6-6 6"/></svg>
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8"
-                                    disabled={index === resume.settings.customSectionOrder.length - 1}
-                                    onClick={() => {
-                                      const updatedOrder = [...resume.settings.customSectionOrder];
-                                      [updatedOrder[index], updatedOrder[index + 1]] = [updatedOrder[index + 1], updatedOrder[index]];
-                                      
-                                      const updatedSettings = {
-                                        ...(resume.settings || {}),
-                                        customSectionOrder: updatedOrder,
-                                        sectionOrder: 'custom'
-                                      };
-                                      updateResume("settings", updatedSettings);
-                                    }}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m6 9 6 6 6-6"/></svg>
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <Button
-                            onClick={() => {
-                              // Initialize custom section order based on current template
-                              let defaultOrder = ['summary', 'experience', 'education', 'skills'];
-                              if (resume.settings?.sectionOrder === 'education-first') {
-                                defaultOrder = ['summary', 'education', 'experience', 'skills'];
-                              } else if (resume.settings?.sectionOrder === 'skills-first') {
-                                defaultOrder = ['summary', 'skills', 'experience', 'education'];
-                              }
-                              
-                              const updatedSettings = {
-                                ...(resume.settings || {}),
-                                customSectionOrder: defaultOrder,
-                                sectionOrder: 'custom'
-                              };
-                              updateResume("settings", updatedSettings);
-                            }}
-                            className="w-full"
-                            variant="outline"
-                          >
-                            Enable Custom Section Order
-                          </Button>
-                        )}
-                      </div>
-                      
-                      <RadioGroup
-                        value={resume.settings?.sectionOrder || "standard"}
-                        onValueChange={(value) => {
-                          const updatedSettings = {
-                            ...(resume.settings || {}),
-                            sectionOrder: value
-                          };
-                          updateResume("settings", updatedSettings);
-                        }}
-                        className="space-y-2"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="standard" id="standard" />
-                          <Label htmlFor="standard">Standard (Summary, Experience, Education, Skills)</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="education-first" id="education-first" />
-                          <Label htmlFor="education-first">Education First</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="skills-first" id="skills-first" />
-                          <Label htmlFor="skills-first">Skills First</Label>
-                        </div>
-                        {resume.settings?.customSectionOrder && (
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="custom" id="custom" />
-                            <Label htmlFor="custom">Custom Order</Label>
-                          </div>
-                        )}
-                      </RadioGroup>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1098,13 +1085,13 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                     <Label htmlFor="publicProfile" className="cursor-pointer">Public Profile</Label>
                     <Switch 
                       id="publicProfile" 
-                      checked={resume.settings?.isPublic === true}
+                      checked={resume.content?.isPublic === true}
                       onCheckedChange={(checked) => {
-                        const updatedSettings = {
-                          ...(resume.settings || {}),
+                        const updatedContent = {
+                          ...resume.content,
                           isPublic: checked
                         }
-                        updateResume("settings", updatedSettings)
+                        updateResume("content", updatedContent)
                       }}
                     />
                   </div>
