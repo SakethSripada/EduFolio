@@ -65,6 +65,28 @@ CREATE TABLE IF NOT EXISTS public.resume_projects (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.resume_languages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  resume_id UUID NOT NULL REFERENCES public.resumes(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  proficiency TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.resume_certifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  resume_id UUID NOT NULL REFERENCES public.resumes(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  issuer TEXT,
+  issue_date DATE,
+  expiration_date DATE,
+  credential_id TEXT,
+  credential_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Add RLS policies for resumes
 ALTER TABLE public.resumes ENABLE ROW LEVEL SECURITY;
 
@@ -180,9 +202,57 @@ CREATE POLICY "Users can delete their own resume projects"
   FOR DELETE
   USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
 
+-- Add RLS policies for resume_languages
+ALTER TABLE public.resume_languages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own resume languages"
+  ON public.resume_languages
+  FOR SELECT
+  USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+CREATE POLICY "Users can insert their own resume languages"
+  ON public.resume_languages
+  FOR INSERT
+  WITH CHECK ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+CREATE POLICY "Users can update their own resume languages"
+  ON public.resume_languages
+  FOR UPDATE
+  USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+CREATE POLICY "Users can delete their own resume languages"
+  ON public.resume_languages
+  FOR DELETE
+  USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+-- Add RLS policies for resume_certifications
+ALTER TABLE public.resume_certifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own resume certifications"
+  ON public.resume_certifications
+  FOR SELECT
+  USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+CREATE POLICY "Users can insert their own resume certifications"
+  ON public.resume_certifications
+  FOR INSERT
+  WITH CHECK ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+CREATE POLICY "Users can update their own resume certifications"
+  ON public.resume_certifications
+  FOR UPDATE
+  USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
+CREATE POLICY "Users can delete their own resume certifications"
+  ON public.resume_certifications
+  FOR DELETE
+  USING ((SELECT user_id FROM public.resumes WHERE id = resume_id) = auth.uid());
+
 -- Add indexes for better performance
 CREATE INDEX IF NOT EXISTS resumes_user_id_idx ON public.resumes(user_id);
 CREATE INDEX IF NOT EXISTS resume_experience_resume_id_idx ON public.resume_experience(resume_id);
 CREATE INDEX IF NOT EXISTS resume_education_resume_id_idx ON public.resume_education(resume_id);
 CREATE INDEX IF NOT EXISTS resume_skills_resume_id_idx ON public.resume_skills(resume_id);
-CREATE INDEX IF NOT EXISTS resume_projects_resume_id_idx ON public.resume_projects(resume_id); 
+CREATE INDEX IF NOT EXISTS resume_projects_resume_id_idx ON public.resume_projects(resume_id);
+CREATE INDEX IF NOT EXISTS resume_languages_resume_id_idx ON public.resume_languages(resume_id);
+CREATE INDEX IF NOT EXISTS resume_certifications_resume_id_idx ON public.resume_certifications(resume_id); 

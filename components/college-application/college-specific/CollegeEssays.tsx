@@ -485,7 +485,23 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.from("college_essays").delete().eq("id", essayId).eq("college_id", collegeId)
+      // First delete all associated essay versions
+      const { error: versionError } = await supabase
+        .from("college_essay_versions")
+        .delete()
+        .eq("essay_id", essayId)
+
+      if (versionError) {
+        console.error("Error deleting essay versions:", versionError)
+        // Continue with essay deletion even if version deletion fails
+      }
+
+      // Then delete the essay itself
+      const { error } = await supabase
+        .from("college_essays")
+        .delete()
+        .eq("id", essayId)
+        .eq("college_id", collegeId)
 
       if (error) throw error
 
@@ -1505,7 +1521,7 @@ export default function CollegeEssays({ collegeId, collegeName }: CollegeEssaysP
                         onSave={() => {
                           // This will be called both on manual save button click
                           // and when auto-save timer fires
-                          handleSaveEssayContent(essay, essayContent, true)
+                          handleSaveEssayContent(essay, essayContent, false)
                         }}
                         onSaveAndExit={() => {
                           // This will be called when the "Save & Exit" button is clicked

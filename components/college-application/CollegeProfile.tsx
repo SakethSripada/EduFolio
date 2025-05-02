@@ -43,6 +43,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
 import SimpleEssayEditor from "@/components/essay/SimpleEssayEditor"
+import { Separator } from "@/components/ui/separator"
 
 type CollegeProfileProps = {
   collegeId: string
@@ -79,13 +80,21 @@ export default function CollegeProfile({
 
   // Improve the sharing functionality
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [isPublic, setIsPublic] = useState(false)
   const [shareLink, setShareLink] = useState("")
   const [copied, setCopied] = useState(false)
-  const [isPublic, setIsPublic] = useState(false)
   const [isLoadingShare, setIsLoadingShare] = useState(false)
   const [existingShareLink, setExistingShareLink] = useState<any>(null)
-  const [expiryOption, setExpiryOption] = useState("never")
+  const [expiryOption, setExpiryOption] = useState<"never" | "date">("never")
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
+  const [shareSettings, setShareSettings] = useState({
+    showAcademics: true, 
+    showExtracurriculars: true,
+    showAwards: true,
+    showEssays: true,
+    hideUserName: true,
+    hidePersonalInfo: true,
+  })
   const { toast } = useToast()
   const { user } = useUser()
   const supabase = createClientComponentClient()
@@ -150,6 +159,17 @@ export default function CollegeProfile({
           } else {
             setExpiryOption("never")
             setExpiryDate(undefined)
+          }
+
+          if (data.settings) {
+            setShareSettings({
+              showAcademics: data.settings.showAcademics ?? true,
+              showExtracurriculars: data.settings.showExtracurriculars ?? true,
+              showAwards: data.settings.showAwards ?? true,
+              showEssays: data.settings.showEssays ?? true,
+              hideUserName: data.settings.hideUserName ?? true,
+              hidePersonalInfo: data.settings.hidePersonalInfo ?? true,
+            });
           }
         } else {
           // Generate a new share ID if none exists
@@ -257,19 +277,24 @@ export default function CollegeProfile({
   }
 
   const handleShareProfile = async () => {
-    if (!user) return
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to create a share link.",
+        variant: "destructive",
+      })
+      return
+    }
 
-    setIsLoadingShare(true)
     try {
-      // Calculate expiry date if needed
-      let expiresAt = null
+      setIsLoadingShare(true)
+      
+      let expiresAt: Date | null = null
       if (expiryOption === "date" && expiryDate) {
         expiresAt = expiryDate
       }
 
-      // Extract the share ID from the link
-      const shareId = shareLink.split("/").pop()
-
+      // Use existing share ID if available
       const result = await createOrUpdateShareLink({
         userId: user.id,
         contentType: "college_profile",
@@ -277,30 +302,25 @@ export default function CollegeProfile({
         isPublic,
         expiresAt,
         existingShareId: existingShareLink?.share_id,
+        settings: shareSettings,
       })
 
-      if (!result.success) throw new Error("Failed to create share link")
-
-      toast({
-        title: existingShareLink ? "Share link updated" : "Share link created",
-        description: "Your college profile can now be shared with others.",
-      })
-
-      // If this is a new share link, update the state
-      if (!existingShareLink) {
-        setExistingShareLink({
-          share_id: result.shareId,
-          content_id: collegeId,
-          content_type: "college_profile",
-          is_public: isPublic,
-          expires_at: expiresAt ? expiresAt.toISOString() : null,
-        })
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create share link")
       }
-    } catch (error) {
-      console.error("Error creating share link:", error)
+
+      setShareLink(result.shareLink || "")
+      setExistingShareLink({ share_id: result.shareId })
+
       toast({
-        title: "Error creating share link",
-        description: "There was a problem creating your share link.",
+        title: "Share link created",
+        description: "Your college profile share link has been created.",
+      })
+    } catch (error) {
+      console.error("Error creating/updating share link:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create share link. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -673,47 +693,89 @@ export default function CollegeProfile({
               </div>
               <Switch checked={isPublic} onCheckedChange={setIsPublic} />
             </div>
-
-            <div className="space-y-3">
-              <Label>Link Expiration</Label>
-              <RadioGroup value={expiryOption} onValueChange={setExpiryOption}>
+            
+            <Separator className="my-4" />
+            
+            <div className="space-y-4">
+              <h3 className="font-medium">Content to Share</h3>
+              <div className="grid grid-cols-1 gap-2">
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="never" id="never" />
-                  <Label htmlFor="never">Never expires</Label>
+                  <Checkbox
+                    id="showAcademics"
+                    checked={shareSettings.showAcademics}
+                    onCheckedChange={(checked) => 
+                      setShareSettings(prev => ({ ...prev, showAcademics: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="showAcademics">Academics</Label>
                 </div>
+                
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="date" id="date" />
-                  <Label htmlFor="date">Expires on specific date</Label>
+                  <Checkbox
+                    id="showExtracurriculars"
+                    checked={shareSettings.showExtracurriculars}
+                    onCheckedChange={(checked) => 
+                      setShareSettings(prev => ({ ...prev, showExtracurriculars: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="showExtracurriculars">Extracurriculars</Label>
                 </div>
-              </RadioGroup>
-
-              {expiryOption === "date" && (
-                <div className="pt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !expiryDate && "text-muted-foreground",
-                        )}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {expiryDate ? format(expiryDate, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={expiryDate}
-                        onSelect={setExpiryDate}
-                        initialFocus
-                        disabled={(date) => date < new Date()}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="showAwards"
+                    checked={shareSettings.showAwards}
+                    onCheckedChange={(checked) => 
+                      setShareSettings(prev => ({ ...prev, showAwards: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="showAwards">Awards</Label>
                 </div>
-              )}
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="showEssays"
+                    checked={shareSettings.showEssays}
+                    onCheckedChange={(checked) => 
+                      setShareSettings(prev => ({ ...prev, showEssays: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="showEssays">Essays</Label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mt-6">
+              <h3 className="font-medium">Privacy Settings</h3>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="hideUserName" 
+                    checked={shareSettings.hideUserName}
+                    onCheckedChange={(checked) => 
+                      setShareSettings(prev => ({ ...prev, hideUserName: checked === true }))
+                    } 
+                  />
+                  <Label htmlFor="hideUserName">Hide Your Name</Label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  Show as "Anonymous" instead of your name
+                </p>
+                
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox 
+                    id="hidePersonalInfo" 
+                    checked={shareSettings.hidePersonalInfo}
+                    onCheckedChange={(checked) => 
+                      setShareSettings(prev => ({ ...prev, hidePersonalInfo: checked === true }))
+                    } 
+                  />
+                  <Label htmlFor="hidePersonalInfo">Hide Personal Information</Label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-6">
+                  Hide high school and graduation year
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">

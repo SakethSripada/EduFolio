@@ -119,7 +119,7 @@ export default function CollegeListTab() {
         if (collegesError) throw collegesError
         setColleges(collegesData || [])
 
-        // 2) Load this user’s colleges
+        // 2) Load this user's colleges
         const { data: userCollegesData, error: userCollegesError } = await supabase
           .from("user_colleges")
           .select(`*, college:colleges(*)`)
@@ -581,6 +581,36 @@ export default function CollegeListTab() {
         const userCollege = userColleges.find((uc) => uc.id === userCollegeId)
         if (!userCollege) throw new Error("College not found")
 
+        // IMPORTANT: Order matters for deletion!
+        // First, get all college essays to find their IDs for essay versions deletion
+        const { data: collegeEssaysData, error: essaysError } = await supabase
+          .from("college_essays")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("college_id", userCollege.college_id)
+        
+        if (essaysError) throw essaysError
+
+        // If there are essays, delete all their versions first (child records must be deleted before parent)
+        if (collegeEssaysData && collegeEssaysData.length > 0) {
+          const essayIds = collegeEssaysData.map(essay => essay.id)
+          
+          // Delete all college essay versions for these essays
+          const { error: versionsError } = await supabase
+            .from("college_essay_versions")
+            .delete()
+            .in("essay_id", essayIds)
+          
+          if (versionsError) throw versionsError
+        }
+
+        // Delete college essay folders
+        await supabase
+          .from("essay_folders")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("college_id", userCollege.college_id)
+
         // Delete college courses
         await supabase.from("college_courses").delete().eq("user_id", user.id).eq("college_id", userCollege.college_id)
 
@@ -594,11 +624,28 @@ export default function CollegeListTab() {
         // Delete college awards
         await supabase.from("college_awards").delete().eq("user_id", user.id).eq("college_id", userCollege.college_id)
 
-        // Delete college essays
+        // Delete college essays (after deleting versions)
         await supabase.from("college_essays").delete().eq("user_id", user.id).eq("college_id", userCollege.college_id)
 
         // Delete college todos
         await supabase.from("college_todos").delete().eq("user_id", user.id).eq("college_id", userCollege.college_id)
+
+        // Delete college profiles if they exist
+        await supabase.from("college_profiles").delete().eq("user_id", user.id).eq("college_id", userCollege.college_id)
+
+        // Delete any references in essays table (for common app essays that might reference this college)
+        await supabase
+          .from("essays")
+          .update({ college_id: null })
+          .eq("user_id", user.id)
+          .eq("college_id", userCollege.college_id)
+
+        // Delete any references in todos table
+        await supabase
+          .from("todos")
+          .update({ related_college_id: null })
+          .eq("user_id", user.id)
+          .eq("related_college_id", userCollege.college_id)
 
         // Finally delete the user college entry
         const { error } = await supabase.from("user_colleges").delete().eq("id", userCollegeId)

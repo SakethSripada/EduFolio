@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle, ChevronDown, FileText, Briefcase } from "lucide-react"
+import { ArrowLeft, Loader2, Lock, Calendar, AlertTriangle, ChevronDown, FileText, Briefcase, School, GraduationCap } from "lucide-react"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { format } from "date-fns"
@@ -105,6 +105,20 @@ export default function SharedCollegeApplicationPage() {
           avatar_url: null,
           school: "Not specified",
           grad_year: "Not specified"
+        };
+
+        // Apply share privacy settings
+        const processedProfile = {
+          full_name: shareData.settings?.hideUserName 
+            ? "Anonymous"
+            : userProfile.full_name || "Student",
+          avatar_url: userProfile.avatar_url,
+          school: shareData.settings?.hidePersonalInfo 
+            ? ""
+            : userProfile.school || "Not specified",
+          grad_year: shareData.settings?.hidePersonalInfo 
+            ? ""
+            : userProfile.grad_year || "Not specified",
         };
 
         // Fetch the application data.
@@ -209,7 +223,7 @@ export default function SharedCollegeApplicationPage() {
 
         // Prepare the student data.
         setStudentData({
-          userProfile,
+          userProfile: processedProfile,
           academics: academicsResponse.data || [],
           testScores: testScoresResponse.data || [],
           extracurricularActivities: extracurricularActivitiesResponse.data || [],
@@ -285,15 +299,28 @@ export default function SharedCollegeApplicationPage() {
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to EduFolio
         </Link>
         <div className="flex items-center gap-4 mb-6">
-          {/* Temporarily disabled avatar in favor of initials */}
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
             {getUserInitials(studentData.userProfile.full_name)}
           </div>
           <div>
-            <h1 className="text-3xl font-bold">{studentData.userProfile.full_name}'s College Application</h1>
-            <p className="text-muted-foreground">
-              {studentData.userProfile.school || "School not specified"} • Class of {studentData.userProfile.grad_year || "Year not specified"}
-            </p>
+            <h1 className="text-3xl font-bold">
+              {studentData.userProfile.full_name}'s College Application
+            </h1>
+            <div className="flex flex-wrap gap-4 mt-2 text-muted-foreground">
+              {studentData.userProfile.school && (
+                <div className="flex items-center gap-1">
+                  <School className="h-4 w-4" />
+                  <span>{studentData.userProfile.school}</span>
+                </div>
+              )}
+              
+              {studentData.userProfile.grad_year && (
+                <div className="flex items-center gap-1">
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Class of {studentData.userProfile.grad_year}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         {shareData && shareData.expires_at && (
@@ -347,46 +374,64 @@ export default function SharedCollegeApplicationPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {studentData.colleges.map((college: any) => (
-                        <Card key={college.id}>
-                          <CardHeader className="pb-2">
-                            <div className="flex items-start justify-between">
+                        <Card key={college.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                          <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-4 border-b">
+                            <div className="flex items-center justify-between">
                               <div>
-                                <CardTitle>{college.name}</CardTitle>
-                                <CardDescription>{college.location}</CardDescription>
+                                <h3 className="font-bold text-lg text-primary-foreground">{college.name}</h3>
+                                <p className="text-sm text-muted-foreground flex items-center">
+                                  <span>{college.location}</span>
+                                </p>
                               </div>
                               {college.logo && (
-                                <img
-                                  src={college.logo || "/placeholder.svg"}
-                                  alt={college.name}
-                                  className="h-10 w-10 object-contain"
-                                />
+                                <div className="h-14 w-14 rounded-full bg-white p-2 flex items-center justify-center shadow-sm">
+                                  <img
+                                    src={college.logo || "/placeholder.svg"}
+                                    alt={college.name}
+                                    className="h-10 w-10 object-contain"
+                                  />
+                                </div>
+                              )}
+                              {!college.logo && (
+                                <div className="h-14 w-14 rounded-full bg-white p-2 flex items-center justify-center shadow-sm">
+                                  <School className="h-8 w-8 text-primary/60" />
+                                </div>
                               )}
                             </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Type</p>
-                                <p>{college.type}</p>
+                          </div>
+                          <CardContent className="p-5">
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-sm mb-4">
+                              <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Type</span>
+                                <span className="font-medium">{college.type || 'Not specified'}</span>
                               </div>
-                              <div>
-                                <p className="text-muted-foreground">Size</p>
-                                <p>{college.size}</p>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Size</span>
+                                <span className="font-medium">{college.size || 'Not specified'}</span>
                               </div>
-                              <div>
-                                <p className="text-muted-foreground">Acceptance</p>
-                                <p>{college.acceptance_rate}%</p>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Acceptance</span>
+                                <span className="font-medium">
+                                  {college.acceptance_rate ? `${college.acceptance_rate}%` : 'N/A'}
+                                </span>
                               </div>
-                              <div>
-                                <p className="text-muted-foreground">Ranking</p>
-                                <p>#{college.ranking}</p>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Ranking</span>
+                                <span className="font-medium">
+                                  {college.ranking ? `#${college.ranking}` : 'N/A'}
+                                </span>
                               </div>
                             </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {college.is_reach && <Badge variant="secondary">Reach</Badge>}
-                              {college.is_target && <Badge variant="secondary">Target</Badge>}
-                              {college.is_safety && <Badge variant="secondary">Safety</Badge>}
-                              {college.is_favorite && <Badge variant="secondary">Favorite</Badge>}
+                            <div className="flex flex-wrap gap-2 pt-3 border-t">
+                              {college.is_reach && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200">Reach</Badge>}
+                              {college.is_target && <Badge className="bg-green-100 text-green-700 hover:bg-green-200">Target</Badge>}
+                              {college.is_safety && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200">Safety</Badge>}
+                              {college.is_favorite && <Badge className="bg-pink-100 text-pink-700 hover:bg-pink-200">Favorite</Badge>}
+                              {college.application_status && (
+                                <Badge className="ml-auto bg-gray-100 text-gray-700">
+                                  {college.application_status}
+                                </Badge>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
@@ -678,153 +723,63 @@ export default function SharedCollegeApplicationPage() {
                       </div>
                     ) : (
                       <>
-                        {/* Group essays by college_id */}
+                        {/* Filter to only show general essays */}
                         {(() => {
-                          // Create essay groups: null/undefined college_id for general essays,
-                          // and separate groups for each college-specific essay
-                          const essayGroups = studentData.essays.reduce((groups: Record<string, any[]>, essay: any) => {
-                            const collegeId = essay.college_id || 'general';
-                            if (!groups[collegeId]) {
-                              groups[collegeId] = [];
-                            }
-                            groups[collegeId].push(essay);
-                            return groups;
-                          }, {});
+                          // Filter general essays (those without college_id)
+                          const generalEssays = studentData.essays.filter((essay: any) => !essay.college_id);
                           
-                          const content = [];
-                          
-                          // First add general essays if they exist
-                          if (essayGroups.general && essayGroups.general.length > 0) {
-                            content.push(
-                              <Collapsible key="general-essays" className="mb-5" defaultOpen>
-                                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-primary/10 rounded-md hover:bg-primary/15 transition-colors">
-                                  <div className="flex items-center">
-                                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center mr-3">
-                                      <FileText className="h-4 w-4 text-primary" />
-                                    </div>
-                                    <h3 className="text-lg font-medium">General Essays</h3>
-                                  </div>
-                                  <ChevronDown className="h-5 w-5 text-primary transition-transform duration-200 ease-in-out ui-open:rotate-180" />
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="pt-4 space-y-4 px-1">
-                                  {essayGroups.general.map((essay: any) => (
-                                    <Collapsible key={essay.id} className="mb-3">
-                                      <Card className="overflow-hidden border-l-4 border-l-primary/40 shadow-sm hover:shadow transition-shadow duration-200">
-                                        <CollapsibleTrigger className="w-full text-left">
-                                          <CardHeader className="pb-2 bg-muted/30">
-                                            <div className="flex justify-between items-start">
-                                              <CardTitle className="text-lg">{essay.title}</CardTitle>
-                                              <div className="flex items-center space-x-2">
-                                                <div className="text-sm px-2 py-1 rounded bg-muted">
-                                                  {essay.word_count} words
-                                                </div>
-                                                {essay.status && (
-                                                  <Badge variant="outline">
-                                                    {essay.status}
-                                                  </Badge>
-                                                )}
-                                                <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out ui-open:rotate-180" />
-                                              </div>
-                                            </div>
-                                          </CardHeader>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent>
-                                          <CardContent className="pt-4">
-                                            <div className="mb-4">
-                                              <h4 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h4>
-                                              <div className="p-3 bg-muted/20 rounded-md">
-                                                <p className="italic">{essay.prompt}</p>
-                                              </div>
-                                            </div>
-                                            <div className="border-t pt-4">
-                                              <h4 className="text-sm font-medium text-muted-foreground mb-2">Essay Content</h4>
-                                              <div className="prose prose-sm dark:prose-invert max-w-none p-3 bg-muted/10 rounded-md font-serif">
-                                                <p className="text-foreground dark:text-foreground whitespace-pre-wrap leading-relaxed">{essay.content}</p>
-                                              </div>
-                                            </div>
-                                          </CardContent>
-                                        </CollapsibleContent>
-                                      </Card>
-                                    </Collapsible>
-                                  ))}
-                                </CollapsibleContent>
-                              </Collapsible>
+                          if (generalEssays.length === 0) {
+                            return (
+                              <div className="text-center p-8 border rounded-md">
+                                <p className="text-muted-foreground">No general essays added yet</p>
+                              </div>
                             );
                           }
                           
-                          // Add college-specific essays
-                          const collegeIds = Object.keys(essayGroups).filter(id => id !== 'general');
-                          if (collegeIds.length > 0) {
-                            // Find college names for each college ID
-                            collegeIds.forEach(collegeId => {
-                              if (collegeId === 'general') return;
-                              
-                              // Find college name from the colleges list
-                              let collegeName = "Unknown College";
-                              const college = studentData.colleges.find((c: any) => c.college_id === collegeId);
-                              if (college) {
-                                collegeName = college.name;
-                              }
-                              
-                              content.push(
-                                <Collapsible key={collegeId} className="mb-5">
-                                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-secondary/20 rounded-md hover:bg-secondary/30 transition-colors">
-                                    <div className="flex items-center">
-                                      <div className="h-8 w-8 rounded-full bg-secondary/20 flex items-center justify-center mr-3">
-                                        <Briefcase className="h-4 w-4 text-secondary-foreground" />
-                                      </div>
-                                      <h3 className="text-lg font-medium">Essays for {collegeName}</h3>
-                                    </div>
-                                    <ChevronDown className="h-5 w-5 text-secondary-foreground transition-transform duration-200 ease-in-out ui-open:rotate-180" />
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="pt-4 space-y-4 px-1">
-                                    {essayGroups[collegeId].map((essay: any) => (
-                                      <Collapsible key={essay.id} className="mb-3">
-                                        <Card className="overflow-hidden border-l-4 border-l-secondary/40 shadow-sm hover:shadow transition-shadow duration-200">
-                                          <CollapsibleTrigger className="w-full text-left">
-                                            <CardHeader className="pb-2 bg-muted/30">
-                                              <div className="flex justify-between items-start">
-                                                <CardTitle className="text-lg">{essay.title}</CardTitle>
-                                                <div className="flex items-center space-x-2">
-                                                  <div className="text-sm px-2 py-1 rounded bg-muted">
-                                                    {essay.word_count} words
-                                                  </div>
-                                                  {essay.status && (
-                                                    <Badge variant="outline">
-                                                      {essay.status}
-                                                    </Badge>
-                                                  )}
-                                                  <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out ui-open:rotate-180" />
-                                                </div>
-                                              </div>
-                                            </CardHeader>
-                                          </CollapsibleTrigger>
-                                          <CollapsibleContent>
-                                            <CardContent className="pt-4">
-                                              <div className="mb-4">
-                                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h4>
-                                                <div className="p-3 bg-muted/20 rounded-md">
-                                                  <p className="italic">{essay.prompt}</p>
-                                                </div>
-                                              </div>
-                                              <div className="border-t pt-4">
-                                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Essay Content</h4>
-                                                <div className="prose prose-sm dark:prose-invert max-w-none p-3 bg-muted/10 rounded-md font-serif">
-                                                  <p className="text-foreground dark:text-foreground whitespace-pre-wrap leading-relaxed">{essay.content}</p>
-                                                </div>
-                                              </div>
-                                            </CardContent>
-                                          </CollapsibleContent>
-                                        </Card>
-                                      </Collapsible>
-                                    ))}
-                                  </CollapsibleContent>
+                          return (
+                            <div className="space-y-4 px-1">
+                              {generalEssays.map((essay: any) => (
+                                <Collapsible key={essay.id} className="mb-3">
+                                  <Card className="overflow-hidden border-l-4 border-l-primary/40 shadow-sm hover:shadow transition-shadow duration-200">
+                                    <CollapsibleTrigger className="w-full text-left">
+                                      <CardHeader className="pb-2 bg-muted/30">
+                                        <div className="flex justify-between items-start">
+                                          <CardTitle className="text-lg">{essay.title}</CardTitle>
+                                          <div className="flex items-center space-x-2">
+                                            <div className="text-sm px-2 py-1 rounded bg-muted">
+                                              {essay.word_count} words
+                                            </div>
+                                            {essay.status && (
+                                              <Badge variant="outline">
+                                                {essay.status}
+                                              </Badge>
+                                            )}
+                                            <ChevronDown className="h-4 w-4 transition-transform duration-200 ease-in-out ui-open:rotate-180" />
+                                          </div>
+                                        </div>
+                                      </CardHeader>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                      <CardContent className="pt-4">
+                                        <div className="mb-4">
+                                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h4>
+                                          <div className="p-3 bg-muted/20 rounded-md">
+                                            <p className="italic">{essay.prompt}</p>
+                                          </div>
+                                        </div>
+                                        <div className="border-t pt-4">
+                                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Essay Content</h4>
+                                          <div className="prose prose-sm dark:prose-invert max-w-none p-3 bg-muted/10 rounded-md font-serif">
+                                            <p className="text-foreground dark:text-foreground whitespace-pre-wrap leading-relaxed">{essay.content}</p>
+                                          </div>
+                                        </div>
+                                      </CardContent>
+                                    </CollapsibleContent>
+                                  </Card>
                                 </Collapsible>
-                              );
-                            });
-                          }
-                          
-                          return content;
+                              ))}
+                            </div>
+                          );
                         })()}
                       </>
                     )}

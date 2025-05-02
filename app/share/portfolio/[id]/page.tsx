@@ -144,6 +144,11 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
           return
         }
         
+        // Apply share privacy settings
+        const displayName = shareData.settings?.hideUserName 
+          ? "Anonymous"
+          : profileData.full_name || "Portfolio Owner";
+        
         // Fetch projects
         const { data: projectsData, error: projectsError } = await supabase
           .from("projects")
@@ -167,7 +172,7 @@ export default function SharedPortfolioPage({ params }: { params: PageParams }) 
         // Update portfolio data
         setPortfolio({
           owner: {
-            name: profileData.full_name || "Portfolio Owner",
+            name: displayName,
             avatar: profileData.avatar_url || "/placeholder.svg?height=100&width=100",
           },
           projects: projectsData as Project[] || [],

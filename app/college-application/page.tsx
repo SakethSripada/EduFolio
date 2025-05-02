@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createOrUpdateShareLink, generateShareUrl } from "@/lib/supabase/utils"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function CollegeApplication() {
   const [isSharingApplication, setIsSharingApplication] = useState(false)
@@ -53,6 +54,8 @@ export default function CollegeApplication() {
     showAwards: true,
     showEssays: true,
     showColleges: true,
+    hideUserName: true,
+    hidePersonalInfo: true,
   })
 
   const supabase = createClientComponentClient()
@@ -123,6 +126,8 @@ export default function CollegeApplication() {
             showAwards: data.settings.showAwards ?? true,
             showEssays: data.settings.showEssays ?? true,
             showColleges: data.settings.showColleges ?? true,
+            hideUserName: data.settings.hideUserName ?? true,
+            hidePersonalInfo: data.settings.hidePersonalInfo ?? true,
           })
         }
       } else {
@@ -134,6 +139,8 @@ export default function CollegeApplication() {
           showAwards: true,
           showEssays: true,
           showColleges: true,
+          hideUserName: true,
+          hidePersonalInfo: true,
         }
         
         // Simple insert operation
@@ -413,6 +420,39 @@ export default function CollegeApplication() {
                     </Popover>
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-4 mt-6">
+                <h3 className="font-medium">Privacy Settings</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="hideUserName" 
+                      checked={shareSettings.hideUserName}
+                      onCheckedChange={(checked) => 
+                        setShareSettings(prev => ({ ...prev, hideUserName: checked === true }))
+                      } 
+                    />
+                    <Label htmlFor="hideUserName">Hide Your Name</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    Show as "Anonymous" instead of your name
+                  </p>
+                  
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Checkbox 
+                      id="hidePersonalInfo" 
+                      checked={shareSettings.hidePersonalInfo}
+                      onCheckedChange={(checked) => 
+                        setShareSettings(prev => ({ ...prev, hidePersonalInfo: checked === true }))
+                      } 
+                    />
+                    <Label htmlFor="hidePersonalInfo">Hide Personal Information</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    Hide high school and graduation year
+                  </p>
+                </div>
               </div>
 
               {/* The share link input is auto‑populated; no extra "Generate" button is shown */}

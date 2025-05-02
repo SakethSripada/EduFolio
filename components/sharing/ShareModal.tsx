@@ -48,6 +48,8 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
     showEssays: true,
     showCourses: true,
     showTestScores: true,
+    hideUserName: true,
+    hidePersonalInfo: true,
   })
 
   // Fetch existing share link on component mount
@@ -107,7 +109,16 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
             
             // Set settings
             if (data.settings) {
-              setSettings(data.settings as ShareSettings);
+              setSettings({
+                showExtracurriculars: data.settings.showExtracurriculars ?? true,
+                showAcademics: data.settings.showAcademics ?? true,
+                showAwards: data.settings.showAwards ?? true,
+                showEssays: data.settings.showEssays ?? true,
+                showCourses: data.settings.showCourses ?? true,
+                showTestScores: data.settings.showTestScores ?? true,
+                hideUserName: data.settings.hideUserName ?? true,
+                hidePersonalInfo: data.settings.hidePersonalInfo ?? true,
+              });
             }
             
             // Set expiry
@@ -131,6 +142,8 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
               showEssays: true,
               showCourses: true,
               showTestScores: true,
+              hideUserName: true,
+              hidePersonalInfo: true,
             });
             setExpiryOption("never");
             setExpiryDate(undefined);
@@ -431,6 +444,39 @@ export function ShareModal({ open, onOpenChange, contentType, contentId, content
                       <div className="grid gap-1.5 leading-none">
                         <Label htmlFor="showTestScores">Test Scores</Label>
                         <p className="text-xs text-muted-foreground">SAT, ACT, AP scores</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3 mt-6">
+                  <Label>Privacy Settings</Label>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex items-start space-x-2">
+                      <Checkbox
+                        id="hideUserName"
+                        checked={settings.hideUserName}
+                        onCheckedChange={(checked) => 
+                          handleSettingChange("hideUserName", checked as boolean)
+                        }
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label htmlFor="hideUserName">Hide Your Name</Label>
+                        <p className="text-xs text-muted-foreground">Show as "Anonymous" instead of your name</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-2">
+                      <Checkbox
+                        id="hidePersonalInfo"
+                        checked={settings.hidePersonalInfo}
+                        onCheckedChange={(checked) => 
+                          handleSettingChange("hidePersonalInfo", checked as boolean)
+                        }
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label htmlFor="hidePersonalInfo">Hide Personal Information</Label>
+                        <p className="text-xs text-muted-foreground">Hide high school and graduation year</p>
                       </div>
                     </div>
                   </div>

@@ -1,14 +1,20 @@
 import type React from "react"
 import "./globals.css"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Merriweather, Roboto, Montserrat, Lora, Source_Sans_3, Playfair_Display } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import Navbar from "@/components/layout/Navbar"
 import Footer from "@/components/layout/Footer"
 import { AuthProvider } from "@/components/auth/AuthProvider"
 import { Toaster } from "@/components/ui/toaster"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"], variable: '--font-inter' })
+const merriweather = Merriweather({ subsets: ["latin"], weight: ['300', '400', '700', '900'], variable: '--font-merriweather' })
+const roboto = Roboto({ subsets: ["latin"], weight: ['100', '300', '400', '500', '700', '900'], variable: '--font-roboto' })
+const playfairDisplay = Playfair_Display({ subsets: ["latin"], variable: '--font-playfair-display' })
+const montserrat = Montserrat({ subsets: ["latin"], variable: '--font-montserrat' })
+const lora = Lora({ subsets: ["latin"], variable: '--font-lora' })
+const sourceSansPro = Source_Sans_3({ subsets: ["latin"], variable: '--font-source-sans-pro' })
 
 export const metadata: Metadata = {
   title: "EduFolio - Your Educational Journey, Beautifully Organized",
@@ -53,9 +59,9 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${merriweather.variable} ${roboto.variable} ${playfairDisplay.variable} ${montserrat.variable} ${lora.variable} ${sourceSansPro.variable}`}>
         <AuthProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <div className="flex flex-col min-h-screen">
               <Navbar />
               <main className="flex-grow">{children}</main>
