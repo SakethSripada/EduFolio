@@ -150,6 +150,16 @@ export default function Navbar() {
                 variant="ghost"
                 className={cn(
                   "text-muted-foreground hover:text-primary transition-colors",
+                  pathname === "/planner" && "text-primary font-medium",
+                )}
+                onClick={() => handleNavigation("/planner")}
+              >
+                Planner
+              </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  "text-muted-foreground hover:text-primary transition-colors",
                   pathname === "/profile" && "text-primary font-medium",
                 )}
                 onClick={() => handleNavigation("/profile")}
@@ -185,6 +195,13 @@ export default function Navbar() {
                   onClick={() => handleNavigation("/resume")}
                 >
                   Resume
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start mb-2"
+                  onClick={() => handleNavigation("/planner")}
+                >
+                  Planner
                 </Button>
                 <Button 
                   variant="ghost" 
