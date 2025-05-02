@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   PlusCircle,
   Upload,
@@ -82,7 +83,7 @@ export const PortfolioContent = ({
   const [isEditingProject, setIsEditingProject] = useState(false)
   const [isManagingCategories, setIsManagingCategories] = useState(false)
   const [isSharingPortfolio, setIsSharingPortfolio] = useState(false)
-  const [isPublic, setIsPublic] = useState(false)
+  const [isPublic, setIsPublic] = useState(true)
   const [shareLink, setShareLink] = useState("")
   const [shareId, setShareId] = useState("")
   const [copied, setCopied] = useState(false)
@@ -90,8 +91,12 @@ export const PortfolioContent = ({
   const [newCategory, setNewCategory] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [existingShareLink, setExistingShareLink] = useState<any>(null)
-  const [expiryOption, setExpiryOption] = useState("never")
+  const [expiryOption, setExpiryOption] = useState<"never" | "date">("never")
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
+  const [shareSettings, setShareSettings] = useState<ShareSettings>({
+    hideUserName: true,
+    hidePersonalInfo: true,
+  })
   const { user } = useAuth()
   const { toast } = useToast()
   const supabase = createClientComponentClient<Database>()
@@ -185,6 +190,19 @@ export const PortfolioContent = ({
           setExpiryOption("never");
           setExpiryDate(undefined);
         }
+
+        // Get existing share settings
+        if (record.settings) {
+          setShareSettings({
+            hideUserName: record.settings.hideUserName ?? true,
+            hidePersonalInfo: record.settings.hidePersonalInfo ?? true,
+          });
+        } else {
+          setShareSettings({
+            hideUserName: true,
+            hidePersonalInfo: true,
+          });
+        }
       } catch (err) {
         console.error("Error in checkExistingShareLink:", err);
       }
@@ -272,6 +290,7 @@ export const PortfolioContent = ({
         isPublic,
         expiresAt,
         existingShareId: currentShareId,
+        settings: shareSettings,
       });
       
       if (!result.success) {
@@ -898,7 +917,10 @@ export const PortfolioContent = ({
 
               <div className="space-y-3">
                 <Label>Link Expiration</Label>
-                <RadioGroup value={expiryOption} onValueChange={setExpiryOption}>
+                <RadioGroup 
+                  value={expiryOption} 
+                  onValueChange={(value: "never" | "date") => setExpiryOption(value)}
+                >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="never" id="never" />
                     <Label htmlFor="never">Never expires</Label>
@@ -935,6 +957,39 @@ export const PortfolioContent = ({
                     </Popover>
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-medium">Privacy Settings</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="hideUserName" 
+                      checked={shareSettings.hideUserName}
+                      onCheckedChange={(checked: boolean | "indeterminate") => 
+                        setShareSettings(prev => ({ ...prev, hideUserName: checked === true }))
+                      } 
+                    />
+                    <Label htmlFor="hideUserName">Hide Your Name</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    Show as "Anonymous" instead of your name
+                  </p>
+                  
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Checkbox 
+                      id="hidePersonalInfo" 
+                      checked={shareSettings.hidePersonalInfo}
+                      onCheckedChange={(checked: boolean | "indeterminate") => 
+                        setShareSettings(prev => ({ ...prev, hidePersonalInfo: checked === true }))
+                      } 
+                    />
+                    <Label htmlFor="hidePersonalInfo">Hide Personal Information</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    Hide high school and graduation year
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-2">

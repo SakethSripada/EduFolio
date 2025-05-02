@@ -84,11 +84,17 @@ export default function SharedProfilePage() {
         
         // Step 3: Process the data
         const userData = {
-          fullName: typeof profileData.full_name === 'string' ? profileData.full_name : "User",
+          fullName: linkData.settings?.hideUserName 
+            ? "Anonymous" 
+            : (typeof profileData.full_name === 'string' ? profileData.full_name : "User"),
           email: profileData.privacy_settings?.showEmail ? profileData.email : null,
           bio: typeof profileData.bio === 'string' ? profileData.bio : "",
-          gradYear: typeof profileData.grad_year === 'string' ? profileData.grad_year : "",
-          school: typeof profileData.school === 'string' ? profileData.school : "",
+          gradYear: linkData.settings?.hidePersonalInfo 
+            ? "" 
+            : (typeof profileData.grad_year === 'string' ? profileData.grad_year : ""),
+          school: linkData.settings?.hidePersonalInfo 
+            ? "" 
+            : (typeof profileData.school === 'string' ? profileData.school : ""),
           interests: typeof profileData.interests === 'string' ? profileData.interests : "",
           avatarUrl: typeof profileData.avatar_url === 'string' ? profileData.avatar_url : "",
         };

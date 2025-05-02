@@ -10,6 +10,8 @@ export interface ShareSettings {
   showCourses?: boolean
   showTestScores?: boolean
   showColleges?: boolean
+  hideUserName?: boolean
+  hidePersonalInfo?: boolean
 }
 
 export interface ShareLinkData {

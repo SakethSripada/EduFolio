@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, School, GraduationCap } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 
@@ -14,6 +14,13 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
   const [collegeData, setCollegeData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [shareData, setShareData] = useState<any>(null)
+  const [processedProfile, setProcessedProfile] = useState({
+    full_name: "Student",
+    avatar_url: null,
+    school: "",
+    grad_year: "",
+  })
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,6 +39,42 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
           setLoading(false)
           return
         }
+
+        // Fetch owner profile
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", shareData.user_id)
+          .maybeSingle()
+          
+        if (profileError) {
+          console.error("Profile error:", profileError);
+          // Don't fail the whole request, use default values
+        }
+        
+        // Create fallback profile data if not found or error occurred
+        const userProfile = profileData || {
+          full_name: "Student",
+          avatar_url: null,
+          school: "Not specified",
+          grad_year: "Not specified"
+        };
+        
+        // Apply share privacy settings
+        const userProfileProcessed = {
+          full_name: shareData.settings?.hideUserName 
+            ? "Anonymous"
+            : userProfile.full_name || "Student",
+          avatar_url: userProfile.avatar_url,
+          school: shareData.settings?.hidePersonalInfo 
+            ? ""
+            : userProfile.school || "Not specified",
+          grad_year: shareData.settings?.hidePersonalInfo 
+            ? ""
+            : userProfile.grad_year || "Not specified",
+        };
+        
+        setProcessedProfile(userProfileProcessed);
 
         // Fetch the college data
         const { data: collegeData, error: collegeError } = await supabase
@@ -102,7 +145,24 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
         <div className="flex items-center gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold">College Profile: {collegeData.collegeName || "University"}</h1>
-            <p className="text-muted-foreground">Shared college-specific application materials</p>
+            <p className="text-muted-foreground">Shared by {processedProfile.full_name}</p>
+            {(processedProfile.school || processedProfile.grad_year) && (
+              <div className="flex flex-wrap gap-4 mt-2 text-muted-foreground">
+                {processedProfile.school && (
+                  <div className="flex items-center gap-1">
+                    <School className="h-4 w-4" />
+                    <span>{processedProfile.school}</span>
+                  </div>
+                )}
+                
+                {processedProfile.grad_year && (
+                  <div className="flex items-center gap-1">
+                    <GraduationCap className="h-4 w-4" />
+                    <span>Class of {processedProfile.grad_year}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
