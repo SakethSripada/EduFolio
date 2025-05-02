@@ -47,6 +47,24 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   // Skills
   const skills = content.skills || []
   
+  // Languages
+  const languages = content.languages || []
+  
+  // Certifications
+  const certifications = content.certifications || []
+  
+  // Publications
+  const publications = content.publications || []
+  
+  // Volunteer Experience
+  const volunteer = content.volunteer || []
+  
+  // Awards
+  const awards = content.awards || []
+  
+  // References
+  const references = content.references || []
+  
   // Custom sections
   const customSections = content.customSections || []
   
@@ -235,12 +253,12 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     
     // Otherwise use the predefined orders
     if (content.sectionOrder === 'education-first') {
-      return ['summary', 'education', 'experience', 'skills'];
+      return ['summary', 'education', 'experience', 'skills', 'languages', 'certifications', 'publications', 'volunteer', 'awards', 'references'];
     } else if (content.sectionOrder === 'skills-first') {
-      return ['summary', 'skills', 'experience', 'education'];
+      return ['summary', 'skills', 'experience', 'education', 'languages', 'certifications', 'publications', 'volunteer', 'awards', 'references'];
     } else {
       // Standard order
-      return ['summary', 'experience', 'education', 'skills'];
+      return ['summary', 'experience', 'education', 'skills', 'languages', 'certifications', 'publications', 'volunteer', 'awards', 'references'];
     }
   }, [content.sectionOrder, content.customSectionOrder, customSections]);
   
@@ -547,6 +565,18 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           return <span className="mr-2">🎓</span>;
         case 'skills':
           return <span className="mr-2">⚡</span>;
+        case 'languages':
+          return <span className="mr-2">🌐</span>;
+        case 'certifications':
+          return <span className="mr-2">🏅</span>;
+        case 'publications':
+          return <span className="mr-2">📄</span>;
+        case 'volunteer':
+          return <span className="mr-2">🤝</span>;
+        case 'awards':
+          return <span className="mr-2">🏆</span>;
+        case 'references':
+          return <span className="mr-2">👥</span>;
         default:
           return null;
       }
@@ -629,6 +659,218 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
             </h2>
             
             {renderSkills(skills)}
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+          </div>
+        ) : null;
+      
+      case 'languages':
+        return languages.length > 0 ? (
+          <div className={`mb-4 ${sectionContainerClass}`} key="languages-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('languages')}
+              Languages
+            </h2>
+            
+            <div className="space-y-2">
+              {languages.map((language: any) => (
+                <div key={language.id} className="flex justify-between items-center">
+                  <span style={{ color: defaultTextColor }}>{language.name}</span>
+                  <span style={{ color: mutedTextColor }}>{language.proficiency}</span>
+                </div>
+              ))}
+            </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+          </div>
+        ) : null;
+      
+      case 'certifications':
+        return certifications.length > 0 ? (
+          <div className={`mb-4 ${sectionContainerClass}`} key="certifications-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('certifications')}
+              Certifications
+            </h2>
+            
+            <div className={`space-y-4 ${lineHeightClass}`}>
+              {certifications.map((cert: any) => (
+                <div key={cert.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{cert.name}</h3>
+                      {cert.issuer && <p style={{ color: defaultTextColor }}>{cert.issuer}</p>}
+                      {cert.credentialId && <p className="text-xs" style={{ color: mutedTextColor }}>ID: {cert.credentialId}</p>}
+                    </div>
+                    
+                    {settings.showDates !== false && cert.issueDate && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        <span>Issued: {cert.issueDate}</span>
+                        {cert.expirationDate && <div>Expires: {cert.expirationDate}</div>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {cert.credentialUrl && (
+                    <a 
+                      href={cert.credentialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs hover:underline mt-1 inline-block"
+                      style={{ color: primaryColor }}
+                    >
+                      View Credential
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+          </div>
+        ) : null;
+      
+      case 'publications':
+        return publications.length > 0 ? (
+          <div className={`mb-4 ${sectionContainerClass}`} key="publications-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('publications')}
+              Publications
+            </h2>
+            
+            <div className={`space-y-4 ${lineHeightClass}`}>
+              {publications.map((pub: any) => (
+                <div key={pub.id} className="mb-3">
+                  <div>
+                    <h3 className="font-semibold" style={{ color: defaultTextColor }}>{pub.title}</h3>
+                    {pub.authors && <p style={{ color: defaultTextColor }}>{pub.authors}</p>}
+                    <p className="text-xs" style={{ color: mutedTextColor }}>
+                      {pub.publication_name && <span>{pub.publication_name}</span>}
+                      {pub.publisher && pub.publication_name && <span>, {pub.publisher}</span>}
+                      {pub.publisher && !pub.publication_name && <span>{pub.publisher}</span>}
+                      {pub.publication_date && <span> ({pub.publication_date})</span>}
+                    </p>
+                    {pub.description && (
+                      <p className="mt-1 text-xs" style={{ color: defaultTextColor }}>{pub.description}</p>
+                    )}
+                    {(pub.doi || pub.url) && (
+                      <div className="mt-1 text-xs">
+                        {pub.doi && <span style={{ color: mutedTextColor }}>DOI: {pub.doi}</span>}
+                        {pub.url && (
+                          <a 
+                            href={pub.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="ml-2 hover:underline"
+                            style={{ color: primaryColor }}
+                          >
+                            View Publication
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+          </div>
+        ) : null;
+        
+      case 'volunteer':
+        return volunteer.length > 0 ? (
+          <div className={`mb-4 ${sectionContainerClass}`} key="volunteer-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('volunteer')}
+              Volunteer Experience
+            </h2>
+            
+            <div className={`space-y-4 ${lineHeightClass}`}>
+              {volunteer.map((vol: any) => (
+                <div key={vol.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{vol.role}</h3>
+                      <p style={{ color: defaultTextColor }}>{vol.organization}{vol.location ? `, ${vol.location}` : ''}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && vol.start_date && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        <span>
+                          {vol.start_date} - {vol.is_current ? 'Present' : vol.end_date}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {vol.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>
+                      {vol.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+          </div>
+        ) : null;
+        
+      case 'awards':
+        return awards.length > 0 ? (
+          <div className={`mb-4 ${sectionContainerClass}`} key="awards-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('awards')}
+              Awards & Honors
+            </h2>
+            
+            <div className={`space-y-3 ${lineHeightClass}`}>
+              {awards.map((award: any) => (
+                <div key={award.id} className="mb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{award.title}</h3>
+                      {award.issuer && <p style={{ color: defaultTextColor }}>{award.issuer}</p>}
+                    </div>
+                    
+                    {settings.showDates !== false && award.date_received && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        <span>{award.date_received}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {award.description && (
+                    <p className="mt-1 text-xs" style={{ color: defaultTextColor }}>{award.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+          </div>
+        ) : null;
+        
+      case 'references':
+        return references.length > 0 ? (
+          <div className={`mb-4 ${sectionContainerClass}`} key="references-section" style={sectionContainerStyle}>
+            <h2 className={headingClass} style={headingColorStyle}>
+              {getSectionIcon('references')}
+              References
+            </h2>
+            
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${lineHeightClass}`}>
+              {references.map((ref: any) => (
+                <div key={ref.id} className="p-3 border rounded">
+                  <h3 className="font-semibold" style={{ color: defaultTextColor }}>{ref.name}</h3>
+                  <p style={{ color: defaultTextColor }}>
+                    {ref.title}{ref.company ? `, ${ref.company}` : ''}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: mutedTextColor }}>
+                    {ref.relationship && <span>{ref.relationship}</span>}
+                  </p>
+                  <div className="mt-2 text-xs">
+                    {ref.email && <div style={{ color: defaultTextColor }}>Email: {ref.email}</div>}
+                    {ref.phone && <div style={{ color: defaultTextColor }}>Phone: {ref.phone}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
             {style.sectionDivider !== 'none' && getSectionDividerStyle()}
           </div>
         ) : null;
@@ -752,12 +994,189 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           </div>
         ) : null
       
+      case 'languages':
+        return languages.length > 0 ? (
+          <div className="mb-5" key="languages-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Languages</h2>
+            </div>
+            
+            <div className="space-y-2 ml-6">
+              {languages.map((language: any) => (
+                <div key={language.id} className="flex justify-between items-center">
+                  <span style={{ color: defaultTextColor }}>{language.name}</span>
+                  <span style={{ color: primaryColor, fontWeight: 500 }}>{language.proficiency}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      
+      case 'certifications':
+        return certifications.length > 0 ? (
+          <div className="mb-5" key="certifications-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Certifications</h2>
+            </div>
+            
+            <div className="space-y-4 ml-6">
+              {certifications.map((cert: any) => (
+                <div key={cert.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{cert.name}</h3>
+                      <p style={{ color: primaryColor, fontWeight: 500 }}>{cert.issuer}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && cert.issueDate && (
+                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                        <span>Issued: {cert.issueDate}</span>
+                        {cert.expirationDate && <div>Expires: {cert.expirationDate}</div>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {cert.credentialUrl && (
+                    <a 
+                      href={cert.credentialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs hover:underline mt-1 inline-block"
+                      style={{ color: primaryColor }}
+                    >
+                      View Credential
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      
+      case 'publications':
+        return publications.length > 0 ? (
+          <div className="mb-5" key="publications-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Publications</h2>
+            </div>
+            
+            <div className="space-y-4 ml-6">
+              {publications.map((pub: any) => (
+                <div key={pub.id} className="mb-3">
+                  <div>
+                    <h3 className="font-semibold" style={{ color: defaultTextColor }}>{pub.title}</h3>
+                    {pub.authors && <p style={{ color: primaryColor, fontWeight: 500 }}>{pub.authors}</p>}
+                    <div className="text-xs" style={{ color: mutedTextColor }}>
+                      {pub.publication_name && <span>{pub.publication_name}</span>}
+                      {pub.publisher && pub.publication_name && <span>, {pub.publisher}</span>}
+                      {pub.publisher && !pub.publication_name && <span>{pub.publisher}</span>}
+                      {pub.publication_date && <span> ({pub.publication_date})</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+        
+      case 'volunteer':
+        return volunteer.length > 0 ? (
+          <div className="mb-5" key="volunteer-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Volunteer Experience</h2>
+            </div>
+            
+            <div className="space-y-4 ml-6">
+              {volunteer.map((vol: any) => (
+                <div key={vol.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{vol.role}</h3>
+                      <p style={{ color: primaryColor, fontWeight: 500 }}>{vol.organization}{vol.location ? ` | ${vol.location}` : ''}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && vol.start_date && (
+                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                        <span>
+                          {vol.start_date} - {vol.is_current ? 'Present' : vol.end_date}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {vol.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{vol.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+        
+      case 'awards':
+        return awards.length > 0 ? (
+          <div className="mb-5" key="awards-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Awards & Honors</h2>
+            </div>
+            
+            <div className="space-y-3 ml-6">
+              {awards.map((award: any) => (
+                <div key={award.id} className="mb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{award.title}</h3>
+                      <p style={{ color: primaryColor, fontWeight: 500 }}>{award.issuer}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && award.date_received && (
+                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                        <span>{award.date_received}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+        
+      case 'references':
+        return references.length > 0 ? (
+          <div className="mb-5" key="references-section">
+            <div className="flex items-center mb-2">
+              <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
+              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>References</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-3 ml-6">
+              {references.map((ref: any) => (
+                <div key={ref.id} className="p-3 border rounded" style={{ borderColor: `${primaryColor}40` }}>
+                  <h3 className="font-semibold" style={{ color: defaultTextColor }}>{ref.name}</h3>
+                  <p style={{ color: primaryColor, fontWeight: 500 }}>
+                    {ref.title}{ref.company ? `, ${ref.company}` : ''}
+                  </p>
+                  <div className="mt-1 text-xs" style={{ color: defaultTextColor }}>
+                    {ref.email && <div>Email: {ref.email}</div>}
+                    {ref.phone && <div>Phone: {ref.phone}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      
       default:
         return null
     }
   }
 
-  // Academic template - focuses on education and publications
+  // Academic template - with serif font and a more formal look
   const renderAcademicSection = (sectionType: string) => {
     const primaryColor = style.primaryColor || "#10b981";
     
@@ -862,8 +1281,173 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           </div>
         ) : null
       
+      case 'languages':
+        return languages.length > 0 ? (
+          <div className="mb-6" key="languages-section">
+            <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
+              color: defaultTextColor,
+              borderColor: style.primaryColor || '#10b981'
+            }}>
+              Languages
+            </h2>
+            
+            <ul className="list-disc pl-5 space-y-1">
+              {languages.map((language: any) => (
+                <li key={language.id} style={{ color: defaultTextColor }}>
+                  <span className="font-semibold">{language.name}</span>
+                  {language.proficiency && <span> - {language.proficiency}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null;
+      
+      case 'certifications':
+        return certifications.length > 0 ? (
+          <div className="mb-6" key="certifications-section">
+            <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
+              color: defaultTextColor,
+              borderColor: style.primaryColor || '#10b981'
+            }}>
+              Certifications
+            </h2>
+            
+            <div className="space-y-3">
+              {certifications.map((cert: any) => (
+                <div key={cert.id} className="mb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{cert.name}</h3>
+                      {cert.issuer && <p style={{ color: style.primaryColor || '#10b981' }}>{cert.issuer}</p>}
+                    </div>
+                    
+                    {settings.showDates !== false && cert.issueDate && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        <span>Issued: {cert.issueDate}</span>
+                        {cert.expirationDate && <div>Expires: {cert.expirationDate}</div>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      
+      case 'publications':
+        return publications.length > 0 ? (
+          <div className="mb-6" key="publications-section">
+            <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
+              color: defaultTextColor,
+              borderColor: style.primaryColor || '#10b981'
+            }}>
+              Publications
+            </h2>
+            
+            <div className="space-y-4">
+              {publications.map((pub: any) => (
+                <div key={pub.id} className="mb-3">
+                  <p className="mb-1" style={{ color: defaultTextColor }}>
+                    {pub.authors && <span className="italic">{pub.authors}. </span>}
+                    <span className="font-semibold">"{pub.title}." </span>
+                    {pub.publication_name && <span className="italic">{pub.publication_name}, </span>}
+                    {pub.publisher && <span>{pub.publisher}, </span>}
+                    {pub.publication_date && <span>{pub.publication_date}. </span>}
+                    {pub.doi && <span>DOI: {pub.doi}</span>}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      
+      case 'volunteer':
+        return volunteer.length > 0 ? (
+          <div className="mb-6" key="volunteer-section">
+            <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
+              color: defaultTextColor,
+              borderColor: style.primaryColor || '#10b981'
+            }}>
+              Volunteer Experience
+            </h2>
+            
+            <div className="space-y-4">
+              {volunteer.map((vol: any) => (
+                <div key={vol.id} className="mb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{vol.role}</h3>
+                      <p style={{ color: style.primaryColor || '#10b981' }}>{vol.organization}{vol.location ? `, ${vol.location}` : ''}</p>
+                    </div>
+                    
+                    {settings.showDates !== false && vol.start_date && (
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                        <span>
+                          {vol.start_date} - {vol.is_current ? 'Present' : vol.end_date}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {vol.description && (
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{vol.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+        
+      case 'awards':
+        return awards.length > 0 ? (
+          <div className="mb-6" key="awards-section">
+            <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
+              color: defaultTextColor,
+              borderColor: style.primaryColor || '#10b981'
+            }}>
+              Awards & Honors
+            </h2>
+            
+            <ul className="list-disc pl-5 space-y-1">
+              {awards.map((award: any) => (
+                <li key={award.id} style={{ color: defaultTextColor }}>
+                  <span className="font-semibold">{award.title}</span>
+                  {award.issuer && <span>, {award.issuer}</span>}
+                  {award.date_received && <span> ({award.date_received})</span>}
+                  {award.description && <p className="text-xs mt-1">{award.description}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null;
+        
+      case 'references':
+        return references.length > 0 ? (
+          <div className="mb-6" key="references-section">
+            <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
+              color: defaultTextColor,
+              borderColor: style.primaryColor || '#10b981'
+            }}>
+              References
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {references.map((ref: any) => (
+                <div key={ref.id} className="mb-2">
+                  <h3 className="font-semibold" style={{ color: defaultTextColor }}>{ref.name}</h3>
+                  <p style={{ color: style.primaryColor || '#10b981' }}>{ref.title}{ref.company ? `, ${ref.company}` : ''}</p>
+                  <div className="text-xs mt-1" style={{ color: mutedTextColor }}>
+                    {ref.email && <div>Email: {ref.email}</div>}
+                    {ref.phone && <div>Phone: {ref.phone}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      
       default:
-        return null
+        return null;
     }
   }
 
@@ -961,6 +1545,12 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'experience':
       case 'education':
       case 'skills':
+      case 'languages':
+      case 'certifications':
+      case 'publications':
+      case 'volunteer':
+      case 'awards':
+      case 'references':
       case 'personalInfo':
         // Render standard section based on template
         switch (template.toLowerCase()) {
