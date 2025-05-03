@@ -1,4 +1,3 @@
-// Update the component to fetch data from the database
 "use client"
 
 import { useState, useEffect } from "react"
@@ -9,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Loader2, School, GraduationCap } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import DOMPurify from "dompurify"
 
 export default function SharedCollegeProfilePage({ params }: { params: { id: string; shareId: string } }) {
   const [collegeData, setCollegeData] = useState<any>(null)
@@ -319,7 +319,12 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
                         collegeData.essays.map((essay: any, index: number) => (
                           <div key={index} className="space-y-2">
                             <h3 className="font-medium mb-2">{essay.prompt}</h3>
-                            <div className="p-4 bg-muted/50 rounded-md font-serif text-foreground">{essay.content}</div>
+                            <div className="prose prose-sm dark:prose-invert max-w-none p-4 bg-muted/50 rounded-md">
+                              <div 
+                                className="essay-content text-foreground dark:text-foreground" 
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(essay.content) }}
+                              />
+                            </div>
                             <p className="text-xs text-muted-foreground">Word Count: {essay.word_count}</p>
                           </div>
                         ))

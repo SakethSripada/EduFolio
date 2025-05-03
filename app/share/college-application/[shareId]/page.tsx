@@ -12,6 +12,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { format } from "date-fns"
 import React from "react"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
+import DOMPurify from "dompurify"
 
 export default function SharedCollegeApplicationPage() {
   // Use useParams to get the dynamic id from the route.
@@ -769,8 +770,11 @@ export default function SharedCollegeApplicationPage() {
                                         </div>
                                         <div className="border-t pt-4">
                                           <h4 className="text-sm font-medium text-muted-foreground mb-2">Essay Content</h4>
-                                          <div className="prose prose-sm dark:prose-invert max-w-none p-3 bg-muted/10 rounded-md font-serif">
-                                            <p className="text-foreground dark:text-foreground whitespace-pre-wrap leading-relaxed">{essay.content}</p>
+                                          <div className="prose prose-sm dark:prose-invert max-w-none p-4 bg-muted/10 rounded-md">
+                                            <div 
+                                              className="essay-content text-foreground dark:text-foreground" 
+                                              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(essay.content) }}
+                                            />
                                           </div>
                                         </div>
                                       </CardContent>
