@@ -94,7 +94,7 @@ export const PortfolioContent = ({
   const [expiryOption, setExpiryOption] = useState<"never" | "date">("never")
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
   const [shareSettings, setShareSettings] = useState<ShareSettings>({
-    hideUserName: true,
+    hideUserName: false,
     hidePersonalInfo: true,
   })
   const { user } = useAuth()
@@ -194,12 +194,12 @@ export const PortfolioContent = ({
         // Get existing share settings
         if (record.settings) {
           setShareSettings({
-            hideUserName: record.settings.hideUserName ?? true,
+            hideUserName: record.settings.hideUserName ?? false,
             hidePersonalInfo: record.settings.hidePersonalInfo ?? true,
           });
         } else {
           setShareSettings({
-            hideUserName: true,
+            hideUserName: false,
             hidePersonalInfo: true,
           });
         }
@@ -974,20 +974,6 @@ export const PortfolioContent = ({
                   </div>
                   <p className="text-xs text-muted-foreground pl-6">
                     Show as "Anonymous" instead of your name
-                  </p>
-                  
-                  <div className="flex items-center space-x-2 mt-2">
-                    <Checkbox 
-                      id="hidePersonalInfo" 
-                      checked={shareSettings.hidePersonalInfo}
-                      onCheckedChange={(checked: boolean | "indeterminate") => 
-                        setShareSettings(prev => ({ ...prev, hidePersonalInfo: checked === true }))
-                      } 
-                    />
-                    <Label htmlFor="hidePersonalInfo">Hide Personal Information</Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground pl-6">
-                    Hide high school and graduation year
                   </p>
                 </div>
               </div>
