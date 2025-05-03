@@ -25,6 +25,7 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
 import ReactMarkdown from "react-markdown"
+import { motion, AnimatePresence } from "framer-motion"
 
 // For client-side usage of API key
 const API_KEY = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
@@ -58,37 +59,143 @@ onClose?: () => void
 showOnLoad?: boolean
 }
 
+// Enhanced message component with animations
 const MessageComponent = React.memo(({ message }: { message: Message }) => (
-<div
-  className={cn(
-    "flex gap-3 max-w-[90%]",
-    message.role === "user" ? "ml-auto flex-row-reverse items-end" : "mr-auto",
-  )}
->
-  <Avatar className="h-8 w-8 mt-1 bg-muted flex-shrink-0">
-    {message.role === "user" ? (
-      <User className="h-4 w-4" />
-    ) : (
-      <Bot className="h-4 w-4 text-primary-foreground" />
-    )}
-  </Avatar>
-  <div
+  <motion.div
+    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={{ duration: 0.3, ease: "easeOut" }}
     className={cn(
-      "rounded-lg p-3",
-      message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+      "flex gap-3 max-w-[90%]",
+      message.role === "user" ? "ml-auto flex-row-reverse items-end" : "mr-auto",
     )}
   >
-    <div className="text-sm whitespace-pre-wrap">
-      <ReactMarkdown>{message.content}</ReactMarkdown>
-    </div>
-    {message.context && (
-      <Badge variant="outline" className="mt-2 text-xs">
-        {message.context.type}: {message.context.title}
-      </Badge>
-    )}
-  </div>
-</div>
+    <motion.div 
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: 0.1, duration: 0.2 }}
+    >
+      <Avatar className={cn(
+        "h-8 w-8 mt-1 flex-shrink-0 shadow-sm",
+        message.role === "user" ? "bg-blue-500" : "bg-primary"
+      )}>
+        {message.role === "user" ? (
+          <User className="h-4 w-4 text-white" />
+        ) : (
+          <Bot className="h-4 w-4 text-primary-foreground" />
+        )}
+      </Avatar>
+    </motion.div>
+    <motion.div
+      initial={{ opacity: 0, x: message.role === "user" ? 10 : -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={cn(
+        "rounded-lg p-3 shadow-sm backdrop-blur-[2px]",
+        message.role === "user" 
+          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
+          : "bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-900",
+      )}
+    >
+      <div className="text-sm whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert">
+        <ReactMarkdown>{message.content}</ReactMarkdown>
+      </div>
+      {message.context && (
+        <motion.div
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.2 }}
+        >
+          <Badge variant="outline" className="mt-2 text-xs backdrop-blur-sm bg-white/10">
+            {message.context.type}: {message.context.title}
+          </Badge>
+        </motion.div>
+      )}
+    </motion.div>
+  </motion.div>
 ))
+
+// Typing indicator with smooth animation
+const TypingIndicator = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+    className="flex gap-3 max-w-[90%]"
+  >
+    <Avatar className="h-8 w-8 mt-1 bg-primary rounded-full flex-shrink-0 shadow-sm">
+      <Bot className="h-4 w-4 text-primary-foreground" />
+    </Avatar>
+    <div className="rounded-lg p-3 bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-800 dark:to-zinc-900 shadow-sm">
+      <div className="flex items-center gap-1">
+        <motion.div
+          animate={{ 
+            y: [0, -4, 0],
+            opacity: [0.5, 1, 0.5]
+          }}
+          transition={{ 
+            duration: 1.2, 
+            repeat: Infinity,
+            repeatType: "loop",
+            ease: "easeInOut",
+            times: [0, 0.5, 1]
+          }}
+          className="h-2 w-2 rounded-full bg-primary"
+        />
+        <motion.div
+          animate={{ 
+            y: [0, -4, 0],
+            opacity: [0.5, 1, 0.5]
+          }}
+          transition={{ 
+            duration: 1.2, 
+            repeat: Infinity,
+            repeatType: "loop",
+            delay: 0.15,
+            ease: "easeInOut",
+            times: [0, 0.5, 1]
+          }}
+          className="h-2 w-2 rounded-full bg-primary"
+        />
+        <motion.div
+          animate={{ 
+            y: [0, -4, 0],
+            opacity: [0.5, 1, 0.5]
+          }}
+          transition={{ 
+            duration: 1.2, 
+            repeat: Infinity,
+            repeatType: "loop",
+            delay: 0.3,
+            ease: "easeInOut",
+            times: [0, 0.5, 1]
+          }}
+          className="h-2 w-2 rounded-full bg-primary"
+        />
+      </div>
+    </div>
+  </motion.div>
+)
+
+// Enhanced Suggestion Button
+const SuggestionButton = ({ suggestion, onClick }: { suggestion: string, onClick: () => void }) => (
+  <motion.div
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+  >
+    <Button
+      variant="outline"
+      className="w-full justify-start text-sm h-auto py-3 px-4 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow bg-white dark:bg-zinc-900"
+      onClick={onClick}
+    >
+      <div className="flex items-start gap-2">
+        <Sparkles className="h-4 w-4 mt-0.5 text-blue-500" />
+        <span className="text-left">{suggestion}</span>
+      </div>
+    </Button>
+  </motion.div>
+)
 
 const AIAssistant = ({ initialContext, initialPrompt, onClose, showOnLoad = false }: AIAssistantProps) => {
 const [isOpen, setIsOpen] = useState(showOnLoad)
@@ -582,158 +689,241 @@ const suggestions = [
 return (
   <>
     {/* Floating Chat Button */}
-    {!isOpen && (
-      <Button
-        className="fixed bottom-6 right-6 rounded-full w-14 h-14 p-0 shadow-lg z-50 bg-primary hover:bg-primary/90"
-        onClick={() => setIsOpen(true)}
-      >
-        <Sparkles className="h-6 w-6" />
-      </Button>
-    )}
+    <AnimatePresence>
+      {!isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.8 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.8 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="fixed bottom-6 right-6 z-50"
+        >
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            className="rounded-full w-14 h-14 shadow-lg bg-primary hover:bg-primary/90 flex items-center justify-center text-white"
+            onClick={() => setIsOpen(true)}
+          >
+            <Sparkles className="h-6 w-6" />
+          </motion.button>
+        </motion.div>
+      )}
+    </AnimatePresence>
 
     {/* Chat Panel */}
-    {isOpen && (
-      <div
-        className={cn(
-          "fixed z-50 bg-card border rounded-lg shadow-lg transition-all duration-300 overflow-hidden flex flex-col",
-          isExpanded
-            ? "inset-2 sm:inset-4 md:inset-10 lg:inset-20"
-            : "bottom-6 right-6 w-[90vw] sm:w-[380px] h-[80vh] max-h-[600px]",
-        )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b bg-muted/50">
-          <div className="flex items-center gap-2">
-            {/* Temporarily using div instead of Avatar */}
-            <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
-              <Bot className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold">EduFolio AI Assistant</h2>
-              <p className="text-xs text-muted-foreground">Powered by advanced AI</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={toggleExpand} className="h-8 w-8">
-              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={clearChat} className="h-8 w-8" title="Clear chat">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={closeChat} className="h-8 w-8">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
-          <TabsList className="px-3 pt-2 justify-start bg-transparent border-b rounded-none flex-shrink-0">
-            <TabsTrigger
-              value="chat"
-              className="rounded-t-md rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
-            >
-              Chat
-            </TabsTrigger>
-            <TabsTrigger
-              value="suggestions"
-              className="rounded-t-md rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
-            >
-              Suggestions
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 data-[state=inactive]:hidden overflow-hidden">
-            {/* Messages */}
-            <ScrollArea className="flex-1 h-[calc(100%-80px)]">
-              <div className="p-4 space-y-4">
-                {messages.map((message) => (
-                  <MessageComponent key={message.id} message={message} />
-                ))}
-                {isTyping && (
-                  <div className="flex gap-3 max-w-[90%]">
-                    {/* Temporarily using div instead of Avatar */}
-                    <div className="h-8 w-8 mt-1 bg-primary rounded-full flex-shrink-0 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                    <div className="rounded-lg p-3 bg-muted">
-                      <div className="flex items-center gap-1">
-                        <div
-                          className="h-2 w-2 rounded-full bg-primary animate-bounce"
-                          style={{ animationDelay: "0ms" }}
-                        ></div>
-                        <div
-                          className="h-2 w-2 rounded-full bg-primary animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        ></div>
-                        <div
-                          className="h-2 w-2 rounded-full bg-primary animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.8 }}
+          transition={{ 
+            type: "spring", 
+            stiffness: 400, 
+            damping: 25,
+            duration: 0.3
+          }}
+          className={cn(
+            "fixed z-50 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl overflow-hidden flex flex-col",
+            isExpanded
+              ? "inset-2 sm:inset-4 md:inset-10 lg:inset-20"
+              : "bottom-6 right-6 w-[90vw] sm:w-[380px] h-[80vh] max-h-[600px]",
+          )}
+          style={{ 
+            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 15px rgba(0, 0, 0, 0.05)",
+            backdropFilter: "blur(8px)"
+          }}
+          layout
+        >
+          {/* Header */}
+          <motion.div 
+            className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-gradient-to-r from-white to-zinc-50 dark:from-zinc-900 dark:to-zinc-950"
+            layoutId="assistant-header"
+          >
+            <div className="flex items-center gap-2">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="h-8 w-8 bg-primary rounded-full flex items-center justify-center shadow-sm"
+              >
+                <Bot className="h-4 w-4 text-primary-foreground" />
+              </motion.div>
+              <div>
+                <h2 className="text-sm font-semibold">EduFolio AI Assistant</h2>
+                <p className="text-xs text-muted-foreground">Powered by advanced AI</p>
               </div>
-            </ScrollArea>
+            </div>
+            <div className="flex items-center gap-1">
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="h-8 w-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                onClick={toggleExpand}
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="h-8 w-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                onClick={clearChat}
+                title="Clear chat"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="h-8 w-8 rounded-full flex items-center justify-center text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                onClick={closeChat}
+              >
+                <X className="h-4 w-4" />
+              </motion.button>
+            </div>
+          </motion.div>
 
-            {/* Input */}
-            <div className="p-3 border-t">
-              <div className="flex items-center gap-2">
-                <Input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask me anything about your application..."
-                  className="flex-1"
-                />
-                <Button size="icon" onClick={handleSendMessage} disabled={!input.trim()}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Paperclip className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                    <Mic className="h-3 w-3" />
-                  </Button>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
+            <TabsList className="px-3 pt-2 justify-start bg-transparent border-b border-zinc-100 dark:border-zinc-800 rounded-none flex-shrink-0">
+              <TabsTrigger
+                value="chat"
+                className="rounded-t-md rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+              >
+                Chat
+              </TabsTrigger>
+              <TabsTrigger
+                value="suggestions"
+                className="rounded-t-md rounded-b-none data-[state=active]:border-b-2 data-[state=active]:border-primary"
+              >
+                Suggestions
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 data-[state=inactive]:hidden overflow-hidden">
+              {/* Messages */}
+              <ScrollArea className="flex-1 h-[calc(100%-80px)]">
+                <div className="p-4 space-y-4">
+                  <AnimatePresence>
+                    {messages.map((message) => (
+                      <motion.div 
+                        key={message.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <MessageComponent message={message} />
+                      </motion.div>
+                    ))}
+                    {isTyping && <TypingIndicator />}
+                  </AnimatePresence>
+                  <div ref={messagesEndRef} />
                 </div>
-                <div className="hidden sm:block">
-                  Press <kbd className="px-1 py-0.5 bg-muted-foreground/20 rounded text-[10px]">Enter</kbd> to send
-                </div>
-              </div>
-            </div>
-          </TabsContent>
+              </ScrollArea>
 
-          <TabsContent value="suggestions" className="flex-1 p-4 m-0 data-[state=inactive]:hidden">
-            <h3 className="text-sm font-medium mb-3">Try asking about:</h3>
-            <div className="space-y-2">
-              {suggestions.map((suggestion, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="w-full justify-start text-sm h-auto py-3 px-4"
-                  onClick={() => {
-                    setInput(suggestion)
-                    setActiveTab("chat")
-                    setTimeout(() => inputRef.current?.focus(), 100)
-                  }}
+              {/* Input */}
+              <motion.div 
+                className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-gradient-to-b from-transparent to-zinc-50/50 dark:to-zinc-900/50 backdrop-blur-sm"
+                layout
+              >
+                <motion.div 
+                  className="flex items-center gap-2 relative"
+                  layout
                 >
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="h-4 w-4 mt-0.5 text-primary" />
-                    <span className="text-left">{suggestion}</span>
+                  <motion.div 
+                    className="flex-1 relative"
+                    layout
+                  >
+                    <Input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Ask me anything about your application..."
+                      className="w-full bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 rounded-full pr-12 focus-visible:ring-2 focus-visible:ring-primary/50 shadow-sm"
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      disabled={!input.trim()}
+                      onClick={handleSendMessage}
+                      className={cn(
+                        "absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 flex items-center justify-center rounded-full transition-colors",
+                        input.trim() 
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+                          : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800"
+                      )}
+                    >
+                      <Send className="h-4 w-4" />
+                    </motion.button>
+                  </motion.div>
+                </motion.div>
+                <motion.div 
+                  className="flex items-center justify-between mt-2 text-xs text-muted-foreground"
+                  layout
+                >
+                  <div className="flex items-center gap-2">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="h-6 w-6 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    >
+                      <Paperclip className="h-3 w-3" />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="h-6 w-6 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    >
+                      <Mic className="h-3 w-3" />
+                    </motion.button>
                   </div>
-                </Button>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    )}
+                  <div className="hidden sm:block text-zinc-400">
+                    Press <kbd className="px-1 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-[10px]">Enter</kbd> to send
+                  </div>
+                </motion.div>
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="suggestions" className="flex-1 p-4 m-0 data-[state=inactive]:hidden">
+              <motion.h3 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-sm font-medium mb-3"
+              >
+                Try asking about:
+              </motion.h3>
+              <div className="space-y-2">
+                <AnimatePresence>
+                  {suggestions.map((suggestion, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ delay: index * 0.05 + 0.1 }}
+                    >
+                      <SuggestionButton
+                        suggestion={suggestion}
+                        onClick={() => {
+                          setInput(suggestion)
+                          setActiveTab("chat")
+                          setTimeout(() => inputRef.current?.focus(), 100)
+                        }}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
+      )}
+    </AnimatePresence>
   </>
 )
 }
