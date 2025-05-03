@@ -8,7 +8,8 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 5
+// Changed from 5 to 1 to ensure only one toast at a time
+const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 5000
 
 type ToasterToast = ToastProps & {
@@ -74,12 +75,23 @@ const addToRemoveQueue = (toastId: string) => {
   toastTimeouts.set(toastId, timeout)
 }
 
+// Clear all existing toast timeouts
+const clearAllToastTimeouts = () => {
+  toastTimeouts.forEach((timeout, id) => {
+    clearTimeout(timeout);
+    toastTimeouts.delete(id);
+  });
+};
+
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
+      // Clear all existing toasts and their timeouts before adding a new one
+      clearAllToastTimeouts();
       return {
         ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+        // Replace all existing toasts with just the new one
+        toasts: [action.toast],
       }
 
     case "UPDATE_TOAST":
@@ -151,6 +163,11 @@ function toast({ ...props }: Toast) {
       toast: { ...props, id },
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+
+  // Remove any existing toasts first
+  dispatch({
+    type: "REMOVE_TOAST",
+  })
 
   dispatch({
     type: "ADD_TOAST",
