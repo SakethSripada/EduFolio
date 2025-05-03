@@ -31,7 +31,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ArrowRight, Plus, Trash, Search } from "lucide-react"
+import { ArrowRight, Plus, Trash, Search, X, RefreshCw } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
@@ -48,11 +48,16 @@ import {
   initializeCoursesWithSelection
 } from "./courseData"
 
+// Extended CourseTemplate with individual grade
+type ExtendedCourseTemplate = CourseTemplate & {
+  individualGrade?: string;
+}
+
 type BulkEntryFormData = {
   gradeLevel: string
   term: string
   schoolYear: string
-  grade: string
+  defaultGrade: string
 }
 
 type BulkCourseEntryProps = {
@@ -65,8 +70,10 @@ type BulkCourseEntryProps = {
 export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: BulkCourseEntryProps) {
   const [activeTab, setActiveTab] = useState("common-courses")
   const [activeCategoryTab, setActiveCategoryTab] = useState("English")
-  const [courseGroups, setCourseGroups] = useState(() => initializeCoursesWithSelection(COMMON_COURSES))
-  const [customCourses, setCustomCourses] = useState<CourseTemplate[]>([])
+  const [courseGroups, setCourseGroups] = useState<Record<string, ExtendedCourseTemplate[]>>(() => 
+    initializeCoursesWithSelection(COMMON_COURSES)
+  )
+  const [customCourses, setCustomCourses] = useState<ExtendedCourseTemplate[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   
   const [newCustomCourse, setNewCustomCourse] = useState<Omit<CourseTemplate, 'isSelected'>>({
@@ -79,7 +86,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
     gradeLevel: "",
     term: "",
     schoolYear: "",
-    grade: ""
+    defaultGrade: ""
   })
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -94,7 +101,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
     }
     
     const searchLower = searchQuery.toLowerCase();
-    const results: Record<string, CourseTemplate[]> = {};
+    const results: Record<string, ExtendedCourseTemplate[]> = {};
     
     for (const [category, courses] of Object.entries(courseGroups)) {
       const matchedCourses = courses.filter(course => 
@@ -112,7 +119,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
   
   // Get all selected courses from both common and custom lists
   const selectedCourses = useMemo(() => {
-    const selectedCommonCourses: CourseTemplate[] = [];
+    const selectedCommonCourses: ExtendedCourseTemplate[] = [];
     
     // Collect all selected courses from each category
     for (const courses of Object.values(courseGroups)) {
@@ -177,7 +184,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
   }, []);
   
   // Update course details
-  const updateCourseDetails = useCallback((index: number, field: keyof CourseTemplate, value: any) => {
+  const updateCourseDetails = useCallback((index: number, field: keyof ExtendedCourseTemplate, value: any) => {
     setCustomCourses(prev => {
       const updatedCourses = [...prev];
       updatedCourses[index] = { 
@@ -187,11 +194,107 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
       return updatedCourses;
     });
   }, []);
+
+  // Update individual course grade for common courses
+  const updateCommonCourseGrade = useCallback((courseName: string, category: string, grade: string) => {
+    setCourseGroups(prev => {
+      const updatedGroups = { ...prev };
+      const categoryData = [...updatedGroups[category]];
+      const courseIndex = categoryData.findIndex(c => c.name === courseName);
+      
+      if (courseIndex !== -1) {
+        categoryData[courseIndex] = {
+          ...categoryData[courseIndex],
+          individualGrade: grade
+        };
+        updatedGroups[category] = categoryData;
+      }
+      
+      return updatedGroups;
+    });
+  }, []);
+
+  // Update individual course grade for custom courses
+  const updateCustomCourseGrade = useCallback((index: number, grade: string) => {
+    setCustomCourses(prev => {
+      const updatedCourses = [...prev];
+      updatedCourses[index] = {
+        ...updatedCourses[index],
+        individualGrade: grade
+      };
+      return updatedCourses;
+    });
+  }, []);
+
+  // Apply grade to all selected courses
+  const applyGradeToAll = useCallback((grade: string) => {
+    // Update common courses
+    setCourseGroups(prev => {
+      const updatedGroups = { ...prev };
+      
+      for (const category in updatedGroups) {
+        updatedGroups[category] = updatedGroups[category].map(course => {
+          if (course.isSelected) {
+            return { ...course, individualGrade: grade };
+          }
+          return course;
+        });
+      }
+      
+      return updatedGroups;
+    });
+    
+    // Update custom courses
+    setCustomCourses(prev => {
+      return prev.map(course => {
+        if (course.isSelected) {
+          return { ...course, individualGrade: grade };
+        }
+        return course;
+      });
+    });
+    
+    // Update default grade
+    setFormData(prev => ({ ...prev, defaultGrade: grade }));
+    
+    toast({
+      title: "Grades updated",
+      description: `Applied grade ${grade} to all selected courses`,
+    });
+  }, [toast]);
+
+  // Clear all selected courses
+  const clearAllSelected = useCallback(() => {
+    // Clear common course selections
+    setCourseGroups(prev => {
+      const updatedGroups = { ...prev };
+      
+      for (const category in updatedGroups) {
+        updatedGroups[category] = updatedGroups[category].map(course => {
+          return { ...course, isSelected: false };
+        });
+      }
+      
+      return updatedGroups;
+    });
+    
+    // Clear custom course selections
+    setCustomCourses(prev => {
+      return prev.map(course => {
+        return { ...course, isSelected: false };
+      });
+    });
+    
+    toast({
+      title: "Selection cleared",
+      description: "All courses have been unselected",
+    });
+  }, [toast]);
   
   // Handle form submission
   const handleSubmit = async () => {
     // Validate form data
-    if (!formData.gradeLevel || !formData.term || !formData.schoolYear || !formData.grade) {
+    if (!formData.gradeLevel || !formData.term || !formData.schoolYear) {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields",
@@ -209,12 +312,22 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
       return
     }
     
+    // Check if any selected courses are missing grades
+    const missingGrades = selectedCourses.some(course => !course.individualGrade && !formData.defaultGrade);
+    if (missingGrades) {
+      toast({
+        title: "Missing grades",
+        description: "Please set a grade for all selected courses or set a default grade",
+        variant: "destructive"
+      })
+      return
+    }
+    
     setIsSubmitting(true)
     
     try {
       // Calculate grade points based on the grade
       const gradePointsMap: { [key: string]: number } = { "A": 4, "B": 3, "C": 2, "D": 1, "F": 0 }
-      const gradePoints = gradePointsMap[formData.grade] || 0
       
       // Determine if the course is weighted
       const calculateWeightedPoints = (level: string, grade: string): number => {
@@ -229,20 +342,26 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
       }
       
       // Create course objects for each selected course
-      const courseObjects = selectedCourses.map(course => ({
-        user_id: userId,
-        name: course.name,
-        grade: formData.grade,
-        credits: course.credits,
-        level: course.level,
-        grade_level: formData.gradeLevel,
-        term: formData.term,
-        school_year: formData.schoolYear,
-        grade_points: gradePoints,
-        weighted_grade_points: calculateWeightedPoints(course.level, formData.grade),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }))
+      const courseObjects = selectedCourses.map(course => {
+        // Use individual grade if set, otherwise use default grade
+        const courseGrade = course.individualGrade || formData.defaultGrade;
+        const gradePoints = gradePointsMap[courseGrade] || 0;
+        
+        return {
+          user_id: userId,
+          name: course.name,
+          grade: courseGrade,
+          credits: course.credits,
+          level: course.level,
+          grade_level: formData.gradeLevel,
+          term: formData.term,
+          school_year: formData.schoolYear,
+          grade_points: gradePoints,
+          weighted_grade_points: calculateWeightedPoints(course.level, courseGrade),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
       
       // Insert all courses in bulk
       const { error } = await supabase
@@ -277,7 +396,7 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
         <DialogHeader>
           <DialogTitle>Bulk Add Courses</DialogTitle>
           <DialogDescription>
-            Add multiple courses at once with the same term, grade level, and grade.
+            Add multiple courses at once with the same term and grade level.
           </DialogDescription>
         </DialogHeader>
         
@@ -304,6 +423,14 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
                     Selected: <span className="font-medium">{selectedCourses.length}</span>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearAllSelected}
+                    className="flex items-center"
+                  >
+                    <X className="h-4 w-4 mr-1" /> Clear All
+                  </Button>
                 </div>
                 
                 <div className="flex flex-col border rounded-md">
@@ -360,6 +487,21 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                                   <div className="text-xs text-muted-foreground">
                                     {course.credits} cr
                                   </div>
+                                  {course.isSelected && (
+                                    <Select
+                                      value={course.individualGrade || formData.defaultGrade || ""}
+                                      onValueChange={(value) => updateCommonCourseGrade(course.name, category, value)}
+                                    >
+                                      <SelectTrigger className="h-7 w-16 text-xs">
+                                        <SelectValue placeholder="Grade" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {GRADE_OPTIONS.map((grade) => (
+                                          <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
                                 </div>
                               </div>
                             ))}
@@ -435,7 +577,22 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                 </div>
                 
                 <div className="flex-1 border rounded-md">
-                  <ScrollArea className="h-[350px]">
+                  <div className="flex justify-between items-center p-2 border-b">
+                    <div className="text-sm text-muted-foreground">
+                      Custom Courses: <span className="font-medium">{customCourses.length}</span>
+                    </div>
+                    {customCourses.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearAllSelected}
+                        className="flex items-center"
+                      >
+                        <X className="h-4 w-4 mr-1" /> Clear All
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="h-[300px]">
                     <div className="p-2 space-y-1">
                       {customCourses.length === 0 ? (
                         <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
@@ -468,6 +625,21 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                               <div className="text-xs text-muted-foreground mr-2">
                                 {course.credits} cr
                               </div>
+                              {course.isSelected && (
+                                <Select
+                                  value={course.individualGrade || formData.defaultGrade || ""}
+                                  onValueChange={(value) => updateCustomCourseGrade(index, value)}
+                                >
+                                  <SelectTrigger className="h-7 w-16 text-xs">
+                                    <SelectValue placeholder="Grade" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {GRADE_OPTIONS.map((grade) => (
+                                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
                               <Button 
                                 variant="ghost" 
                                 size="icon"
@@ -541,13 +713,24 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="grade">Grade</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="default-grade">Default Grade</Label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => formData.defaultGrade && applyGradeToAll(formData.defaultGrade)}
+                  disabled={!formData.defaultGrade || selectedCourses.length === 0}
+                  className="h-7 text-xs"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Apply to All
+                </Button>
+              </div>
               <Select 
-                value={formData.grade} 
-                onValueChange={(value) => setFormData({ ...formData, grade: value })}
+                value={formData.defaultGrade} 
+                onValueChange={(value) => setFormData({ ...formData, defaultGrade: value })}
               >
-                <SelectTrigger id="grade">
-                  <SelectValue placeholder="Select Grade" />
+                <SelectTrigger id="default-grade">
+                  <SelectValue placeholder="Select Default Grade" />
                 </SelectTrigger>
                 <SelectContent>
                   {GRADE_OPTIONS.map((grade) => (
@@ -555,12 +738,15 @@ export function BulkCourseEntry({ open, onOpenChange, onCoursesAdded, userId }: 
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Set a default grade or assign grades individually to each course
+              </p>
             </div>
             
             <div className="mt-6 p-3 bg-muted/40 rounded-md">
               <div className="text-sm font-medium mb-1">Selected Courses</div>
               <div className="text-2xl font-bold">{selectedCourses.length}</div>
-              <div className="text-xs text-muted-foreground">Courses will be added with the same grade, term, and grade level</div>
+              <div className="text-xs text-muted-foreground">Courses will be added with the same term and grade level</div>
             </div>
             
             <div className="mt-auto">
