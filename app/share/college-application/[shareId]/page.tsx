@@ -13,6 +13,7 @@ import { format } from "date-fns"
 import React from "react"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import DOMPurify from "dompurify"
+import parse from "html-react-parser"
 
 export default function SharedCollegeApplicationPage() {
   // Use useParams to get the dynamic id from the route.
@@ -773,8 +774,9 @@ export default function SharedCollegeApplicationPage() {
                                           <div className="prose prose-sm dark:prose-invert max-w-none p-4 bg-muted/10 rounded-md">
                                             <div 
                                               className="essay-content text-foreground dark:text-foreground" 
-                                              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(essay.content) }}
-                                            />
+                                            >
+                                              {parse(DOMPurify.sanitize(essay.content))}
+                                            </div>
                                           </div>
                                         </div>
                                       </CardContent>
