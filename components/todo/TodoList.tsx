@@ -1,12 +1,10 @@
 "use client"
 
 import { DialogFooter } from "@/components/ui/dialog"
-
 import { DialogHeader } from "@/components/ui/dialog"
-
 import { DialogContent } from "@/components/ui/dialog"
-
 import { Dialog } from "@/components/ui/dialog"
+import { DialogTitle } from "@/components/ui/dialog"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -528,7 +526,7 @@ export default function TodoList() {
       <Dialog open={isAddingTodo} onOpenChange={setIsAddingTodo}>
         <DialogContent>
           <DialogHeader>
-            <CardTitle>Add New Task</CardTitle>
+            <DialogTitle>Add New Task</DialogTitle>
           </DialogHeader>
           
           <FormErrorSummary errors={formErrors} show={formSubmitted} />
@@ -612,7 +610,7 @@ export default function TodoList() {
       <Dialog open={isEditingTodo} onOpenChange={setIsEditingTodo}>
         <DialogContent>
           <DialogHeader>
-            <CardTitle>Edit Task</CardTitle>
+            <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
           
           <FormErrorSummary errors={formErrors} show={formSubmitted} />
