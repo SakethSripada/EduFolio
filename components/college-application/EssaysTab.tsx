@@ -27,6 +27,7 @@ import { RequiredLabel } from "@/components/ui/required-label"
 import { FormErrorSummary } from "@/components/ui/form-error-summary"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
+import parse from "html-react-parser"
 
 type Essay = {
   id: string
@@ -1871,8 +1872,9 @@ export default function EssaysTab() {
                     ) : (
                       <div 
                         className="prose prose-sm max-w-none dark:text-foreground"
-                        dangerouslySetInnerHTML={{ __html: renderSafeHTML(essay.content || "") }}
-                      />
+                      >
+                        {parse(renderSafeHTML(essay.content || ""))}
+                      </div>
                     )}
                   </CardContent>
                 

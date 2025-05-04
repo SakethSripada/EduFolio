@@ -7,6 +7,7 @@ import Navbar from "@/components/layout/Navbar"
 import Footer from "@/components/layout/Footer"
 import { AuthProvider } from "@/components/auth/AuthProvider"
 import { Toaster } from "@/components/ui/toaster"
+import Script from "next/script"
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' })
 const merriweather = Merriweather({ subsets: ["latin"], weight: ['300', '400', '700', '900'], variable: '--font-merriweather' })
@@ -23,32 +24,6 @@ export const metadata: Metadata = {
     generator: 'v0.dev'
 }
 
-// This script runs before any content to set the theme 
-// and prevent theme flash on initial load
-const themeScript = `
-  (function() {
-    try {
-      // Try to get the theme from localStorage
-      const storedTheme = localStorage.getItem('theme');
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      
-      // Logic to determine which theme to use
-      let theme;
-      if (storedTheme === 'dark' || (storedTheme === 'system' && systemPrefersDark) || (!storedTheme && systemPrefersDark)) {
-        document.documentElement.classList.add('dark');
-        theme = 'dark';
-      } else {
-        document.documentElement.classList.remove('dark');
-        theme = 'light';
-      }
-      
-      localStorage.setItem('theme', theme);
-    } catch (e) {
-      console.error('Error setting initial theme', e);
-    }
-  })()
-`;
-
 export default function RootLayout({
   children,
 }: {
@@ -57,7 +32,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <Script
+          id="theme-script"
+          strategy="beforeInteractive"
+          src="/theme-script.js"
+        />
       </head>
       <body className={`${inter.variable} ${merriweather.variable} ${roboto.variable} ${playfairDisplay.variable} ${montserrat.variable} ${lora.variable} ${sourceSansPro.variable}`}>
         <AuthProvider>

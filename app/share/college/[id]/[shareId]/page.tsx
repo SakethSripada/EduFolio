@@ -9,6 +9,7 @@ import { ArrowLeft, Loader2, School, GraduationCap } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import DOMPurify from "dompurify"
+import parse from "html-react-parser"
 
 export default function SharedCollegeProfilePage({ params }: { params: { id: string; shareId: string } }) {
   const [collegeData, setCollegeData] = useState<any>(null)
@@ -322,8 +323,9 @@ export default function SharedCollegeProfilePage({ params }: { params: { id: str
                             <div className="prose prose-sm dark:prose-invert max-w-none p-4 bg-muted/50 rounded-md">
                               <div 
                                 className="essay-content text-foreground dark:text-foreground" 
-                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(essay.content) }}
-                              />
+                              >
+                                {parse(DOMPurify.sanitize(essay.content))}
+                              </div>
                             </div>
                             <p className="text-xs text-muted-foreground">Word Count: {essay.word_count}</p>
                           </div>
