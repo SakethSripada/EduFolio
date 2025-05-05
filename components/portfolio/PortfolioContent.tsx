@@ -724,45 +724,70 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        const newCategoryData = {
-          id: categoryId,
-          user_id: user.id,
-          name: newCategory.trim(),
-          icon: "FileText", // Default icon
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
+    // Show temporary loading indicator in the state immediately
+    const tempCategory = {
+      id: categoryId,
+      user_id: user.id,
+      name: newCategory.trim(),
+      icon: "FileText",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      isTemporary: true
+    }
+    
+    // Optimistic UI update - add to the state immediately
+    setCategories(prev => [...prev, tempCategory]);
+    
+    // Clear input field immediately for better UX
+    const categoryNameToShow = newCategory.trim();
+    setNewCategory("");
 
-        const { data, error } = await supabase.from("categories").insert(newCategoryData).select()
+    try {
+      const newCategoryData = {
+        id: categoryId,
+        user_id: user.id,
+        name: categoryNameToShow,
+        icon: "FileText", // Default icon
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
 
-        if (error) throw error
+      const { data, error } = await supabase.from("categories").insert(newCategoryData).select();
 
-        return data
-      },
-      setIsLoading,
-      (data) => {
-        if (data && data.length > 0) {
-          setCategories([...categories, data[0]])
-          setNewCategory("")
-          toast({
-            title: "Category added",
-            description: `"${newCategory.trim()}" has been added to your categories.`,
-          })
-        } else {
-          throw new Error("No data returned after inserting category")
-        }
-      },
-      (error) => {
-        console.error("Error adding category:", error)
+      if (error) {
+        // Remove temporary category if there was an error
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        console.error("Error adding category:", error);
         toast({
           title: "Error adding category",
           description: handleSupabaseError(error, "There was a problem adding your category."),
           variant: "destructive",
-        })
-      },
-    )
+        });
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Replace the temporary entry with the real one
+        setCategories(prev => prev.map(c => c.id === categoryId ? data[0] : c));
+        toast({
+          title: "Category added",
+          description: `"${categoryNameToShow}" has been added to your categories.`,
+        });
+      } else {
+        // If there's no data back, remove the temporary entry
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        throw new Error("No data returned after inserting category");
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      // Remove temporary category
+      setCategories(prev => prev.filter(c => c.id !== categoryId));
+      toast({
+        title: "Error adding category",
+        description: "There was a problem adding your category.",
+        variant: "destructive",
+      });
+    }
   }
 
   // Update the deleteCategory function
@@ -783,51 +808,56 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        // First, check if the category exists and belongs to this user
-        const { data: categoryExists, error: checkError } = await supabase
-          .from("categories")
-          .select("id")
-          .eq("id", categoryId)
-          .eq("user_id", user.id)
-          .single();
+    // Close the confirmation dialog immediately
+    setConfirmDeleteCategory(null)
+    
+    // Optimistic UI update - remove from state immediately
+    const categoryToDelete = categories.find(c => c.id === categoryId);
+    const previousCategories = [...categories];
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    
+    try {
+      // First, check if the category exists and belongs to this user
+      const { data: categoryExists, error: checkError } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("id", categoryId)
+        .eq("user_id", user.id)
+        .single();
 
-        if (checkError) {
-          if (checkError.code === 'PGRST116') { // Code for "no rows returned" in single()
-            throw new Error(`Category with ID ${categoryId} not found or doesn't belong to this user`);
-          }
-          throw checkError;
+      if (checkError) {
+        if (checkError.code === 'PGRST116') { // Code for "no rows returned" in single()
+          throw new Error(`Category with ID ${categoryId} not found or doesn't belong to this user`);
         }
+        throw checkError;
+      }
 
-        // If we got here, the category exists and belongs to the user - proceed with deletion
-        const { error } = await supabase
-          .from("categories")
-          .delete()
-          .eq("id", categoryId)
-          .eq("user_id", user.id);
+      // If we got here, the category exists and belongs to the user - proceed with deletion
+      const { error } = await supabase
+        .from("categories")
+        .delete()
+        .eq("id", categoryId)
+        .eq("user_id", user.id);
 
-        if (error) throw error;
-      },
-      setIsLoading,
-      () => {
-        setCategories(categories.filter((c) => c.id !== categoryId))
-        toast({
-          title: "Category deleted",
-          description: "The category has been deleted.",
-        })
-        setConfirmDeleteCategory(null)
-      },
-      (error) => {
-        console.error("Error deleting category:", error)
-        toast({
-          title: "Error deleting category",
-          description: handleSupabaseError(error, "There was a problem deleting the category."),
-          variant: "destructive",
-        })
-        setConfirmDeleteCategory(null)
-      },
-    )
+      if (error) throw error;
+
+      // If we get here, deletion was successful - show toast
+      toast({
+        title: "Category deleted",
+        description: `"${categoryToDelete?.name || 'Category'}" has been deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      
+      // Restore the category in state if there was an error
+      setCategories(previousCategories);
+      
+      toast({
+        title: "Error deleting category",
+        description: handleSupabaseError(error, "There was a problem deleting the category."),
+        variant: "destructive",
+      });
+    }
   }
 
   const copyShareLink = () => {
@@ -912,14 +942,17 @@ export const PortfolioContent = ({
         {/* Category Management Dialog */}
         <Dialog open={isManagingCategories} onOpenChange={setIsManagingCategories}>
           <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
+            <DialogHeader className="mb-4">
               <DialogTitle>Manage Categories</DialogTitle>
-              <DialogDescription>Add, edit, or remove project categories.</DialogDescription>
+              <DialogDescription className="mt-1.5">Add, edit, or remove project categories.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="flex items-end gap-2">
+              <form onSubmit={(e) => {
+                e.preventDefault(); // Prevent form submission which causes page refresh
+                handleAddCategory();
+              }} className="flex items-end gap-2">
                 <div className="flex-grow">
-                  <Label htmlFor="newCategory" className="mb-2">
+                  <Label htmlFor="newCategory" className="block mb-2">
                     New Category
                   </Label>
                   <Input
@@ -929,30 +962,50 @@ export const PortfolioContent = ({
                     placeholder="Enter category name"
                   />
                 </div>
-                <Button onClick={handleAddCategory}>Add</Button>
-              </div>
+                <Button type="submit">Add</Button>
+              </form>
 
-              <div className="border rounded-md">
+              <div className="border rounded-md mt-6">
                 <div className="py-2 px-4 border-b bg-muted/50">
                   <h3 className="font-medium">Current Categories</h3>
                 </div>
-                <ul className="divide-y">
-                  {categories.map((category) => (
-                    <li key={category.id} className="flex items-center justify-between py-3 px-4">
-                      <div className="flex items-center">
-                        {getCategoryIcon(category.id)}
-                        <span>{category.name}</span>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => setConfirmDeleteCategory(category.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
+                {categories.length > 0 ? (
+                  <ul className="divide-y max-h-[300px] overflow-y-auto">
+                    {categories.map((category) => (
+                      <li key={category.id} className="flex items-center justify-between py-3 px-4">
+                        <div className="flex items-center">
+                          {getCategoryIcon(category.id)}
+                          <span>{category.name}</span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent bubbling 
+                            setConfirmDeleteCategory(category.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="py-4 px-4 text-center text-muted-foreground">
+                    No categories found. Add your first category above.
+                  </div>
+                )}
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={() => setIsManagingCategories(false)}>Done</Button>
+            <DialogFooter className="mt-2 pt-2 border-t">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsManagingCategories(false)}
+              >
+                Done
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1439,7 +1492,11 @@ export const PortfolioContent = ({
         description="Are you sure you want to delete this category? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
-        onConfirm={() => confirmDeleteCategory && deleteCategory(confirmDeleteCategory)}
+        onConfirm={() => {
+          if (confirmDeleteCategory) {
+            deleteCategory(confirmDeleteCategory);
+          }
+        }}
       />
     </>
   )
