@@ -217,6 +217,7 @@ export const PortfolioContent = ({
     if (!user?.id) return;
   
     const fetchData = async () => {
+      console.log("Fetching categories for user:", user.id);
       performDatabaseOperation(
         async () => {
           const [{ data: catData, error: catErr }, { data: projData, error: projErr }] = await Promise.all([
@@ -234,18 +235,53 @@ export const PortfolioContent = ({
   
           if (catErr) throw catErr;
           if (projErr) throw projErr;
-  
+
+          console.log("Categories fetched:", catData?.length || 0, "items");
+          
           return {
             categories: catData || [],
             projects: projData || [],
           };
         },
         setIsLoading,
-        (data) => {
+        async (data) => {
           if (data.categories.length) {
+            console.log("Using existing categories from database");
             setCategories(data.categories);
           } else {
-            // insert your defaults...
+            console.log("No categories found, creating defaults");
+            // Insert default categories for new users
+            const defaultCategories = [
+              { id: "coding", name: "Coding", icon: "Code", user_id: user.id },
+              { id: "research", name: "Research", icon: "FileText", user_id: user.id },
+              { id: "business", name: "Business", icon: "Briefcase", user_id: user.id },
+              { id: "engineering", name: "Engineering", icon: "Lightbulb", user_id: user.id },
+              { id: "art", name: "Art & Design", icon: "ImageIcon", user_id: user.id },
+              { id: "photography", name: "Photography", icon: "Camera", user_id: user.id },
+            ];
+
+            try {
+              const { data: insertedCategories, error } = await supabase
+                .from("categories")
+                .insert(defaultCategories)
+                .select();
+              
+              if (error) {
+                console.error("Error creating default categories:", error);
+                toast({
+                  title: "Warning",
+                  description: "Could not create default categories. Some features may be limited.",
+                  variant: "destructive",
+                });
+              } else {
+                // If successful, update the categories state
+                setCategories(insertedCategories || defaultCategories);
+              }
+            } catch (err) {
+              console.error("Error inserting default categories:", err);
+              // Still set the default categories in the state even if DB insert fails
+              setCategories(defaultCategories);
+            }
           }
           setProjects(data.projects);
         },
@@ -395,99 +431,113 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        // Upload image if exists
-        let imagePath = "/placeholder.svg?height=400&width=600"
-        if (newProject.image) {
-          const fileExt = newProject.image.name.split(".").pop()
-          const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-          const filePath = `${user.id}/projects/${fileName}`
+    // Create a temporary project with a temporary ID
+    const tempId = `temp-${Math.random().toString(36).substring(2, 15)}`;
+    const tempProject = {
+      id: tempId,
+      user_id: user.id,
+      title: newProject.title,
+      description: newProject.description,
+      category: newProject.category,
+      tags: newProject.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      link: newProject.link,
+      image: newProject.imagePreview || "/placeholder.svg?height=400&width=600",
+      gallery: newProject.gallery.map(g => g.preview),
+      date: new Date().toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+      isTemporary: true,
+    };
 
-          const { error: uploadError } = await supabase.storage
-            .from("project-images")
-            .upload(filePath, newProject.image)
+    // Optimistic UI update - add to state immediately
+    setProjects([tempProject, ...projects]);
+    
+    // Reset form and close modal immediately for better UX
+    resetProjectForm();
+    setIsAddingProject(false);
+    setFormSubmitted(false);
 
-          if (uploadError) throw uploadError
+    try {
+      // Upload image if exists
+      let imagePath = "/placeholder.svg?height=400&width=600";
+      if (newProject.image) {
+        const fileExt = newProject.image.name.split(".").pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${user.id}/projects/${fileName}`;
 
-          const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-          imagePath = data.publicUrl
-        }
+        const { error: uploadError } = await supabase.storage
+          .from("project-images")
+          .upload(filePath, newProject.image);
 
-        // Upload gallery images if exist
-        const galleryPaths: string[] = []
-        if (newProject.gallery.length > 0) {
-          for (const item of newProject.gallery) {
-            if (item.file) {
-              const fileExt = item.file.name.split(".").pop()
-              const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-              const filePath = `${user.id}/gallery/${fileName}`
+        if (uploadError) throw uploadError;
 
-              const { error: uploadError } = await supabase.storage.from("project-images").upload(filePath, item.file)
+        const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+        imagePath = data.publicUrl;
+      }
 
-              if (uploadError) throw uploadError
+      // Upload gallery images if exist
+      const galleryPaths: string[] = [];
+      if (newProject.gallery.length > 0) {
+        for (const item of newProject.gallery) {
+          if (item.file) {
+            const fileExt = item.file.name.split(".").pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+            const filePath = `${user.id}/gallery/${fileName}`;
 
-              const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-              galleryPaths.push(data.publicUrl)
-            }
+            const { error: uploadError } = await supabase.storage.from("project-images").upload(filePath, item.file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+            galleryPaths.push(data.publicUrl);
           }
         }
+      }
 
-        // Create project in database
-        const projectToAdd = {
-          user_id: user.id,
-          title: newProject.title,
-          description: newProject.description,
-          category: newProject.category,
-          tags: newProject.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          link: newProject.link,
-          image: imagePath,
-          gallery: galleryPaths.length > 0 ? galleryPaths : [],
-          date: new Date().toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-          }),
-        }
+      // Create project in database
+      const projectToAdd = {
+        user_id: user.id,
+        title: tempProject.title,
+        description: tempProject.description,
+        category: tempProject.category,
+        tags: tempProject.tags,
+        link: tempProject.link,
+        image: imagePath,
+        gallery: galleryPaths.length > 0 ? galleryPaths : [],
+        date: tempProject.date,
+      };
 
-        const { data, error } = await supabase.from("projects").insert(projectToAdd).select()
+      const { data, error } = await supabase.from("projects").insert(projectToAdd).select();
 
-        if (error) throw error
+      if (error) throw error;
 
-        return data
-      },
-      setIsLoading,
-      (data) => {
-        if (data) {
-          // First update the data
-          setProjects([data[0], ...projects])
-          
-          // Then reset form and close the modal with a small delay to prevent reopening
-          resetProjectForm()
-          
-          // Use a timeout to ensure state updates don't conflict
-          setTimeout(() => {
-            setIsAddingProject(false)
-            setFormSubmitted(false)
-          }, 0)
-          
-          toast({
-            title: "Project added",
-            description: "Your project has been added successfully.",
-          })
-        }
-      },
-      (error) => {
-        console.error("Error adding project:", error)
+      if (data && data.length > 0) {
+        // Replace temporary project with real one
+        setProjects(prev => prev.map(p => p.id === tempId ? data[0] : p));
+        
         toast({
-          title: "Error adding project",
-          description: handleSupabaseError(error, "There was a problem adding your project."),
-          variant: "destructive",
-        })
-      },
-    )
+          title: "Project added",
+          description: "Your project has been added successfully.",
+        });
+      } else {
+        throw new Error("No data returned after adding project");
+      }
+    } catch (error) {
+      console.error("Error adding project:", error);
+      
+      // Remove temporary project on error
+      setProjects(prev => prev.filter(p => p.id !== tempId));
+      
+      toast({
+        title: "Error adding project",
+        description: handleSupabaseError(error, "There was a problem adding your project."),
+        variant: "destructive",
+      });
+    }
   }
 
   const handleEditProject = async () => {
@@ -499,114 +549,127 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        const projectToUpdate = projects.find((p) => p.id === editingProjectId)
+    // Get the current version of the project
+    const currentProject = projects.find(p => p.id === editingProjectId);
+    if (!currentProject) return;
+    
+    // Create the updated project for optimistic update
+    const updatedProject = {
+      ...currentProject,
+      title: newProject.title,
+      description: newProject.description,
+      category: newProject.category,
+      tags: newProject.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      link: newProject.link,
+      // Keep the existing image for now
+      updated_at: new Date().toISOString(),
+      isUpdating: true,
+    };
+    
+    // Save previous state for restoration if needed
+    const previousProjects = [...projects];
+    
+    // Optimistic UI update - update state immediately
+    setProjects(prev => prev.map(p => p.id === editingProjectId ? updatedProject : p));
+    
+    // Reset form and close the dialog immediately
+    resetProjectForm();
+    setIsEditingProject(false);
+    setEditingProjectId(null);
+    setFormSubmitted(false);
 
-        // Upload image if changed
-        let imagePath = projectToUpdate.image
-        if (newProject.image) {
-          const fileExt = newProject.image.name.split(".").pop()
-          const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-          const filePath = `${user.id}/projects/${fileName}`
+    try {
+      // Upload image if changed
+      let imagePath = currentProject.image;
+      if (newProject.image) {
+        const fileExt = newProject.image.name.split(".").pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${user.id}/projects/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("project-images")
-            .upload(filePath, newProject.image)
+        const { error: uploadError } = await supabase.storage
+          .from("project-images")
+          .upload(filePath, newProject.image);
 
-          if (uploadError) throw uploadError
+        if (uploadError) throw uploadError;
 
-          const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-          imagePath = data.publicUrl
-        }
+        const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+        imagePath = data.publicUrl;
+      }
 
-        // Upload new gallery images if exist
-        let galleryPaths = projectToUpdate.gallery || []
-        if (newProject.gallery.length > 0) {
-          // Only upload new images (those with file property)
-          const newImages = newProject.gallery.filter((item) => item.file)
+      // Upload new gallery images if exist
+      let galleryPaths = currentProject.gallery || [];
+      if (newProject.gallery.length > 0) {
+        // Only upload new images (those with file property)
+        const newImages = newProject.gallery.filter((item) => item.file);
 
-          if (newImages.length > 0) {
-            galleryPaths = [] // Reset if we have new images
+        if (newImages.length > 0) {
+          galleryPaths = []; // Reset if we have new images
 
-            for (const item of newProject.gallery) {
-              if (item.file) {
-                const fileExt = item.file.name.split(".").pop()
-                const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-                const filePath = `${user.id}/gallery/${fileName}`
+          for (const item of newProject.gallery) {
+            if (item.file) {
+              const fileExt = item.file.name.split(".").pop();
+              const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+              const filePath = `${user.id}/gallery/${fileName}`;
 
-                const { error: uploadError } = await supabase.storage
-                  .from("project-images")
-                  .upload(filePath, item.file)
+              const { error: uploadError } = await supabase.storage
+                .from("project-images")
+                .upload(filePath, item.file);
 
-                if (uploadError) throw uploadError
+              if (uploadError) throw uploadError;
 
-                const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-                galleryPaths.push(data.publicUrl)
-              } else if (item.preview.startsWith("http")) {
-                // Keep existing gallery images
-                galleryPaths.push(item.preview)
-              }
+              const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+              galleryPaths.push(data.publicUrl);
+            } else if (item.preview.startsWith("http")) {
+              // Keep existing gallery images
+              galleryPaths.push(item.preview);
             }
           }
         }
+      }
 
-        // Update project in database
-        const projectUpdates = {
-          title: newProject.title,
-          description: newProject.description,
-          category: newProject.category,
-          tags: newProject.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          link: newProject.link,
-          image: imagePath,
-          gallery: galleryPaths,
-          updated_at: new Date().toISOString(),
-        }
+      // Update project in database
+      const projectUpdates = {
+        title: newProject.title,
+        description: newProject.description,
+        category: newProject.category,
+        tags: newProject.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        link: newProject.link,
+        image: imagePath,
+        gallery: galleryPaths,
+        updated_at: new Date().toISOString(),
+      };
 
-        const { error } = await supabase.from("projects").update(projectUpdates).eq("id", editingProjectId)
+      const { error, data } = await supabase.from("projects").update(projectUpdates).eq("id", editingProjectId).select();
 
-        if (error) throw error
+      if (error) throw error;
 
-        return { projectUpdates }
-      },
-      setIsLoading,
-      (data) => {
-        // First update the projects data
-        setProjects(
-          projects.map((project) => {
-            if (project.id === editingProjectId) {
-              return { ...project, ...data.projectUpdates }
-            }
-            return project
-          }),
-        )
-
-        // Reset form first
-        resetProjectForm()
-        
-        // Use a timeout to ensure state updates don't conflict
-        setTimeout(() => {
-          setIsEditingProject(false)
-          setEditingProjectId(null)
-        }, 0)
-        
-        toast({
-          title: "Project updated",
-          description: "Your project has been updated successfully.",
-        })
-      },
-      (error) => {
-        console.error("Error updating project:", error)
-        toast({
-          title: "Error updating project",
-          description: handleSupabaseError(error, "There was a problem updating your project."),
-          variant: "destructive",
-        })
-      },
-    )
+      if (data && data.length > 0) {
+        // Update with the actual data from server
+        setProjects(prev => prev.map(p => p.id === editingProjectId ? data[0] : p));
+      }
+      
+      toast({
+        title: "Project updated",
+        description: "Your project has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating project:", error);
+      
+      // Restore previous projects on error
+      setProjects(previousProjects);
+      
+      toast({
+        title: "Error updating project",
+        description: handleSupabaseError(error, "There was a problem updating your project."),
+        variant: "destructive",
+      });
+    }
   }
 
   const startEditProject = (projectId: string) => {
@@ -631,31 +694,37 @@ export const PortfolioContent = ({
   const deleteProject = async (projectId: string) => {
     if (!user) return
 
-    performDatabaseOperation(
-      async () => {
-        const { error } = await supabase.from("projects").delete().eq("id", projectId)
+    // Close confirmation dialog immediately
+    setConfirmDeleteProject(null);
+    
+    // Save the project before removing it (for restoration if needed)
+    const projectToDelete = projects.find(p => p.id === projectId);
+    const previousProjects = [...projects];
+    
+    // Optimistic UI update - remove from state immediately
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    
+    try {
+      const { error } = await supabase.from("projects").delete().eq("id", projectId);
 
-        if (error) throw error
-      },
-      setIsLoading,
-      () => {
-        setProjects(projects.filter((p) => p.id !== projectId))
-        toast({
-          title: "Project deleted",
-          description: "Your project has been deleted.",
-        })
-        setConfirmDeleteProject(null)
-      },
-      (error) => {
-        console.error("Error deleting project:", error)
-        toast({
-          title: "Error deleting project",
-          description: handleSupabaseError(error, "There was a problem deleting your project."),
-          variant: "destructive",
-        })
-        setConfirmDeleteProject(null)
-      },
-    )
+      if (error) throw error;
+      
+      toast({
+        title: "Project deleted",
+        description: "Your project has been deleted.",
+      });
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      
+      // Restore the project in state if there was an error
+      setProjects(previousProjects);
+      
+      toast({
+        title: "Error deleting project",
+        description: handleSupabaseError(error, "There was a problem deleting your project."),
+        variant: "destructive",
+      });
+    }
   }
 
   const resetProjectForm = () => {
@@ -676,8 +745,10 @@ export const PortfolioContent = ({
   const handleAddCategory = async () => {
     if (!user || !newCategory.trim()) return
 
+    console.log("Adding new category:", newCategory);
     const categoryId = newCategory.toLowerCase().replace(/\s+/g, "-")
     if (categories.some((c) => c.id === categoryId)) {
+      console.log("Category already exists:", categoryId);
       toast({
         title: "Category already exists",
         description: "Please use a different name for your category.",
@@ -686,49 +757,81 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        const newCategoryData = {
-          id: categoryId,
-          user_id: user.id,
-          name: newCategory.trim(),
-          icon: "FileText", // Default icon
-        }
+    // Show temporary loading indicator in the state immediately
+    const tempCategory = {
+      id: categoryId,
+      user_id: user.id,
+      name: newCategory.trim(),
+      icon: "FileText",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      isTemporary: true
+    }
+    
+    // Optimistic UI update - add to the state immediately
+    setCategories(prev => [...prev, tempCategory]);
+    
+    // Clear input field immediately for better UX
+    const categoryNameToShow = newCategory.trim();
+    setNewCategory("");
 
-        const { data, error } = await supabase.from("categories").insert(newCategoryData).select()
+    try {
+      const newCategoryData = {
+        id: categoryId,
+        user_id: user.id,
+        name: categoryNameToShow,
+        icon: "FileText", // Default icon
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
 
-        if (error) throw error
+      const { data, error } = await supabase.from("categories").insert(newCategoryData).select();
 
-        return data
-      },
-      setIsLoading,
-      (data) => {
-        if (data) {
-          setCategories([...categories, data[0]])
-          setNewCategory("")
-          toast({
-            title: "Category added",
-            description: `"${newCategory.trim()}" has been added to your categories.`,
-          })
-        }
-      },
-      (error) => {
-        console.error("Error adding category:", error)
+      if (error) {
+        // Remove temporary category if there was an error
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        console.error("Error adding category:", error);
         toast({
           title: "Error adding category",
           description: handleSupabaseError(error, "There was a problem adding your category."),
           variant: "destructive",
-        })
-      },
-    )
+        });
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Replace the temporary entry with the real one
+        setCategories(prev => prev.map(c => c.id === categoryId ? data[0] : c));
+        toast({
+          title: "Category added",
+          description: `"${categoryNameToShow}" has been added to your categories.`,
+        });
+      } else {
+        // If there's no data back, remove the temporary entry
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        throw new Error("No data returned after inserting category");
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      // Remove temporary category
+      setCategories(prev => prev.filter(c => c.id !== categoryId));
+      toast({
+        title: "Error adding category",
+        description: "There was a problem adding your category.",
+        variant: "destructive",
+      });
+    }
   }
 
   // Update the deleteCategory function
   const deleteCategory = async (categoryId: string) => {
     if (!user) return
 
+    console.log("Attempting to delete category:", categoryId);
+    
     // Don't delete if there are projects using this category
     if (projects.some((p) => p.category === categoryId)) {
+      console.log("Cannot delete category - projects are using it");
       toast({
         title: "Cannot delete category",
         description: "There are projects using this category. Please reassign or delete those projects first.",
@@ -738,31 +841,56 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        const { error } = await supabase.from("categories").delete().eq("id", categoryId).eq("user_id", user.id)
+    // Close the confirmation dialog immediately
+    setConfirmDeleteCategory(null)
+    
+    // Optimistic UI update - remove from state immediately
+    const categoryToDelete = categories.find(c => c.id === categoryId);
+    const previousCategories = [...categories];
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    
+    try {
+      // First, check if the category exists and belongs to this user
+      const { data: categoryExists, error: checkError } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("id", categoryId)
+        .eq("user_id", user.id)
+        .single();
 
-        if (error) throw error
-      },
-      setIsLoading,
-      () => {
-        setCategories(categories.filter((c) => c.id !== categoryId))
-        toast({
-          title: "Category deleted",
-          description: "The category has been deleted.",
-        })
-        setConfirmDeleteCategory(null)
-      },
-      (error) => {
-        console.error("Error deleting category:", error)
-        toast({
-          title: "Error deleting category",
-          description: handleSupabaseError(error, "There was a problem deleting the category."),
-          variant: "destructive",
-        })
-        setConfirmDeleteCategory(null)
-      },
-    )
+      if (checkError) {
+        if (checkError.code === 'PGRST116') { // Code for "no rows returned" in single()
+          throw new Error(`Category with ID ${categoryId} not found or doesn't belong to this user`);
+        }
+        throw checkError;
+      }
+
+      // If we got here, the category exists and belongs to the user - proceed with deletion
+      const { error } = await supabase
+        .from("categories")
+        .delete()
+        .eq("id", categoryId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      // If we get here, deletion was successful - show toast
+      toast({
+        title: "Category deleted",
+        description: `"${categoryToDelete?.name || 'Category'}" has been deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      
+      // Restore the category in state if there was an error
+      setCategories(previousCategories);
+      
+      toast({
+        title: "Error deleting category",
+        description: handleSupabaseError(error, "There was a problem deleting the category."),
+        variant: "destructive",
+      });
+    }
   }
 
   const copyShareLink = () => {
@@ -847,14 +975,17 @@ export const PortfolioContent = ({
         {/* Category Management Dialog */}
         <Dialog open={isManagingCategories} onOpenChange={setIsManagingCategories}>
           <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
+            <DialogHeader className="mb-4">
               <DialogTitle>Manage Categories</DialogTitle>
-              <DialogDescription>Add, edit, or remove project categories.</DialogDescription>
+              <DialogDescription className="mt-1.5">Add, edit, or remove project categories.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="flex items-end gap-2">
+              <form onSubmit={(e) => {
+                e.preventDefault(); // Prevent form submission which causes page refresh
+                handleAddCategory();
+              }} className="flex items-end gap-2">
                 <div className="flex-grow">
-                  <Label htmlFor="newCategory" className="mb-2">
+                  <Label htmlFor="newCategory" className="block mb-2">
                     New Category
                   </Label>
                   <Input
@@ -864,30 +995,50 @@ export const PortfolioContent = ({
                     placeholder="Enter category name"
                   />
                 </div>
-                <Button onClick={handleAddCategory}>Add</Button>
-              </div>
+                <Button type="submit">Add</Button>
+              </form>
 
-              <div className="border rounded-md">
+              <div className="border rounded-md mt-6">
                 <div className="py-2 px-4 border-b bg-muted/50">
                   <h3 className="font-medium">Current Categories</h3>
                 </div>
-                <ul className="divide-y">
-                  {categories.map((category) => (
-                    <li key={category.id} className="flex items-center justify-between py-3 px-4">
-                      <div className="flex items-center">
-                        {getCategoryIcon(category.id)}
-                        <span>{category.name}</span>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => setConfirmDeleteCategory(category.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
+                {categories.length > 0 ? (
+                  <ul className="divide-y max-h-[300px] overflow-y-auto">
+                    {categories.map((category) => (
+                      <li key={category.id} className="flex items-center justify-between py-3 px-4">
+                        <div className="flex items-center">
+                          {getCategoryIcon(category.id)}
+                          <span>{category.name}</span>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault(); // Prevent bubbling 
+                            setConfirmDeleteCategory(category.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="py-4 px-4 text-center text-muted-foreground">
+                    No categories found. Add your first category above.
+                  </div>
+                )}
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={() => setIsManagingCategories(false)}>Done</Button>
+            <DialogFooter className="mt-2 pt-2 border-t">
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => setIsManagingCategories(false)}
+              >
+                Done
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1364,7 +1515,11 @@ export const PortfolioContent = ({
         description="Are you sure you want to delete this project? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel" 
-        onConfirm={() => confirmDeleteProject && deleteProject(confirmDeleteProject)}
+        onConfirm={() => {
+          if (confirmDeleteProject) {
+            deleteProject(confirmDeleteProject);
+          }
+        }}
       />
 
       <ConfirmationDialog
@@ -1374,7 +1529,11 @@ export const PortfolioContent = ({
         description="Are you sure you want to delete this category? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
-        onConfirm={() => confirmDeleteCategory && deleteCategory(confirmDeleteCategory)}
+        onConfirm={() => {
+          if (confirmDeleteCategory) {
+            deleteCategory(confirmDeleteCategory);
+          }
+        }}
       />
     </>
   )

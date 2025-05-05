@@ -27,7 +27,8 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     fontSize: 'medium',
     spacing: 'comfortable',
     backgroundColor: '#ffffff',
-    textColor: '#000000'
+    textColor: '#000000',
+    columnLayout: 'single'
   }
   const settings = content || {
     showDates: true,
@@ -96,12 +97,23 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   
   // Muted text color for secondary elements
   const mutedTextColor = useMemo(() => {
+    // If custom muted color is set, use it
+    if (style.mutedTextColor) {
+      return style.mutedTextColor;
+    }
+    
     // If there's a text color set, create a slightly muted version
     if (style.textColor) {
       return style.textColor + '99'; // Add 60% opacity
     }
+    
     return isDarkBackground ? '#cccccc' : '#666666'
-  }, [style.textColor, isDarkBackground])
+  }, [style.textColor, isDarkBackground, style.mutedTextColor])
+  
+  // Link color
+  const linkColor = useMemo(() => {
+    return style.linkColor || style.primaryColor || '#4f46e5';
+  }, [style.linkColor, style.primaryColor])
   
   // Apply the lineHeight setting
   const lineHeightClass = useMemo(() => {
@@ -149,6 +161,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   
   // Get heading color
   const headingColorStyle = useMemo(() => {
+    // If there's a specific heading color, use it
+    if (style.headingColor) {
+      return { color: style.headingColor };
+    }
+    
     // If there's a primary color, use it for headings
     const primaryColor = style.primaryColor || '#4f46e5'
     
@@ -166,7 +183,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     return { 
       color: isDarkBackground ? '#ffffff' : primaryColor 
     }
-  }, [style.primaryColor, style.textColor, isDarkBackground, style.headerStyle])
+  }, [style.primaryColor, style.textColor, isDarkBackground, style.headerStyle, style.headingColor])
   
   // Generate spacing class based on style
   const spacingClass = useMemo(() => {
@@ -279,7 +296,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     
     switch (sectionLayout) {
       case 'boxed':
-        return 'p-4 bg-gray-50 rounded-md shadow-sm dark:bg-gray-800';
+        return 'p-4 rounded-md shadow-sm';
       case 'bordered':
         return 'p-4 border rounded-md';
       case 'left-border':
@@ -302,7 +319,39 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       return { borderColor: `${primaryColor}30` };
     }
     
+    if (sectionLayout === 'boxed') {
+      // Use custom box background color if set, otherwise use a light gray
+      const boxBgColor = style.boxBgColor || '#f3f4f6';
+      
+      // Determine if the background is dark by checking its brightness
+      const isDarkBoxBg = isColorDark(boxBgColor);
+      
+      return { 
+        backgroundColor: boxBgColor,
+        color: isDarkBoxBg ? '#ffffff' : defaultTextColor
+      };
+    }
+    
     return {};
+  };
+  
+  // Helper function to determine if a color is dark
+  const isColorDark = (hexColor: string) => {
+    if (!hexColor) return false;
+    
+    // Remove the hash if it's there
+    hexColor = hexColor.replace('#', '');
+    
+    // Convert to RGB
+    const r = parseInt(hexColor.substring(0, 2), 16);
+    const g = parseInt(hexColor.substring(2, 4), 16);
+    const b = parseInt(hexColor.substring(4, 6), 16);
+    
+    // Calculate brightness (using perceived luminance)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    
+    // If brightness is less than 128, color is considered dark
+    return brightness < 128;
   };
   
   // Render skills based on display style
@@ -550,12 +599,115 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     }
   };
 
+  // Render a custom section
+  const renderCustomSection = (sectionId: string) => {
+    // Find the custom section by ID
+    const section = customSections.find((s: any) => s.id === sectionId);
+    if (!section) {
+      console.log(`Could not find custom section with ID: ${sectionId}`);
+      return null;
+    }
+    
+    // For debugging
+    console.log(`Rendering custom section:`, { 
+      id: section.id, 
+      title: section.title,
+      itemsCount: section.items?.length || 0 
+    });
+    
+    const sectionContainerClass = getSectionContainerClass();
+    const sectionContainerStyle = getSectionContainerStyle();
+    const primaryColor = style.primaryColor || '#4f46e5';
+    
+    // Check if we're using a dark box background that needs light text
+    const isBoxed = style.sectionLayout === 'boxed';
+    const boxBgColor = style.boxBgColor || '#f3f4f6';
+    const isDarkBox = isBoxed && isColorDark(boxBgColor);
+    
+    // Override text colors if we're in a dark box
+    const sectionTextColor = isDarkBox ? '#ffffff' : defaultTextColor;
+    const sectionMutedColor = isDarkBox ? '#cccccc' : mutedTextColor;
+    const sectionHeadingColor = isDarkBox ? '#ffffff' : headingColorStyle.color;
+    const sectionLinkColor = isDarkBox ? '#8bb9fe' : linkColor;
+    
+    return (
+      <div className={`mb-4 ${sectionContainerClass}`} key={`custom-section-${sectionId}`} style={sectionContainerStyle}>
+        <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
+          {style.sectionIcons && <span className="mr-2">📄</span>}
+          {section.title || "Custom Section"}
+        </h2>
+        
+        {section.description && (
+          <p className="mb-3 text-sm" style={{ color: sectionMutedColor }}>{section.description}</p>
+        )}
+        
+        <div className={`space-y-4 ${lineHeightClass}`}>
+          {section.items && section.items.map((item: any) => (
+            <div key={item.id} className="mb-3">
+              {/* Find and display title field if it exists */}
+              {item.fields && item.fields.find((f: any) => f.type === 'title' && f.value) && (
+                <h3 className="font-semibold" style={{ color: sectionTextColor }}>
+                  {item.fields.find((f: any) => f.type === 'title').value}
+                </h3>
+              )}
+              
+              {/* Display all non-title fields with values */}
+              <div className="space-y-1 mt-1">
+                {item.fields && item.fields
+                  .filter((f: any) => f.type !== 'title' && f.value)
+                  .map((field: any) => (
+                    <div key={field.id} className="flex items-start">
+                      {field.type === 'date' && (
+                        <p className="text-xs" style={{ color: sectionMutedColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                      
+                      {field.type === 'text' && (
+                        <p className="text-sm" style={{ color: sectionTextColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                      
+                      {field.type === 'textarea' && (
+                        <p className="text-xs whitespace-pre-line" style={{ color: sectionTextColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                      
+                      {field.type === 'url' && field.value && (
+                        <p className="text-xs" style={{ color: sectionLinkColor }}>
+                          {field.value}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {style.sectionDivider !== 'none' && getSectionDividerStyle()}
+      </div>
+    );
+  };
+
   // Render standard section with new styling
   const renderStandardSection = (sectionType: string) => {
     const sectionContainerClass = getSectionContainerClass();
     const sectionContainerStyle = getSectionContainerStyle();
     const sectionIcons = style.sectionIcons === true;
     const primaryColor = style.primaryColor || '#4f46e5';
+    
+    // Check if we're using a dark box background that needs light text
+    const isBoxed = style.sectionLayout === 'boxed';
+    const boxBgColor = style.boxBgColor || '#f3f4f6';
+    const isDarkBox = isBoxed && isColorDark(boxBgColor);
+    
+    // Override text colors if we're in a dark box
+    const sectionTextColor = isDarkBox ? '#ffffff' : defaultTextColor;
+    const sectionMutedColor = isDarkBox ? '#cccccc' : mutedTextColor;
+    const sectionHeadingColor = isDarkBox ? '#ffffff' : headingColorStyle.color;
+    const sectionLinkColor = isDarkBox ? '#8bb9fe' : linkColor;
     
     const getSectionIcon = (type: string) => {
       if (!sectionIcons) return null;
@@ -590,11 +742,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'summary':
         return content.summary ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="summary-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('summary')}
               Professional Summary
             </h2>
-            <p className={`whitespace-pre-line ${lineHeightClass}`} style={{ color: defaultTextColor }}>{content.summary}</p>
+            <p className={`whitespace-pre-line ${lineHeightClass}`} style={{ color: sectionTextColor }}>{content.summary}</p>
             {style.sectionDivider !== 'none' && getSectionDividerStyle()}
           </div>
         ) : null;
@@ -602,7 +754,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'experience':
         return experience.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="experience-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('experience')}
               Work Experience
             </h2>
@@ -617,7 +769,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'education':
         return education.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="education-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('education')}
               Education
             </h2>
@@ -627,13 +779,13 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                 <div key={edu.id} className="mb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{edu.institution}</h3>
-                      <p style={{ color: defaultTextColor }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
-                      {edu.location && <p className={`text-xs`} style={{ color: mutedTextColor }}>{edu.location}</p>}
+                      <h3 className="font-semibold" style={{ color: sectionTextColor }}>{edu.institution}</h3>
+                      <p style={{ color: sectionTextColor }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
+                      {edu.location && <p className={`text-xs`} style={{ color: sectionMutedColor }}>{edu.location}</p>}
                     </div>
                     
                     {settings.showDates !== false && (
-                      <div className={`text-right text-xs`} style={{ color: mutedTextColor }}>
+                      <div className={`text-right text-xs`} style={{ color: sectionMutedColor }}>
                         {edu.startDate && (
                           <span>
                             {edu.startDate} - {edu.isCurrent ? 'Present' : edu.endDate}
@@ -645,7 +797,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   </div>
                   
                   {edu.description && (
-                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>{edu.description}</p>
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: sectionTextColor }}>{edu.description}</p>
                   )}
                 </div>
               ))}
@@ -657,7 +809,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'skills':
         return skills.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="skills-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('skills')}
               Skills
             </h2>
@@ -670,7 +822,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'languages':
         return languages.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="languages-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('languages')}
               Languages
             </h2>
@@ -678,8 +830,8 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
             <div className="space-y-2">
               {languages.map((language: any) => (
                 <div key={language.id} className="flex justify-between items-center">
-                  <span style={{ color: defaultTextColor }}>{language.name}</span>
-                  <span style={{ color: mutedTextColor }}>{language.proficiency}</span>
+                  <span style={{ color: sectionTextColor }}>{language.name}</span>
+                  <span style={{ color: sectionMutedColor }}>{language.proficiency}</span>
                 </div>
               ))}
             </div>
@@ -690,7 +842,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'certifications':
         return certifications.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="certifications-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('certifications')}
               Certifications
             </h2>
@@ -700,13 +852,12 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                 <div key={cert.id} className="mb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{cert.name}</h3>
-                      {cert.issuer && <p style={{ color: defaultTextColor }}>{cert.issuer}</p>}
-                      {cert.credentialId && <p className="text-xs" style={{ color: mutedTextColor }}>ID: {cert.credentialId}</p>}
+                      <h3 className="font-semibold" style={{ color: sectionTextColor }}>{cert.name}</h3>
+                      {cert.issuer && <p style={{ color: sectionTextColor }}>{cert.issuer}</p>}
                     </div>
                     
                     {settings.showDates !== false && cert.issueDate && (
-                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                      <div className="text-right text-xs" style={{ color: sectionMutedColor }}>
                         <span>Issued: {cert.issueDate}</span>
                         {cert.expirationDate && <div>Expires: {cert.expirationDate}</div>}
                       </div>
@@ -719,7 +870,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs hover:underline mt-1 inline-block"
-                      style={{ color: primaryColor }}
+                      style={{ color: sectionLinkColor }}
                     >
                       View Credential
                     </a>
@@ -734,7 +885,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'publications':
         return publications.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="publications-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('publications')}
               Publications
             </h2>
@@ -743,27 +894,27 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
               {publications.map((pub: any) => (
                 <div key={pub.id} className="mb-3">
                   <div>
-                    <h3 className="font-semibold" style={{ color: defaultTextColor }}>{pub.title}</h3>
-                    {pub.authors && <p style={{ color: defaultTextColor }}>{pub.authors}</p>}
-                    <p className="text-xs" style={{ color: mutedTextColor }}>
+                    <h3 className="font-semibold" style={{ color: sectionTextColor }}>{pub.title}</h3>
+                    {pub.authors && <p style={{ color: sectionTextColor }}>{pub.authors}</p>}
+                    <p className="text-xs" style={{ color: sectionMutedColor }}>
                       {pub.publication_name && <span>{pub.publication_name}</span>}
                       {pub.publisher && pub.publication_name && <span>, {pub.publisher}</span>}
                       {pub.publisher && !pub.publication_name && <span>{pub.publisher}</span>}
                       {pub.publication_date && <span> ({pub.publication_date})</span>}
                     </p>
                     {pub.description && (
-                      <p className="mt-1 text-xs" style={{ color: defaultTextColor }}>{pub.description}</p>
+                      <p className="mt-1 text-xs" style={{ color: sectionTextColor }}>{pub.description}</p>
                     )}
                     {(pub.doi || pub.url) && (
                       <div className="mt-1 text-xs">
-                        {pub.doi && <span style={{ color: mutedTextColor }}>DOI: {pub.doi}</span>}
+                        {pub.doi && <span style={{ color: sectionMutedColor }}>DOI: {pub.doi}</span>}
                         {pub.url && (
                           <a 
                             href={pub.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="ml-2 hover:underline"
-                            style={{ color: primaryColor }}
+                            style={{ color: sectionLinkColor }}
                           >
                             View Publication
                           </a>
@@ -781,7 +932,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'volunteer':
         return volunteer.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="volunteer-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('volunteer')}
               Volunteer Experience
             </h2>
@@ -791,12 +942,12 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                 <div key={vol.id} className="mb-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{vol.role}</h3>
-                      <p style={{ color: defaultTextColor }}>{vol.organization}{vol.location ? `, ${vol.location}` : ''}</p>
+                      <h3 className="font-semibold" style={{ color: sectionTextColor }}>{vol.role}</h3>
+                      <p style={{ color: sectionTextColor }}>{vol.organization}{vol.location ? `, ${vol.location}` : ''}</p>
                     </div>
                     
                     {settings.showDates !== false && vol.start_date && (
-                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                      <div className="text-right text-xs" style={{ color: sectionMutedColor }}>
                         <span>
                           {vol.start_date} - {vol.is_current ? 'Present' : vol.end_date}
                         </span>
@@ -805,7 +956,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   </div>
                   
                   {vol.description && (
-                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: defaultTextColor }}>
+                    <p className="mt-2 whitespace-pre-line text-xs" style={{ color: sectionTextColor }}>
                       {vol.description}
                     </p>
                   )}
@@ -819,7 +970,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'awards':
         return awards.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="awards-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('awards')}
               Awards & Honors
             </h2>
@@ -829,19 +980,19 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                 <div key={award.id} className="mb-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold" style={{ color: defaultTextColor }}>{award.title}</h3>
-                      {award.issuer && <p style={{ color: defaultTextColor }}>{award.issuer}</p>}
+                      <h3 className="font-semibold" style={{ color: sectionTextColor }}>{award.title}</h3>
+                      {award.issuer && <p style={{ color: sectionTextColor }}>{award.issuer}</p>}
                     </div>
                     
                     {settings.showDates !== false && award.date_received && (
-                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
+                      <div className="text-right text-xs" style={{ color: sectionMutedColor }}>
                         <span>{award.date_received}</span>
                       </div>
                     )}
                   </div>
                   
                   {award.description && (
-                    <p className="mt-1 text-xs" style={{ color: defaultTextColor }}>{award.description}</p>
+                    <p className="mt-1 text-xs" style={{ color: sectionTextColor }}>{award.description}</p>
                   )}
                 </div>
               ))}
@@ -853,7 +1004,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'references':
         return references.length > 0 ? (
           <div className={`mb-4 ${sectionContainerClass}`} key="references-section" style={sectionContainerStyle}>
-            <h2 className={headingClass} style={headingColorStyle}>
+            <h2 className={headingClass} style={{ ...headingColorStyle, color: sectionHeadingColor }}>
               {getSectionIcon('references')}
               References
             </h2>
@@ -861,16 +1012,16 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${lineHeightClass}`}>
               {references.map((ref: any) => (
                 <div key={ref.id} className="p-3 border rounded">
-                  <h3 className="font-semibold" style={{ color: defaultTextColor }}>{ref.name}</h3>
-                  <p style={{ color: defaultTextColor }}>
+                  <h3 className="font-semibold" style={{ color: sectionTextColor }}>{ref.name}</h3>
+                  <p style={{ color: sectionLinkColor }}>
                     {ref.title}{ref.company ? `, ${ref.company}` : ''}
                   </p>
-                  <p className="text-xs mt-1" style={{ color: mutedTextColor }}>
+                  <p className="text-xs mt-1" style={{ color: sectionMutedColor }}>
                     {ref.relationship && <span>{ref.relationship}</span>}
                   </p>
                   <div className="mt-2 text-xs">
-                    {ref.email && <div style={{ color: defaultTextColor }}>Email: {ref.email}</div>}
-                    {ref.phone && <div style={{ color: defaultTextColor }}>Phone: {ref.phone}</div>}
+                    {ref.email && <div style={{ color: sectionTextColor }}>Email: {ref.email}</div>}
+                    {ref.phone && <div style={{ color: sectionTextColor }}>Phone: {ref.phone}</div>}
                   </div>
                 </div>
               ))}
@@ -887,16 +1038,29 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   // Modern template - with bullet points and a different layout
   const renderModernSection = (sectionType: string) => {
     const primaryColor = style.primaryColor || "#8b5cf6";
+    const sectionContainerClass = getSectionContainerClass();
+    const sectionContainerStyle = getSectionContainerStyle();
+    
+    // Check if we're using a dark box background that needs light text
+    const isBoxed = style.sectionLayout === 'boxed';
+    const boxBgColor = style.boxBgColor || '#f3f4f6';
+    const isDarkBox = isBoxed && isColorDark(boxBgColor);
+    
+    // Override text colors if we're in a dark box
+    const sectionTextColor = isDarkBox ? '#ffffff' : defaultTextColor;
+    const sectionMutedColor = isDarkBox ? '#cccccc' : mutedTextColor;
+    const sectionHeadingColor = isDarkBox ? '#ffffff' : (style.headingColor || defaultTextColor);
+    const sectionLinkColor = isDarkBox ? '#8bb9fe' : linkColor;
     
     switch (sectionType) {
       case 'summary':
         return content.summary ? (
-          <div className="mb-5" key="summary-section">
+          <div className={`mb-5 ${sectionContainerClass}`} key="summary-section" style={sectionContainerStyle}>
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Professional Summary</h2>
+              <h2 className="text-lg font-bold" style={{ color: sectionHeadingColor }}>Professional Summary</h2>
             </div>
-            <p className="whitespace-pre-line ml-6" style={{ color: defaultTextColor }}>{content.summary}</p>
+            <p className="whitespace-pre-line ml-6" style={{ color: sectionTextColor }}>{content.summary}</p>
           </div>
         ) : null
       
@@ -905,7 +1069,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="experience-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Work Experience</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Work Experience</h2>
             </div>
             
             <div className="space-y-4 ml-6">
@@ -914,11 +1078,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold" style={{ color: defaultTextColor }}>{exp.position}</h3>
-                      <p style={{ color: primaryColor, fontWeight: 500 }}>{exp.company}{exp.location ? ` | ${exp.location}` : ''}</p>
+                      <p style={{ color: linkColor }}>{exp.company}{exp.location ? ` | ${exp.location}` : ''}</p>
                     </div>
                     
                     {settings.showDates !== false && exp.startDate && (
-                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
                         <span>
                           {exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}
                         </span>
@@ -940,7 +1104,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="education-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Education</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Education</h2>
             </div>
             
             <div className="space-y-4 ml-6">
@@ -949,11 +1113,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold" style={{ color: defaultTextColor }}>{edu.institution}</h3>
-                      <p style={{ color: primaryColor, fontWeight: 500 }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
+                      <p style={{ color: linkColor }}>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
                     </div>
                     
                     {settings.showDates !== false && (
-                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
                         {edu.startDate && (
                           <span>
                             {edu.startDate} - {edu.isCurrent ? 'Present' : edu.endDate}
@@ -978,7 +1142,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="skills-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Skills</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Skills</h2>
             </div>
             
             <div className="flex flex-wrap gap-2 ml-6">
@@ -1003,7 +1167,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="languages-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Languages</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Languages</h2>
             </div>
             
             <div className="space-y-2 ml-6">
@@ -1022,7 +1186,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="certifications-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Certifications</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Certifications</h2>
             </div>
             
             <div className="space-y-4 ml-6">
@@ -1031,11 +1195,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold" style={{ color: defaultTextColor }}>{cert.name}</h3>
-                      <p style={{ color: primaryColor, fontWeight: 500 }}>{cert.issuer}</p>
+                      {cert.issuer && <p style={{ color: primaryColor }}>{cert.issuer}</p>}
                     </div>
                     
                     {settings.showDates !== false && cert.issueDate && (
-                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
                         <span>Issued: {cert.issueDate}</span>
                         {cert.expirationDate && <div>Expires: {cert.expirationDate}</div>}
                       </div>
@@ -1048,7 +1212,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs hover:underline mt-1 inline-block"
-                      style={{ color: primaryColor }}
+                      style={{ color: linkColor }}
                     >
                       View Credential
                     </a>
@@ -1064,7 +1228,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="publications-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Publications</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Publications</h2>
             </div>
             
             <div className="space-y-4 ml-6">
@@ -1091,7 +1255,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="volunteer-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Volunteer Experience</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Volunteer Experience</h2>
             </div>
             
             <div className="space-y-4 ml-6">
@@ -1104,7 +1268,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                     </div>
                     
                     {settings.showDates !== false && vol.start_date && (
-                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
                         <span>
                           {vol.start_date} - {vol.is_current ? 'Present' : vol.end_date}
                         </span>
@@ -1126,7 +1290,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="awards-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>Awards & Honors</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>Awards & Honors</h2>
             </div>
             
             <div className="space-y-3 ml-6">
@@ -1135,11 +1299,11 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold" style={{ color: defaultTextColor }}>{award.title}</h3>
-                      <p style={{ color: primaryColor, fontWeight: 500 }}>{award.issuer}</p>
+                      {award.issuer && <p style={{ color: primaryColor }}>{award.issuer}</p>}
                     </div>
                     
                     {settings.showDates !== false && award.date_received && (
-                      <div className="text-right text-xs" style={{ color: primaryColor, fontWeight: 500 }}>
+                      <div className="text-right text-xs" style={{ color: mutedTextColor }}>
                         <span>{award.date_received}</span>
                       </div>
                     )}
@@ -1155,7 +1319,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           <div className="mb-5" key="references-section">
             <div className="flex items-center mb-2">
               <div className="h-4 w-4 rounded-full mr-2" style={{ backgroundColor: primaryColor }}></div>
-              <h2 className="text-lg font-bold" style={{ color: defaultTextColor }}>References</h2>
+              <h2 className="text-lg font-bold" style={{ color: style.headingColor || defaultTextColor }}>References</h2>
             </div>
             
             <div className="grid grid-cols-1 gap-3 ml-6">
@@ -1165,7 +1329,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   <p style={{ color: primaryColor, fontWeight: 500 }}>
                     {ref.title}{ref.company ? `, ${ref.company}` : ''}
                   </p>
-                  <div className="mt-1 text-xs" style={{ color: defaultTextColor }}>
+                  <div className="mt-1 text-xs" style={{ color: mutedTextColor }}>
                     {ref.email && <div>Email: {ref.email}</div>}
                     {ref.phone && <div>Phone: {ref.phone}</div>}
                   </div>
@@ -1183,20 +1347,33 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
   // Academic template - with serif font and a more formal look
   const renderAcademicSection = (sectionType: string) => {
     const primaryColor = style.primaryColor || "#10b981";
+    const sectionContainerClass = getSectionContainerClass();
+    const sectionContainerStyle = getSectionContainerStyle();
+    
+    // Check if we're using a dark box background that needs light text
+    const isBoxed = style.sectionLayout === 'boxed';
+    const boxBgColor = style.boxBgColor || '#f3f4f6';
+    const isDarkBox = isBoxed && isColorDark(boxBgColor);
+    
+    // Override text colors if we're in a dark box
+    const sectionTextColor = isDarkBox ? '#ffffff' : defaultTextColor;
+    const sectionMutedColor = isDarkBox ? '#cccccc' : mutedTextColor;
+    const sectionHeadingColor = isDarkBox ? '#ffffff' : (style.headingColor || defaultTextColor);
+    const sectionLinkColor = isDarkBox ? '#8bb9fe' : linkColor;
     
     switch (sectionType) {
       case 'summary':
         return content.summary ? (
-          <div className="mb-5" key="summary-section">
-            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Professional Summary</h2>
-            <p className="whitespace-pre-line" style={{ color: defaultTextColor }}>{content.summary}</p>
+          <div className={`mb-5 ${sectionContainerClass}`} key="summary-section" style={sectionContainerStyle}>
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: sectionHeadingColor, borderColor: primaryColor }}>Professional Summary</h2>
+            <p className="whitespace-pre-line" style={{ color: sectionTextColor }}>{content.summary}</p>
           </div>
         ) : null
       
       case 'experience':
         return experience.length > 0 ? (
           <div className="mb-5" key="experience-section">
-            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Work Experience</h2>
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: style.headingColor || defaultTextColor, borderColor: primaryColor }}>Work Experience</h2>
             
             <div className="space-y-4 border-l-2 pl-4" style={{ borderColor: primaryColor }}>
               {experience.map((exp: any) => (
@@ -1228,7 +1405,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'education':
         return education.length > 0 ? (
           <div className="mb-5" key="education-section">
-            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Education</h2>
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: style.headingColor || defaultTextColor, borderColor: primaryColor }}>Education</h2>
             
             <div className="space-y-4 border-l-2 pl-4" style={{ borderColor: primaryColor }}>
               {education.map((edu: any) => (
@@ -1264,7 +1441,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
       case 'skills':
         return skills.length > 0 ? (
           <div className="mb-5" key="skills-section">
-            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: defaultTextColor, borderColor: primaryColor }}>Skills</h2>
+            <h2 className="text-lg font-bold border-b-2 pb-1 mb-3" style={{ color: style.headingColor || defaultTextColor, borderColor: primaryColor }}>Skills</h2>
             
             <div className="border-l-2 pl-4" style={{ borderColor: primaryColor }}>
               <div className="flex flex-wrap gap-2">
@@ -1289,7 +1466,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return languages.length > 0 ? (
           <div className="mb-6" key="languages-section">
             <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
-              color: defaultTextColor,
+              color: style.headingColor || defaultTextColor,
               borderColor: style.primaryColor || '#10b981'
             }}>
               Languages
@@ -1310,7 +1487,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return certifications.length > 0 ? (
           <div className="mb-6" key="certifications-section">
             <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
-              color: defaultTextColor,
+              color: style.headingColor || defaultTextColor,
               borderColor: style.primaryColor || '#10b981'
             }}>
               Certifications
@@ -1322,7 +1499,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold" style={{ color: defaultTextColor }}>{cert.name}</h3>
-                      {cert.issuer && <p style={{ color: style.primaryColor || '#10b981' }}>{cert.issuer}</p>}
+                      {cert.issuer && <p style={{ color: primaryColor }}>{cert.issuer}</p>}
                     </div>
                     
                     {settings.showDates !== false && cert.issueDate && (
@@ -1342,7 +1519,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return publications.length > 0 ? (
           <div className="mb-6" key="publications-section">
             <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
-              color: defaultTextColor,
+              color: style.headingColor || defaultTextColor,
               borderColor: style.primaryColor || '#10b981'
             }}>
               Publications
@@ -1369,7 +1546,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return volunteer.length > 0 ? (
           <div className="mb-6" key="volunteer-section">
             <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
-              color: defaultTextColor,
+              color: style.headingColor || defaultTextColor,
               borderColor: style.primaryColor || '#10b981'
             }}>
               Volunteer Experience
@@ -1406,7 +1583,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return awards.length > 0 ? (
           <div className="mb-6" key="awards-section">
             <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
-              color: defaultTextColor,
+              color: style.headingColor || defaultTextColor,
               borderColor: style.primaryColor || '#10b981'
             }}>
               Awards & Honors
@@ -1429,7 +1606,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return references.length > 0 ? (
           <div className="mb-6" key="references-section">
             <h2 className="text-lg font-bold border-b-2 mb-3 pb-1" style={{ 
-              color: defaultTextColor,
+              color: style.headingColor || defaultTextColor,
               borderColor: style.primaryColor || '#10b981'
             }}>
               References
@@ -1439,7 +1616,7 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
               {references.map((ref: any) => (
                 <div key={ref.id} className="mb-2">
                   <h3 className="font-semibold" style={{ color: defaultTextColor }}>{ref.name}</h3>
-                  <p style={{ color: style.primaryColor || '#10b981' }}>{ref.title}{ref.company ? `, ${ref.company}` : ''}</p>
+                  <p style={{ color: linkColor }}>{ref.title}{ref.company ? `, ${ref.company}` : ''}</p>
                   <div className="text-xs mt-1" style={{ color: mutedTextColor }}>
                     {ref.email && <div>Email: {ref.email}</div>}
                     {ref.phone && <div>Phone: {ref.phone}</div>}
@@ -1454,87 +1631,6 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
         return null;
     }
   }
-
-  // Render a custom section
-  const renderCustomSection = (sectionId: string) => {
-    // Find the custom section by ID
-    const section = customSections.find((s: any) => s.id === sectionId);
-    if (!section) {
-      console.log(`Could not find custom section with ID: ${sectionId}`);
-      return null;
-    }
-    
-    // For debugging
-    console.log(`Rendering custom section:`, { 
-      id: section.id, 
-      title: section.title,
-      itemsCount: section.items?.length || 0 
-    });
-    
-    const sectionContainerClass = getSectionContainerClass();
-    const sectionContainerStyle = getSectionContainerStyle();
-    const primaryColor = style.primaryColor || '#4f46e5';
-    
-    return (
-      <div className={`mb-4 ${sectionContainerClass}`} key={`custom-section-${sectionId}`} style={sectionContainerStyle}>
-        <h2 className={headingClass} style={headingColorStyle}>
-          {style.sectionIcons && <span className="mr-2">📄</span>}
-          {section.title || "Custom Section"}
-        </h2>
-        
-        {section.description && (
-          <p className="mb-3 text-sm" style={{ color: mutedTextColor }}>{section.description}</p>
-        )}
-        
-        <div className={`space-y-4 ${lineHeightClass}`}>
-          {section.items && section.items.map((item: any) => (
-            <div key={item.id} className="mb-3">
-              {/* Find and display title field if it exists */}
-              {item.fields && item.fields.find((f: any) => f.type === 'title' && f.value) && (
-                <h3 className="font-semibold" style={{ color: defaultTextColor }}>
-                  {item.fields.find((f: any) => f.type === 'title').value}
-                </h3>
-              )}
-              
-              {/* Display all non-title fields with values */}
-              <div className="space-y-1 mt-1">
-                {item.fields && item.fields
-                  .filter((f: any) => f.type !== 'title' && f.value)
-                  .map((field: any) => (
-                    <div key={field.id} className="flex items-start">
-                      {field.type === 'date' && (
-                        <p className="text-xs" style={{ color: mutedTextColor }}>
-                          {field.value}
-                        </p>
-                      )}
-                      
-                      {field.type === 'text' && (
-                        <p className="text-sm" style={{ color: defaultTextColor }}>
-                          {field.value}
-                        </p>
-                      )}
-                      
-                      {field.type === 'textarea' && (
-                        <p className="text-xs whitespace-pre-line" style={{ color: defaultTextColor }}>
-                          {field.value}
-                        </p>
-                      )}
-                      
-                      {field.type === 'url' && field.value && (
-                        <p className="text-xs" style={{ color: primaryColor }}>
-                          {field.value}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        {style.sectionDivider !== 'none' && getSectionDividerStyle()}
-      </div>
-    );
-  };
 
   // Select the correct section renderer based on template
   const renderSection = (sectionType: string) => {
@@ -1660,28 +1756,114 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
     }
   };
   
+  // Generate column layout class based on style
+  const columnLayoutStyle = useMemo(() => {
+    const layout = style.columnLayout || 'single';
+    
+    switch (layout) {
+      case 'double':
+        return {
+          columnCount: 2,
+          columnGap: '1.5rem',
+          columnRule: `1px solid ${style.primaryColor}20`
+        };
+      case 'double-right-sidebar':
+        return {
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr',
+          gap: '1.5rem'
+        };
+      case 'double-left-sidebar':
+        return {
+          display: 'grid',
+          gridTemplateColumns: '1fr 2fr',
+          gap: '1.5rem'
+        };
+      case 'triple':
+        return {
+          columnCount: 3,
+          columnGap: '1rem',
+          columnRule: `1px solid ${style.primaryColor}20`
+        };
+      default: // 'single'
+        return {};
+    }
+  }, [style.columnLayout, style.primaryColor]);
+
+  // Determine if we need sidebar layout rendering
+  const hasSidebarLayout = useMemo(() => {
+    return style.columnLayout === 'double-left-sidebar' || style.columnLayout === 'double-right-sidebar';
+  }, [style.columnLayout]);
+
+  // Extra function to render content for sidebar layouts
+  const renderSidebarContent = () => {
+    if (!hasSidebarLayout) return null;
+    
+    // Decide which sections go in main column vs sidebar
+    const mainSections = sections.filter((section: string) => 
+      section !== 'skills' && 
+      section !== 'languages' && 
+      section !== 'certifications' &&
+      !section.startsWith('custom')
+    );
+    
+    const sidebarSections = sections.filter((section: string) => 
+      section === 'skills' || 
+      section === 'languages' || 
+      section === 'certifications' ||
+      section.startsWith('custom')
+    );
+    
+    // For left sidebar, the sidebar content comes first
+    const isLeftSidebar = style.columnLayout === 'double-left-sidebar';
+    const firstColumnSections = isLeftSidebar ? sidebarSections : mainSections;
+    const secondColumnSections = isLeftSidebar ? mainSections : sidebarSections;
+    
+    return (
+      <div className="resume-content-columns" style={{ display: 'grid', gridTemplateColumns: isLeftSidebar ? '1fr 2fr' : '2fr 1fr', gap: '1.5rem' }}>
+        <div className="resume-column" style={{ maxHeight: 'calc(100% - 150px)', overflowY: 'hidden' }}>
+          {firstColumnSections.map((section: string, index: number) => (
+            <div key={`section-${section}-${index}`} className="break-inside-avoid mb-4">
+              {renderSection(section)}
+            </div>
+          ))}
+        </div>
+        <div className="resume-column" style={{ maxHeight: 'calc(100% - 150px)', overflowY: 'hidden' }}>
+          {secondColumnSections.map((section: string, index: number) => (
+            <div key={`section-${section}-${index}`} className="break-inside-avoid mb-4">
+              {renderSection(section)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div 
       className={`${fontSizeClass} ${spacingClass}`}
       style={{ 
         fontFamily: `"${style.fontFamily}", sans-serif` || '"Inter", sans-serif',
         color: defaultTextColor,
-        '--primary-color': style.primaryColor || '#4f46e5'
+        '--primary-color': style.primaryColor || '#4f46e5',
+        width: '100%',
+        height: '100%'
       } as React.CSSProperties}
     >
       <div 
         className="resume-pages" 
         style={{
           position: 'relative',
+          width: '100%',
+          height: '100%'
         }}
       >
         {/* Page 1 - always contains the header and starts with the first sections */}
         <div 
           className="resume-page" 
           style={{
-            minHeight: '1056px', /* 11 inches at 96 DPI */
             width: '100%',
-            pageBreakAfter: 'always',
+            height: '100%',
             position: 'relative',
             overflow: 'hidden'
           }}
@@ -1690,13 +1872,25 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
           {renderHeader()}
           
           {/* Render sections in order with overflow detection */}
-          <div ref={contentRef} className="resume-content">
-            {sections.map((section: string, index: number) => (
-              <React.Fragment key={`section-${section}-${index}`}>
-                {renderSection(section)}
-              </React.Fragment>
-            ))}
-          </div>
+          {hasSidebarLayout ? (
+            renderSidebarContent()
+          ) : (
+            <div 
+              ref={contentRef} 
+              className={`resume-content ${style.columnLayout === 'double' || style.columnLayout === 'triple' ? 'has-columns' : ''}`}
+              style={{
+                ...columnLayoutStyle,
+                maxHeight: 'calc(100% - 150px)', // Approximate space for header
+                overflowY: 'hidden'
+              }}
+            >
+              {sections.map((section: string, index: number) => (
+                <div key={`section-${section}-${index}`} className="break-inside-avoid-column break-inside-avoid mb-4">
+                  {renderSection(section)}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         
         {/* Print-specific styles for page breaks */}
@@ -1705,16 +1899,53 @@ export default function ResumePreview({ resume }: ResumePreviewProps) {
             .resume-page {
               page-break-after: always;
               break-after: page;
+              width: 8.5in !important;
+              height: 11in !important;
+              max-height: 11in !important;
             }
             
             .resume-content > div {
               break-inside: avoid;
             }
             
+            .break-inside-avoid {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+            
             @page {
               size: letter;
               margin: 0.5in;
             }
+          }
+          
+          /* Add essential styles for all views, not just print */
+          .break-inside-avoid {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+          
+          /* Better column break control */
+          .break-inside-avoid-column {
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 1rem;
+          }
+          
+          /* Column layout with balance */
+          .has-columns {
+            column-fill: auto !important;
+          }
+          
+          /* Make sure content doesn't touch borders in boxed sections */
+          .resume-content .p-4 {
+            margin-bottom: 1rem;
+          }
+          
+          /* Fix for double column sidebar layout */
+          .resume-content-columns .resume-column {
+            display: flex;
+            flex-direction: column;
           }
         `}</style>
       </div>
