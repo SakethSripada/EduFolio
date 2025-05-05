@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent theme flash by setting dark mode as early as possible */
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background-color: #09090b; /* Dark background color */
+  color: #ffffff; /* Light text color */
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

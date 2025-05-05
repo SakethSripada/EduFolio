@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <Script
           id="theme-script"
@@ -40,7 +40,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${merriweather.variable} ${roboto.variable} ${playfairDisplay.variable} ${montserrat.variable} ${lora.variable} ${sourceSansPro.variable}`}>
         <AuthProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
             <div className="flex flex-col min-h-screen">
               <Navbar />
               <main className="flex-grow">{children}</main>

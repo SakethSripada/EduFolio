@@ -12,9 +12,9 @@ const themeScript = `
       const storedTheme = window.localStorage.getItem('theme');
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       
-      // Logic to determine which theme to use
+      // Logic to determine which theme to use - prioritize dark mode
       let theme;
-      if (storedTheme === 'dark' || (storedTheme === 'system' && systemPrefersDark) || (!storedTheme && systemPrefersDark)) {
+      if (storedTheme === 'dark' || (storedTheme === 'system' && systemPrefersDark) || !storedTheme || (!storedTheme && systemPrefersDark)) {
         document.documentElement.classList.add('dark');
         theme = 'dark';
       } else {
@@ -24,7 +24,8 @@ const themeScript = `
       
       window.localStorage.setItem('theme', theme);
     } catch (e) {
-      // If there's an error (like localStorage is disabled), do nothing
+      // If there's an error, default to dark mode
+      document.documentElement.classList.add('dark');
       console.error('Error setting initial theme', e);
     }
   })();
@@ -32,7 +33,7 @@ const themeScript = `
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
   enableSystem = true,
   ...props
 }: ThemeProviderProps) {
