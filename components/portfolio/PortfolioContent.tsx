@@ -431,99 +431,113 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        // Upload image if exists
-        let imagePath = "/placeholder.svg?height=400&width=600"
-        if (newProject.image) {
-          const fileExt = newProject.image.name.split(".").pop()
-          const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-          const filePath = `${user.id}/projects/${fileName}`
+    // Create a temporary project with a temporary ID
+    const tempId = `temp-${Math.random().toString(36).substring(2, 15)}`;
+    const tempProject = {
+      id: tempId,
+      user_id: user.id,
+      title: newProject.title,
+      description: newProject.description,
+      category: newProject.category,
+      tags: newProject.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      link: newProject.link,
+      image: newProject.imagePreview || "/placeholder.svg?height=400&width=600",
+      gallery: newProject.gallery.map(g => g.preview),
+      date: new Date().toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+      isTemporary: true,
+    };
 
-          const { error: uploadError } = await supabase.storage
-            .from("project-images")
-            .upload(filePath, newProject.image)
+    // Optimistic UI update - add to state immediately
+    setProjects([tempProject, ...projects]);
+    
+    // Reset form and close modal immediately for better UX
+    resetProjectForm();
+    setIsAddingProject(false);
+    setFormSubmitted(false);
 
-          if (uploadError) throw uploadError
+    try {
+      // Upload image if exists
+      let imagePath = "/placeholder.svg?height=400&width=600";
+      if (newProject.image) {
+        const fileExt = newProject.image.name.split(".").pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${user.id}/projects/${fileName}`;
 
-          const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-          imagePath = data.publicUrl
-        }
+        const { error: uploadError } = await supabase.storage
+          .from("project-images")
+          .upload(filePath, newProject.image);
 
-        // Upload gallery images if exist
-        const galleryPaths: string[] = []
-        if (newProject.gallery.length > 0) {
-          for (const item of newProject.gallery) {
-            if (item.file) {
-              const fileExt = item.file.name.split(".").pop()
-              const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-              const filePath = `${user.id}/gallery/${fileName}`
+        if (uploadError) throw uploadError;
 
-              const { error: uploadError } = await supabase.storage.from("project-images").upload(filePath, item.file)
+        const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+        imagePath = data.publicUrl;
+      }
 
-              if (uploadError) throw uploadError
+      // Upload gallery images if exist
+      const galleryPaths: string[] = [];
+      if (newProject.gallery.length > 0) {
+        for (const item of newProject.gallery) {
+          if (item.file) {
+            const fileExt = item.file.name.split(".").pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+            const filePath = `${user.id}/gallery/${fileName}`;
 
-              const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-              galleryPaths.push(data.publicUrl)
-            }
+            const { error: uploadError } = await supabase.storage.from("project-images").upload(filePath, item.file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+            galleryPaths.push(data.publicUrl);
           }
         }
+      }
 
-        // Create project in database
-        const projectToAdd = {
-          user_id: user.id,
-          title: newProject.title,
-          description: newProject.description,
-          category: newProject.category,
-          tags: newProject.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          link: newProject.link,
-          image: imagePath,
-          gallery: galleryPaths.length > 0 ? galleryPaths : [],
-          date: new Date().toLocaleDateString("en-US", {
-            month: "long",
-            year: "numeric",
-          }),
-        }
+      // Create project in database
+      const projectToAdd = {
+        user_id: user.id,
+        title: tempProject.title,
+        description: tempProject.description,
+        category: tempProject.category,
+        tags: tempProject.tags,
+        link: tempProject.link,
+        image: imagePath,
+        gallery: galleryPaths.length > 0 ? galleryPaths : [],
+        date: tempProject.date,
+      };
 
-        const { data, error } = await supabase.from("projects").insert(projectToAdd).select()
+      const { data, error } = await supabase.from("projects").insert(projectToAdd).select();
 
-        if (error) throw error
+      if (error) throw error;
 
-        return data
-      },
-      setIsLoading,
-      (data) => {
-        if (data) {
-          // First update the data
-          setProjects([data[0], ...projects])
-          
-          // Then reset form and close the modal with a small delay to prevent reopening
-          resetProjectForm()
-          
-          // Use a timeout to ensure state updates don't conflict
-          setTimeout(() => {
-            setIsAddingProject(false)
-            setFormSubmitted(false)
-          }, 0)
-          
-          toast({
-            title: "Project added",
-            description: "Your project has been added successfully.",
-          })
-        }
-      },
-      (error) => {
-        console.error("Error adding project:", error)
+      if (data && data.length > 0) {
+        // Replace temporary project with real one
+        setProjects(prev => prev.map(p => p.id === tempId ? data[0] : p));
+        
         toast({
-          title: "Error adding project",
-          description: handleSupabaseError(error, "There was a problem adding your project."),
-          variant: "destructive",
-        })
-      },
-    )
+          title: "Project added",
+          description: "Your project has been added successfully.",
+        });
+      } else {
+        throw new Error("No data returned after adding project");
+      }
+    } catch (error) {
+      console.error("Error adding project:", error);
+      
+      // Remove temporary project on error
+      setProjects(prev => prev.filter(p => p.id !== tempId));
+      
+      toast({
+        title: "Error adding project",
+        description: handleSupabaseError(error, "There was a problem adding your project."),
+        variant: "destructive",
+      });
+    }
   }
 
   const handleEditProject = async () => {
@@ -535,114 +549,127 @@ export const PortfolioContent = ({
       return
     }
 
-    performDatabaseOperation(
-      async () => {
-        const projectToUpdate = projects.find((p) => p.id === editingProjectId)
+    // Get the current version of the project
+    const currentProject = projects.find(p => p.id === editingProjectId);
+    if (!currentProject) return;
+    
+    // Create the updated project for optimistic update
+    const updatedProject = {
+      ...currentProject,
+      title: newProject.title,
+      description: newProject.description,
+      category: newProject.category,
+      tags: newProject.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      link: newProject.link,
+      // Keep the existing image for now
+      updated_at: new Date().toISOString(),
+      isUpdating: true,
+    };
+    
+    // Save previous state for restoration if needed
+    const previousProjects = [...projects];
+    
+    // Optimistic UI update - update state immediately
+    setProjects(prev => prev.map(p => p.id === editingProjectId ? updatedProject : p));
+    
+    // Reset form and close the dialog immediately
+    resetProjectForm();
+    setIsEditingProject(false);
+    setEditingProjectId(null);
+    setFormSubmitted(false);
 
-        // Upload image if changed
-        let imagePath = projectToUpdate.image
-        if (newProject.image) {
-          const fileExt = newProject.image.name.split(".").pop()
-          const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-          const filePath = `${user.id}/projects/${fileName}`
+    try {
+      // Upload image if changed
+      let imagePath = currentProject.image;
+      if (newProject.image) {
+        const fileExt = newProject.image.name.split(".").pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${user.id}/projects/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("project-images")
-            .upload(filePath, newProject.image)
+        const { error: uploadError } = await supabase.storage
+          .from("project-images")
+          .upload(filePath, newProject.image);
 
-          if (uploadError) throw uploadError
+        if (uploadError) throw uploadError;
 
-          const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-          imagePath = data.publicUrl
-        }
+        const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+        imagePath = data.publicUrl;
+      }
 
-        // Upload new gallery images if exist
-        let galleryPaths = projectToUpdate.gallery || []
-        if (newProject.gallery.length > 0) {
-          // Only upload new images (those with file property)
-          const newImages = newProject.gallery.filter((item) => item.file)
+      // Upload new gallery images if exist
+      let galleryPaths = currentProject.gallery || [];
+      if (newProject.gallery.length > 0) {
+        // Only upload new images (those with file property)
+        const newImages = newProject.gallery.filter((item) => item.file);
 
-          if (newImages.length > 0) {
-            galleryPaths = [] // Reset if we have new images
+        if (newImages.length > 0) {
+          galleryPaths = []; // Reset if we have new images
 
-            for (const item of newProject.gallery) {
-              if (item.file) {
-                const fileExt = item.file.name.split(".").pop()
-                const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-                const filePath = `${user.id}/gallery/${fileName}`
+          for (const item of newProject.gallery) {
+            if (item.file) {
+              const fileExt = item.file.name.split(".").pop();
+              const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+              const filePath = `${user.id}/gallery/${fileName}`;
 
-                const { error: uploadError } = await supabase.storage
-                  .from("project-images")
-                  .upload(filePath, item.file)
+              const { error: uploadError } = await supabase.storage
+                .from("project-images")
+                .upload(filePath, item.file);
 
-                if (uploadError) throw uploadError
+              if (uploadError) throw uploadError;
 
-                const { data } = supabase.storage.from("project-images").getPublicUrl(filePath)
-                galleryPaths.push(data.publicUrl)
-              } else if (item.preview.startsWith("http")) {
-                // Keep existing gallery images
-                galleryPaths.push(item.preview)
-              }
+              const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+              galleryPaths.push(data.publicUrl);
+            } else if (item.preview.startsWith("http")) {
+              // Keep existing gallery images
+              galleryPaths.push(item.preview);
             }
           }
         }
+      }
 
-        // Update project in database
-        const projectUpdates = {
-          title: newProject.title,
-          description: newProject.description,
-          category: newProject.category,
-          tags: newProject.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-          link: newProject.link,
-          image: imagePath,
-          gallery: galleryPaths,
-          updated_at: new Date().toISOString(),
-        }
+      // Update project in database
+      const projectUpdates = {
+        title: newProject.title,
+        description: newProject.description,
+        category: newProject.category,
+        tags: newProject.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        link: newProject.link,
+        image: imagePath,
+        gallery: galleryPaths,
+        updated_at: new Date().toISOString(),
+      };
 
-        const { error } = await supabase.from("projects").update(projectUpdates).eq("id", editingProjectId)
+      const { error, data } = await supabase.from("projects").update(projectUpdates).eq("id", editingProjectId).select();
 
-        if (error) throw error
+      if (error) throw error;
 
-        return { projectUpdates }
-      },
-      setIsLoading,
-      (data) => {
-        // First update the projects data
-        setProjects(
-          projects.map((project) => {
-            if (project.id === editingProjectId) {
-              return { ...project, ...data.projectUpdates }
-            }
-            return project
-          }),
-        )
-
-        // Reset form first
-        resetProjectForm()
-        
-        // Use a timeout to ensure state updates don't conflict
-        setTimeout(() => {
-          setIsEditingProject(false)
-          setEditingProjectId(null)
-        }, 0)
-        
-        toast({
-          title: "Project updated",
-          description: "Your project has been updated successfully.",
-        })
-      },
-      (error) => {
-        console.error("Error updating project:", error)
-        toast({
-          title: "Error updating project",
-          description: handleSupabaseError(error, "There was a problem updating your project."),
-          variant: "destructive",
-        })
-      },
-    )
+      if (data && data.length > 0) {
+        // Update with the actual data from server
+        setProjects(prev => prev.map(p => p.id === editingProjectId ? data[0] : p));
+      }
+      
+      toast({
+        title: "Project updated",
+        description: "Your project has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating project:", error);
+      
+      // Restore previous projects on error
+      setProjects(previousProjects);
+      
+      toast({
+        title: "Error updating project",
+        description: handleSupabaseError(error, "There was a problem updating your project."),
+        variant: "destructive",
+      });
+    }
   }
 
   const startEditProject = (projectId: string) => {
@@ -667,31 +694,37 @@ export const PortfolioContent = ({
   const deleteProject = async (projectId: string) => {
     if (!user) return
 
-    performDatabaseOperation(
-      async () => {
-        const { error } = await supabase.from("projects").delete().eq("id", projectId)
+    // Close confirmation dialog immediately
+    setConfirmDeleteProject(null);
+    
+    // Save the project before removing it (for restoration if needed)
+    const projectToDelete = projects.find(p => p.id === projectId);
+    const previousProjects = [...projects];
+    
+    // Optimistic UI update - remove from state immediately
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    
+    try {
+      const { error } = await supabase.from("projects").delete().eq("id", projectId);
 
-        if (error) throw error
-      },
-      setIsLoading,
-      () => {
-        setProjects(projects.filter((p) => p.id !== projectId))
-        toast({
-          title: "Project deleted",
-          description: "Your project has been deleted.",
-        })
-        setConfirmDeleteProject(null)
-      },
-      (error) => {
-        console.error("Error deleting project:", error)
-        toast({
-          title: "Error deleting project",
-          description: handleSupabaseError(error, "There was a problem deleting your project."),
-          variant: "destructive",
-        })
-        setConfirmDeleteProject(null)
-      },
-    )
+      if (error) throw error;
+      
+      toast({
+        title: "Project deleted",
+        description: "Your project has been deleted.",
+      });
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      
+      // Restore the project in state if there was an error
+      setProjects(previousProjects);
+      
+      toast({
+        title: "Error deleting project",
+        description: handleSupabaseError(error, "There was a problem deleting your project."),
+        variant: "destructive",
+      });
+    }
   }
 
   const resetProjectForm = () => {
@@ -1482,7 +1515,11 @@ export const PortfolioContent = ({
         description="Are you sure you want to delete this project? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel" 
-        onConfirm={() => confirmDeleteProject && deleteProject(confirmDeleteProject)}
+        onConfirm={() => {
+          if (confirmDeleteProject) {
+            deleteProject(confirmDeleteProject);
+          }
+        }}
       />
 
       <ConfirmationDialog
