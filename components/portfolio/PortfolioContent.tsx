@@ -217,6 +217,7 @@ export const PortfolioContent = ({
     if (!user?.id) return;
   
     const fetchData = async () => {
+      console.log("Fetching categories for user:", user.id);
       performDatabaseOperation(
         async () => {
           const [{ data: catData, error: catErr }, { data: projData, error: projErr }] = await Promise.all([
@@ -234,18 +235,53 @@ export const PortfolioContent = ({
   
           if (catErr) throw catErr;
           if (projErr) throw projErr;
-  
+
+          console.log("Categories fetched:", catData?.length || 0, "items");
+          
           return {
             categories: catData || [],
             projects: projData || [],
           };
         },
         setIsLoading,
-        (data) => {
+        async (data) => {
           if (data.categories.length) {
+            console.log("Using existing categories from database");
             setCategories(data.categories);
           } else {
-            // insert your defaults...
+            console.log("No categories found, creating defaults");
+            // Insert default categories for new users
+            const defaultCategories = [
+              { id: "coding", name: "Coding", icon: "Code", user_id: user.id },
+              { id: "research", name: "Research", icon: "FileText", user_id: user.id },
+              { id: "business", name: "Business", icon: "Briefcase", user_id: user.id },
+              { id: "engineering", name: "Engineering", icon: "Lightbulb", user_id: user.id },
+              { id: "art", name: "Art & Design", icon: "ImageIcon", user_id: user.id },
+              { id: "photography", name: "Photography", icon: "Camera", user_id: user.id },
+            ];
+
+            try {
+              const { data: insertedCategories, error } = await supabase
+                .from("categories")
+                .insert(defaultCategories)
+                .select();
+              
+              if (error) {
+                console.error("Error creating default categories:", error);
+                toast({
+                  title: "Warning",
+                  description: "Could not create default categories. Some features may be limited.",
+                  variant: "destructive",
+                });
+              } else {
+                // If successful, update the categories state
+                setCategories(insertedCategories || defaultCategories);
+              }
+            } catch (err) {
+              console.error("Error inserting default categories:", err);
+              // Still set the default categories in the state even if DB insert fails
+              setCategories(defaultCategories);
+            }
           }
           setProjects(data.projects);
         },
@@ -676,8 +712,10 @@ export const PortfolioContent = ({
   const handleAddCategory = async () => {
     if (!user || !newCategory.trim()) return
 
+    console.log("Adding new category:", newCategory);
     const categoryId = newCategory.toLowerCase().replace(/\s+/g, "-")
     if (categories.some((c) => c.id === categoryId)) {
+      console.log("Category already exists:", categoryId);
       toast({
         title: "Category already exists",
         description: "Please use a different name for your category.",
@@ -693,6 +731,8 @@ export const PortfolioContent = ({
           user_id: user.id,
           name: newCategory.trim(),
           icon: "FileText", // Default icon
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }
 
         const { data, error } = await supabase.from("categories").insert(newCategoryData).select()
@@ -703,13 +743,15 @@ export const PortfolioContent = ({
       },
       setIsLoading,
       (data) => {
-        if (data) {
+        if (data && data.length > 0) {
           setCategories([...categories, data[0]])
           setNewCategory("")
           toast({
             title: "Category added",
             description: `"${newCategory.trim()}" has been added to your categories.`,
           })
+        } else {
+          throw new Error("No data returned after inserting category")
         }
       },
       (error) => {
@@ -727,8 +769,11 @@ export const PortfolioContent = ({
   const deleteCategory = async (categoryId: string) => {
     if (!user) return
 
+    console.log("Attempting to delete category:", categoryId);
+    
     // Don't delete if there are projects using this category
     if (projects.some((p) => p.category === categoryId)) {
+      console.log("Cannot delete category - projects are using it");
       toast({
         title: "Cannot delete category",
         description: "There are projects using this category. Please reassign or delete those projects first.",
@@ -740,9 +785,29 @@ export const PortfolioContent = ({
 
     performDatabaseOperation(
       async () => {
-        const { error } = await supabase.from("categories").delete().eq("id", categoryId).eq("user_id", user.id)
+        // First, check if the category exists and belongs to this user
+        const { data: categoryExists, error: checkError } = await supabase
+          .from("categories")
+          .select("id")
+          .eq("id", categoryId)
+          .eq("user_id", user.id)
+          .single();
 
-        if (error) throw error
+        if (checkError) {
+          if (checkError.code === 'PGRST116') { // Code for "no rows returned" in single()
+            throw new Error(`Category with ID ${categoryId} not found or doesn't belong to this user`);
+          }
+          throw checkError;
+        }
+
+        // If we got here, the category exists and belongs to the user - proceed with deletion
+        const { error } = await supabase
+          .from("categories")
+          .delete()
+          .eq("id", categoryId)
+          .eq("user_id", user.id);
+
+        if (error) throw error;
       },
       setIsLoading,
       () => {

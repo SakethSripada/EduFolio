@@ -221,46 +221,79 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
 
   // Export resume to PDF
   const exportToPdf = async () => {
-    if (!resumePreviewRef.current) return
-    
+    setExporting(true);
     try {
-      setExporting(true)
+      const element = resumePreviewRef.current;
+      if (!element) return;
+      
+      // Create a clone of the resume element with fixed dimensions for PDF generation
+      const clone = element.cloneNode(true) as HTMLElement;
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.width = '816px'; // 8.5 inches at 96 DPI
+      container.style.height = '1056px'; // 11 inches at 96 DPI
+      container.style.overflow = 'hidden';
+      
+      // Apply the same styles as the original but with fixed dimensions
+      Object.assign(clone.style, {
+        width: '816px',
+        height: '1056px',
+        position: 'relative',
+        transform: 'none',
+        maxWidth: 'none',
+        maxHeight: 'none'
+      });
+      
+      // Append to DOM temporarily
+      container.appendChild(clone);
+      document.body.appendChild(container);
       
       // Dynamically import jsPDF and html2canvas
-      const { jsPDF } = await import('jspdf')
-      const html2canvas = (await import('html2canvas')).default
+      const { jsPDF } = await import('jspdf');
+      const html2canvas = (await import('html2canvas')).default;
       
-      const canvas = await html2canvas(resumePreviewRef.current, {
-        scale: 2,
+      // Use html2canvas to capture the resume
+      const canvas = await html2canvas(clone, {
+        scale: 2, // Higher scale for better quality
         useCORS: true,
-        logging: false
-      } as any)
+        logging: false,
+        width: 816, // 8.5 inches at 96 DPI
+        height: 1056, // 11 inches at 96 DPI
+      });
       
-      const imgData = canvas.toDataURL('image/jpeg', 1.0)
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
+      // Clean up
+      document.body.removeChild(container);
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight)
-      pdf.save(`${resume.title || 'resume'}.pdf`)
+      // Create PDF with exact 8.5x11 dimensions
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'letter' // 8.5 x 11 inches
+      });
+      
+      // Add the canvas image to the PDF
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, 8.5, 11);
+      
+      // Save the PDF
+      pdf.save(`${resume.title || 'Resume'}.pdf`);
       
       toast({
-        title: "Success",
-        description: "PDF exported successfully",
-        duration: 3000
-      })
+        title: "PDF exported successfully",
+        description: "Your resume has been exported to PDF",
+      });
     } catch (error) {
-      console.error("PDF export error:", error)
+      console.error("Error exporting to PDF:", error);
       toast({
-        title: "Export Failed",
-        description: "There was an error exporting your resume to PDF",
+        title: "Error exporting to PDF",
+        description: "There was a problem exporting your resume",
         variant: "destructive",
-        duration: 3000
-      })
+      });
     } finally {
-      setExporting(false)
+      setExporting(false);
     }
-  }
+  };
 
   // Export resume to DOCX
   const exportToDocx = async () => {
@@ -661,6 +694,65 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                         </Select>
                       </div>
                       
+                      {style.sectionLayout === "boxed" && (
+                        <div className="space-y-3 pl-6 border-l-2 border-muted-foreground/20">
+                          <Label className="text-sm font-medium">Box Background Color</Label>
+                          <div className="grid grid-cols-4 gap-3">
+                            {[
+                              "#f9fafb", // Light Gray
+                              "#f3f4f6", // Gray 100
+                              "#e5e7eb", // Gray 200
+                              "#f1f5f9", // Slate 100
+                              "#ecfdf5", // Light Green
+                              "#eff6ff", // Light Blue
+                              "#faf5ff", // Light Purple
+                              "#fff7ed", // Light Orange
+                              "#1f2937", // Dark Gray
+                              "#334155", // Dark Slate
+                            ].map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                className={`h-9 w-full rounded-md ${style.boxBgColor === color ? 'ring-2 ring-offset-2' : ''}`}
+                                style={{ backgroundColor: color }}
+                                onClick={() => updateStyle("boxBgColor", color)}
+                                aria-label={`Box background color ${color}`}
+                              />
+                            ))}
+                            
+                            <div className="col-span-4 flex items-center space-x-2 mt-2">
+                              <Label htmlFor="customBoxBgColor" className="text-sm font-medium">Custom</Label>
+                              <Input 
+                                id="customBoxBgColor" 
+                                type="color" 
+                                value={style.boxBgColor || "#f3f4f6"}
+                                onChange={(e) => updateStyle("boxBgColor", e.target.value)}
+                                className="w-10 h-10 p-0 border-0"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Column Layout</Label>
+                        <Select 
+                          value={style.columnLayout || "single"} 
+                          onValueChange={(value) => updateStyle("columnLayout", value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Column layout" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="single">Single Column</SelectItem>
+                            <SelectItem value="double">Double Column</SelectItem>
+                            <SelectItem value="triple">Triple Column</SelectItem>
+                            <SelectItem value="double-left-sidebar">Left Sidebar</SelectItem>
+                            <SelectItem value="double-right-sidebar">Right Sidebar</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
                       <div className="space-y-3">
                         <Label className="text-sm font-medium">Section Dividers</Label>
                         <Select 
@@ -855,6 +947,52 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                         </div>
                       </div>
                       
+                      <div className="space-y-5 pt-4 border-t">
+                        <Label className="text-sm font-medium">Element-specific Colors</Label>
+                        
+                        <div className="space-y-3">
+                          <Label htmlFor="headingColor" className="text-xs font-medium ml-4">Heading Color</Label>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Input 
+                              id="headingColor" 
+                              type="color" 
+                              value={style.headingColor || style.textColor || "#000000"}
+                              onChange={(e) => updateStyle("headingColor", e.target.value)}
+                              className="w-8 h-8 p-0 border-0"
+                            />
+                            <span className="text-xs text-muted-foreground">Section headings</span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <Label htmlFor="mutedTextColor" className="text-xs font-medium ml-4">Secondary Text Color</Label>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Input 
+                              id="mutedTextColor" 
+                              type="color" 
+                              value={style.mutedTextColor || (style.textColor ? `${style.textColor}99` : "#6b7280")}
+                              onChange={(e) => updateStyle("mutedTextColor", e.target.value)}
+                              className="w-8 h-8 p-0 border-0"
+                            />
+                            <span className="text-xs text-muted-foreground">Dates, locations, subtitles</span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <Label htmlFor="linkColor" className="text-xs font-medium ml-4">Link Color</Label>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Input 
+                              id="linkColor" 
+                              type="color" 
+                              value={style.linkColor || style.primaryColor || "#4f46e5"}
+                              onChange={(e) => updateStyle("linkColor", e.target.value)}
+                              className="w-8 h-8 p-0 border-0"
+                            />
+                            <span className="text-xs text-muted-foreground">URLs and linked elements</span>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium cursor-pointer">Enable Background Pattern</Label>
@@ -961,6 +1099,41 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
                       </div>
                     </CardContent>
                   </Card>
+                  
+                  <div className="pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        // Reset to default style settings
+                        const defaultStyle = {
+                          fontFamily: "Inter",
+                          primaryColor: resume.template === "professional" ? "#4f46e5" : 
+                                       resume.template === "modern" ? "#8b5cf6" : 
+                                       resume.template === "academic" ? "#10b981" : "#4f46e5",
+                          fontSize: "medium",
+                          spacing: "comfortable",
+                          backgroundColor: "#ffffff",
+                          textColor: "#000000",
+                          columnLayout: "single",
+                          sectionLayout: "standard",
+                          headerStyle: "underline",
+                          lineHeight: "normal",
+                          sectionDivider: "none",
+                          skillsDisplay: "tags"
+                        };
+                        
+                        updateResume("style", defaultStyle);
+                        
+                        toast({
+                          title: "Style reset",
+                          description: "Resume style has been reset to default",
+                        });
+                      }}
+                      className="w-full"
+                    >
+                      Reset to Default Style
+                    </Button>
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="settings" className="h-full space-y-6 pt-4 overflow-y-auto pr-2">
@@ -1077,29 +1250,88 @@ export default function ResumeEditorPage({ params }: { params: Promise<{ id: str
         
         <div className="lg:col-span-6 xl:col-span-7 flex justify-center">
           <div 
-            ref={resumePreviewRef}
-            className="border rounded-md shadow-sm w-full max-w-[816px] p-10 overflow-auto print:border-none print:shadow-none"
-            style={{ 
-              backgroundColor: style.backgroundColor || '#ffffff',
-              color: style.textColor || (style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000'),
-              fontFamily: style.fontFamily || 'Inter, sans-serif',
-              height: "1056px",
-              aspectRatio: "8.5/11",
-              ...(style.backgroundPattern && style.patternStyle ? {
-                backgroundImage: style.patternStyle === 'dots' 
-                  ? `radial-gradient(${style.primaryColor}10 1px, ${style.backgroundColor || '#ffffff'} 1px)`
-                  : style.patternStyle === 'lines'
-                  ? `linear-gradient(${style.primaryColor}10 1px, transparent 1px)`
-                  : `linear-gradient(${style.primaryColor}10 1px, transparent 1px), 
-                     linear-gradient(to right, ${style.primaryColor}10 1px, ${style.backgroundColor || '#ffffff'} 1px)`,
-                backgroundSize: style.patternStyle === 'lines' ? '100% 20px' : '20px 20px'
-              } : {})
+            className="relative w-full h-auto max-w-full"
+            style={{
+              maxWidth: "816px", // Maximum width of 8.5 inches at 96 DPI
             }}
           >
-            <ResumePreview resume={resume} />
+            <div
+              ref={resumePreviewRef}
+              className="border rounded-md shadow-sm w-full overflow-hidden print:border-none print:shadow-none"
+              style={{ 
+                backgroundColor: style.backgroundColor || '#ffffff',
+                color: style.textColor || (style.backgroundColor === '#1f2937' ? '#ffffff' : '#000000'),
+                fontFamily: style.fontFamily || 'Inter, sans-serif',
+                aspectRatio: "8.5/11", // Maintain 8.5x11 aspect ratio
+                ...(style.backgroundPattern && style.patternStyle ? {
+                  backgroundImage: style.patternStyle === 'dots' 
+                    ? `radial-gradient(${style.primaryColor}10 1px, ${style.backgroundColor || '#ffffff'} 1px)`
+                    : style.patternStyle === 'lines'
+                    ? `linear-gradient(${style.primaryColor}10 1px, transparent 1px)`
+                    : `linear-gradient(${style.primaryColor}10 1px, transparent 1px), 
+                      linear-gradient(to right, ${style.primaryColor}10 1px, ${style.backgroundColor || '#ffffff'} 1px)`,
+                  backgroundSize: style.patternStyle === 'lines' ? '100% 20px' : '20px 20px'
+                } : {})
+              }}
+            >
+              <div className="scale-container w-full h-full p-10 overflow-hidden">
+                <ResumePreview resume={resume} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        /* Responsive resume styles */
+        @media (max-width: 1023px) {
+          .scale-container {
+            transform: scale(0.9);
+            transform-origin: top center;
+            padding: 5px !important;
+          }
+        }
+        
+        @media (max-width: 767px) {
+          .scale-container {
+            transform: scale(0.8);
+            transform-origin: top center;
+            padding: 0 !important;
+          }
+        }
+        
+        @media (max-width: 639px) {
+          .scale-container {
+            transform: scale(0.7);
+            transform-origin: top center;
+          }
+        }
+        
+        /* Print-specific styles */
+        @media print {
+          .scale-container {
+            transform: none !important;
+            padding: 0 !important;
+          }
+        }
+
+        /* Column layout improvements */
+        .resume-content .break-inside-avoid {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+          display: inline-block;
+          width: 100%;
+        }
+
+        .has-columns {
+          column-fill: auto !important;
+        }
+
+        /* Boxed section styles */
+        .resume-content div[style*="backgroundColor"] {
+          margin-bottom: 1rem;
+        }
+      `}</style>
     </main>
   )
 } 
