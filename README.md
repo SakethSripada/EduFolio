@@ -170,6 +170,3 @@ EduFolio uses a PostgreSQL database with the following main tables:
 - Scholarship finder and application tracking
 - College visit planner
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
