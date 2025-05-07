@@ -4,10 +4,12 @@ import type { Metadata } from "next"
 import { Inter, Merriweather, Roboto, Montserrat, Lora, Source_Sans_3, Playfair_Display } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import Navbar from "@/components/layout/Navbar"
+import NetworkStatus from "@/components/NetworkStatus"
 import Footer from "@/components/layout/Footer"
 import { AuthProvider } from "@/components/auth/AuthProvider"
 import { Toaster } from "@/components/ui/toaster"
 import Script from "next/script"
+import ErrorBoundary from "@/components/ErrorBoundary"
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' })
 const merriweather = Merriweather({ subsets: ["latin"], weight: ['300', '400', '700', '900'], variable: '--font-merriweather' })
@@ -43,7 +45,10 @@ export default function RootLayout({
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
             <div className="flex flex-col min-h-screen">
               <Navbar />
-              <main className="flex-grow">{children}</main>
+              <NetworkStatus />
+              <ErrorBoundary>
+                <main className="flex-grow">{children}</main>
+              </ErrorBoundary>
               <Footer />
               <Toaster />
             </div>
